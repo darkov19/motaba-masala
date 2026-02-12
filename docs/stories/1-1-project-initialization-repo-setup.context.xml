@@ -1,0 +1,140 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1</storyId>
+    <title>Project Initialization &amp; Repo Setup</title>
+    <status>drafted</status>
+    <generatedAt>2026-02-12</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-1-project-initialization-repo-setup.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Developer</asA>
+    <iWant>set up the project repository with the correct tech stack and directory structure</iWant>
+    <soThat>the team has a solid, consistent foundation for development</soThat>
+    <tasks>
+- Initialize Wails project (AC: 1, 2)
+    - Run `wails init` with React-TS template
+    - Configure `wails_server.json` and `wails_client.json`
+- Establish Backend structure (AC: 4)
+    - Create `internal/app`, `internal/domain`, `internal/infrastructure` directories
+    - Create `cmd/server/main.go` and `cmd/client/main.go`
+- Configure Frontend environment (AC: 3, 5)
+    - Install `antd`, `@ant-design/icons`, `@tanstack/react-query`, `axios`
+    - Implement `ConfigProvider` with Motaba Deep Maroon (`#7D1111`) theme
+- Verify baseline build (AC: 1)
+    - Run `wails build` for both server and client configurations
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+1. Project Init: Application initializes successfully as a Wails project (Go + React + Vite). [Source: docs/tech-spec-epic-1.md#L152]
+2. Directory Structure: Separate Client/Server entry points are established in `cmd/` as per the dual-binary architecture. [Source: docs/architecture.md#L57-65]
+3. Frontend Setup: React frontend is initialized with Ant Design 6.2.1 using pure CSS variables (token-based theming). [Source: docs/architecture.md#L17-21, L103-118]
+4. Backend Foundation: Go backend follows Hexagonal Architecture patterns with `internal/app`, `internal/domain`, and `internal/infrastructure`. [Source: docs/architecture.md#L37-56]
+5. Dependency Management: Core dependencies (Wails v2.11+, React, AntD, React Query) are correctly tracked in relevant manifests. [Source: docs/tech-spec-epic-1.md#L140-149]
+6. Persistence of bmad: The `bmad` directory is preserved during project initialization and configuration. [Source: docs/epics.md#L78]
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification: Core Foundation &amp; Infrastructure</title>
+        <section>Acceptance Criteria</section>
+        <snippet>Application initializes successfully as a Wails project with correct frontend (React+AntD) and backend (Go) structure.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture: Masala Inventory Management</title>
+        <section>Project Structure</section>
+        <snippet>We follow a Hexagonal Architecture (Ports and Adapters) within the Go backend to keep business logic independent of Wails.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture: Masala Inventory Management</title>
+        <section>Ant Design 6.0 Theme Pattern</section>
+        <snippet>We use the new ConfigProvider with token based theming. NO LESS VARIABLES.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <!-- No existing project code discovered yet - initial setup story -->
+    </code>
+    <dependencies>
+      <dependency>
+        <name>Wails v2</name>
+        <version>^2.11.0</version>
+        <purpose>Desktop Application Wrapper</purpose>
+      </dependency>
+      <dependency>
+        <name>Go</name>
+        <version>1.26</version>
+        <purpose>Backend Runtime</purpose>
+      </dependency>
+      <dependency>
+        <name>React</name>
+        <version>^19.0.0</version>
+        <purpose>Frontend Framework</purpose>
+      </dependency>
+      <dependency>
+        <name>Ant Design</name>
+        <version>^6.2.1</version>
+        <purpose>UI Component Library</purpose>
+      </dependency>
+      <dependency>
+        <name>SQLite</name>
+        <version>^3.51.2</version>
+        <purpose>Local Database</purpose>
+      </dependency>
+      <dependency>
+        <name>golang-migrate</name>
+        <version>^4.19.1</version>
+        <purpose>Schema Migration</purpose>
+      </dependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>
+      <name>Hexagonal Architecture</name>
+      <description>Follow Hexagonal Architecture within the Go backend (internal/app, internal/domain, internal/infrastructure).</description>
+      <source>docs/architecture.md#L37-56</source>
+    </constraint>
+    <constraint>
+      <name>Dual-Binary Entry Points</name>
+      <description>Establish separate cmd/server/main.go and cmd/client/main.go entry points.</description>
+      <source>docs/architecture.md#L57-65</source>
+    </constraint>
+    <constraint>
+      <name>Ant Design 6.0 Token Theming</name>
+      <description>Use Ant Design 6.0 ConfigProvider with token-based theming; avoid legacy LESS variables.</description>
+      <source>docs/architecture.md#L95-118</source>
+    </constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>App Initialization</name>
+      <kind>Orchestrator</kind>
+      <signature>Startup logic for Wails, DB migrations, and service initialization.</signature>
+      <path>cmd/server/main.go</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Follow Go standard testing patterns for the backend and Vitest for the React frontend. Core services must have &gt;80% test coverage.</standards>
+    <locations>
+      <location>internal/app/tests</location>
+      <location>internal/infrastructure/db/migrations/tests</location>
+    </locations>
+    <ideas>
+      <idea>
+        <id>AC1</id>
+        <test>Verify that `wails init` generates the expected directory structure and that both server/client binaries can be built.</test>
+      </idea>
+      <idea>
+        <id>AC4</id>
+        <test>Ensure hexagonal structure is respected by checking that domain logic has no dependencies on Wails or SQLite adapters.</test>
+      </idea>
+    </ideas>
+  </tests>
+</story-context>

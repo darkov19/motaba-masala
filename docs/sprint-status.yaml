@@ -1,0 +1,92 @@
+# generated: 2026-02-12
+# project: masala_inventory_managment
+# project_key: masala_inventory_managment
+# tracking_system: file-system
+# story_location: {project-root}/docs/stories
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic exists in epic file but not contexted
+#   - contexted: Epic tech context created (required before drafting stories)
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - drafted: Story file created in stories folder
+#   - ready-for-dev: Draft approved and story context created
+#   - in-progress: Developer actively working on implementation
+#   - review: Under SM review (via code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - completed: Retrospective has been done
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epics should be 'contexted' before stories can be 'drafted'
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically drafts next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', SM reviews, then Dev moves to 'done'
+
+generated: 2026-02-12
+project: masala_inventory_managment
+project_key: masala_inventory_managment
+tracking_system: file-system
+story_location: "{project-root}/docs/stories"
+
+development_status:
+    # Epic 1: Core Foundation & Infrastructure
+    epic-1: contexted
+    1-1-project-initialization-repo-setup: ready-for-dev
+    1-2-database-schema-migration-system: backlog
+    1-3-hardware-bound-licensing-system: backlog
+    1-4-local-authentication-rbac: backlog
+    1-5-automated-local-backup-service: backlog
+    epic-1-retrospective: optional
+
+    # Epic 2: Master Data & Configuration
+    epic-2: backlog
+    2-1-item-master-management: backlog
+    2-2-unit-conversion-engine: backlog
+    2-3-recipe-bom-management: backlog
+    2-4-supplier-customer-masters: backlog
+    epic-2-retrospective: optional
+
+    # Epic 3: Procurement & Inventory (Inbound)
+    epic-3: backlog
+    3-1-goods-received-note-grn-standard: backlog
+    3-2-lot-tracking-system: backlog
+    3-3-third-party-bulk-procurement: backlog
+    3-4-stock-reconciliation-audit: backlog
+    epic-3-retrospective: optional
+
+    # Epic 4: Production & Processing (The Core)
+    epic-4: backlog
+    4-1-production-batch-creation: backlog
+    4-2-recipe-execution-material-consumption: backlog
+    4-3-bulk-output-wastage-recording: backlog
+    4-4-value-add-cost-validation: backlog
+    epic-4-retrospective: optional
+
+    # Epic 5: Packing & Finished Goods
+    epic-5: backlog
+    5-1-packing-run-creation: backlog
+    5-2-packing-material-consumption: backlog
+    5-3-finished-goods-stock-entry: backlog
+    epic-5-retrospective: optional
+
+    # Epic 6: Sales & Dispatch
+    epic-6: backlog
+    6-1-sales-order-dispatch-note: backlog
+    6-2-fifo-dispatch-suggestion: backlog
+    6-3-invoice-generation-pdf: backlog
+    6-4-sales-returns: backlog
+    epic-6-retrospective: optional
+
+    # Epic 7: Reporting & Analytics
+    epic-7: backlog
+    7-1-real-time-stock-ledger: backlog
+    7-2-wastage-analysis-report: backlog
+    7-3-audit-trail-data-integrity: backlog
+    epic-7-retrospective: optional
