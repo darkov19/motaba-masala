@@ -33,14 +33,15 @@ workflow_status: |
     product-brief: docs/product-brief.md
 
     # Phase 1: Planning
-    prd: required
+    prd: docs/PRD.md
     validate-prd: optional
-    create-design: conditional
+    create-design: docs/ux-design-specification.md
+    create-epics-and-stories: docs/epics.md
 
     # Phase 2: Solutioning
-    create-architecture: required
-    validate-architecture: optional
-    solutioning-gate-check: required
+    create-architecture: docs/architecture.md
+    validate-architecture: docs/validation_report_20260212.md
+    solutioning-gate-check: docs/implementation-readiness-report-2026-02-12.md
 
     # Phase 3: Implementation
     sprint-planning: required

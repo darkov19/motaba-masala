@@ -119,46 +119,43 @@ Unlike standard inventory apps that just count stock, this system models the _tr
 
 ### Deployment Model
 
-- **Server Platform:** Windows-based server installed on customer's existing machine.
-- **Client Access:** Browser-based — clients on LAN open `http://inventory.motaba.internal` (internal DNS) or `http://<server-ip>:<port>`.
-- **Internal DNS:** Configure local DNS so all client machines resolve a friendly domain (e.g., `inventory.motaba.internal`) to the server IP.
-- **No Internet Required:** The application is fully functional without an internet connection.
-- **Updates & Maintenance:** Delivered via on-site technician visits. Software updates packaged for offline installation (USB/local transfer).
-- **Per-Customer Isolation:** Each customer receives a completely independent, standalone deployment. No shared infrastructure between customers.
+- **Architecture:** Client-Server model using **Distributed Wails** applications.
+    - **Server Node:** Windows PC running `Server.exe` (Hosts SQLite DB, API, and Admin UI).
+    - **Client Nodes:** Windows PCs running `Client.exe` (Factory/Store terminals connecting via LAN).
+- **Networking:**
+    - **UDP Discovery:** Client apps automatically find the Server on the LAN (Zero-Config).
+    - **Communication:** Secure JSON-RPC over TCP/HTTP between Client and Server.
+- **No Internet Required:** Fully functional offline LAN ecosystem.
+- **Updates:** Technician updates `Server.exe`; Clients auto-update or are updated via shared folder.
 
 ### Licensing & Subscription
 
 - **Business Model:** Annual subscription per customer deployment.
 - **Hardware-Bound License:**
-    - License key is tied to the server's MAC address / Hardware ID + an encoded expiry date.
-    - License file is cryptographically signed to prevent tampering.
-    - License is validated on every application startup and periodically during use.
+    - **Server Bound:** License is tied strictly to the **Server PC's** Hardware ID (Motherboard + Disk).
+    - **Client Freedom:** Client terminals do NOT require separate licenses; they validate against the Server.
 - **Clock Tamper Protection:**
-    - An encrypted counter file records the "last seen" timestamp on disk.
-    - If the system clock is detected to have moved backward, the application locks immediately with a "Clock Tamper Detected" message.
-    - This prevents license bypass via system clock rollback.
+    - Server maintains encrypted counter file.
+    - Time rollback detection locks the Server App (and thus all Clients).
 - **Expiry Behavior:**
-    - **30-Day Warning Period:** Starting 30 days before expiry, users see a non-dismissible banner: "License expires in X days. Contact support."
-    - **Hard Lock on Expiry:** After the expiry date, the application becomes completely inaccessible. All users see a "License Expired — Contact Support" screen. No data access.
-- **Renewal Process:** Customer contacts vendor → technician visits site → installs new license key file.
+    - **Hard Lock:** On expiry, Server API stops responding. All Clients show "License Expired" screen.
 
 ### API Specification
 
-- **RESTful Core:** Standard REST API structure for all resources (Items, Orders, Batches).
-- **JSON Response:** All API responses in standard JSON format.
-- **LAN-Only Access:** API is only accessible from within the local network.
+- **Internal API:** specialized JSON-RPC for Wails-to-Go communication (Internal) AND Client-to-Server communication (LAN).
+- **LAN-Only Access:** Server listens on specific port (e.g., 8090) accessible only within local subnet.
 
 ### Authentication & Authorization
 
-- **Secure Auth:** JWT-based authentication for session management (LAN-only, no cloud auth).
-- **Password Policy:** Enforce strong passwords for Admin accounts.
-- **Session Timeout:** Auto-logout after 2 hours of inactivity for security.
+- **User-Based RBAC:**
+    - Roles (Admin, Storekeeper, Worker) are tied to **User Accounts**, not Machines.
+    - _Example:_ Admin can log in solely on a Factory Client PC and access full Admin features.
+- **Secure Auth:** Setup SRP (Secure Remote Password) or hashed token exchange for LAN authentication.
 
 ### Multi-User Support
 
-- **Concurrent Users:** Support 4-5 simultaneous users without performance degradation.
-- **Role-Based Sessions:** Each user logs in with their own credentials; actions are attributed to individual users.
-- **No Client Installation Required:** Users only need a modern web browser.
+- **Concurrency:** Support 4-5 simultaneous users (1 Server User + 4 LAN Clients).
+- **Installation:** `Client.exe` installed on factory floor machines.
 
 ---
 
