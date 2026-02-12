@@ -1,0 +1,983 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Motaba Inventory - Final Design Direction</title>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            :root {
+                /* Motaba Modern Theme */
+                --primary: #7d1111;
+                --primary-hover: #5a0c0c;
+                --bg-body: #f8f9fa;
+                --bg-card: #ffffff;
+                --text-main: #0f172a;
+                --text-secondary: #64748b;
+                --border: #e2e8f0;
+                --success: #52c41a;
+                --warning: #faad14;
+                --error: #ff4d4f;
+                --sidebar-width: 240px;
+                --radius-md: 16px;
+                --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+                --shadow-md:
+                    0 4px 6px -1px rgba(0, 0, 0, 0.02),
+                    0 2px 4px -1px rgba(0, 0, 0, 0.02);
+            }
+
+            body {
+                font-family:
+                    "Inter",
+                    -apple-system,
+                    BlinkMacSystemFont,
+                    "Segoe UI",
+                    Roboto,
+                    sans-serif;
+                background-color: var(--bg-body);
+                color: var(--text-main);
+                margin: 0;
+                padding: 0;
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
+
+            /* Top Control Bar */
+            .preview-controls {
+                background: #fff;
+                padding: 10px 20px;
+                border-bottom: 1px solid #ddd;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                z-index: 1000;
+                box-shadow: var(--shadow-sm);
+            }
+
+            .logo-area {
+                font-weight: bold;
+                color: var(--primary);
+                font-size: 1.2rem;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .logo-badge {
+                background: var(--primary);
+                color: white;
+                padding: 2px 8px;
+                border-radius: 6px;
+                font-size: 0.8rem;
+            }
+
+            .role-switcher {
+                display: flex;
+                gap: 10px;
+                background: #f1f5f9;
+                padding: 4px;
+                border-radius: 10px;
+            }
+
+            .role-btn {
+                padding: 8px 16px;
+                border: none;
+                background: transparent;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                color: var(--text-secondary);
+                transition: all 0.2s;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-family: inherit;
+            }
+
+            .role-btn:hover {
+                background: #e2e8f0;
+                color: var(--text-main);
+            }
+            .role-btn.active {
+                background: #fff;
+                color: var(--primary);
+                box-shadow: var(--shadow-sm);
+                font-weight: 600;
+            }
+
+            /* Viewport Container */
+            .viewport {
+                flex: 1;
+                position: relative;
+                overflow: hidden;
+                background: #e2e8f0; /* framing background */
+                padding: 20px;
+            }
+
+            /* Mockup Containers */
+            .mockup-frame {
+                background: var(--bg-body);
+                width: 100%;
+                height: 100%;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+                border-radius: var(--radius-md);
+                overflow: hidden;
+                display: none; /* hidden by default */
+                flex-direction: row;
+            }
+
+            .mockup-frame.active {
+                display: flex;
+            }
+
+            /* --- Shared Components --- */
+            .sidebar {
+                width: var(--sidebar-width);
+                background: #fff;
+                border-right: 1px solid var(--border);
+                color: var(--text-secondary);
+                display: flex;
+                flex-direction: column;
+            }
+
+            /* Modern Sidebar Header */
+            .sidebar-header {
+                height: 70px;
+                display: flex;
+                align-items: center;
+                padding: 0 24px;
+                font-weight: bold;
+                font-size: 1.4rem;
+                color: var(--primary);
+            }
+
+            .sidebar-menu-item {
+                padding: 12px 16px;
+                cursor: pointer;
+                display: flex;
+                gap: 12px;
+                align-items: center;
+                margin: 4px 16px;
+                border-radius: 8px;
+                font-weight: 500;
+                transition: all 0.2s;
+            }
+
+            .sidebar-menu-item:hover {
+                background: #f1f5f9;
+                color: var(--text-main);
+            }
+            .sidebar-menu-item.active {
+                background: #fff1f2;
+                color: var(--primary);
+            }
+
+            .main-content {
+                flex: 1;
+                background: var(--bg-body);
+                display: flex;
+                flex-direction: column;
+                overflow: auto;
+            }
+
+            .header {
+                height: 70px;
+                background: #fff;
+                padding: 0 32px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                box-shadow: var(--shadow-sm);
+                z-index: 10;
+            }
+
+            .content-body {
+                padding: 32px;
+            }
+
+            .card {
+                background: #fff;
+                padding: 24px;
+                border-radius: var(--radius-md);
+                box-shadow: var(--shadow-md);
+                margin-bottom: 24px;
+            }
+
+            /* --- Admin Dashboard Specifics --- */
+            .kpi-grid {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 24px;
+                margin-bottom: 24px;
+            }
+            @media (max-width: 1100px) {
+                .kpi-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+            }
+
+            .kpi-card {
+                background: #fff;
+                padding: 24px;
+                border-radius: var(--radius-md);
+                box-shadow: var(--shadow-md);
+                position: relative;
+                overflow: hidden;
+                height: 100%;
+                box-sizing: border-box;
+            }
+
+            .kpi-card::before {
+                content: "";
+                position: absolute;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                width: 4px;
+                background: currentColor;
+                opacity: 0.8;
+                border-radius: 4px 0 0 4px;
+            }
+
+            .kpi-val {
+                font-size: 28px;
+                font-weight: 700;
+                color: var(--text-main);
+                margin: 8px 0;
+                letter-spacing: -0.5px;
+            }
+            .kpi-label {
+                font-size: 14px;
+                color: var(--text-secondary);
+                font-weight: 500;
+            }
+            .kpi-trend {
+                font-size: 13px;
+                margin-top: 4px;
+                font-weight: 500;
+            }
+            .trend-up {
+                color: var(--success);
+            }
+            .trend-down {
+                color: var(--error);
+            }
+
+            .pipeline-container {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 40px;
+                background: #fff;
+                border-radius: var(--radius-md);
+                box-shadow: var(--shadow-md);
+                margin-bottom: 24px;
+            }
+            .pipeline-stage {
+                text-align: center;
+                flex: 1;
+                position: relative;
+            }
+            .pipeline-val {
+                font-size: 32px;
+                font-weight: 700;
+                color: var(--primary);
+                letter-spacing: -1px;
+            }
+            .pipeline-arrow {
+                font-size: 24px;
+                color: #cbd5e1;
+            }
+            .sub-badge {
+                font-size: 13px;
+                color: #94a3b8;
+                background: #f1f5f9;
+                display: inline-block;
+                padding: 4px 12px;
+                border-radius: 20px;
+                margin-top: 8px;
+                font-weight: 500;
+            }
+
+            /* Modern Table */
+            .modern-table {
+                width: 100%;
+                text-align: left;
+                border-collapse: separate;
+                border-spacing: 0 8px;
+            }
+            .modern-table th {
+                color: var(--text-secondary);
+                font-size: 0.85rem;
+                padding: 0 20px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            .modern-table td {
+                background: #fff;
+                padding: 20px;
+                transition: transform 0.2s;
+            }
+            .modern-table tr:hover td {
+                transform: scale(1.005);
+                box-shadow: var(--shadow-sm);
+                z-index: 1;
+            }
+
+            .modern-table td:first-child {
+                border-radius: 12px 0 0 12px;
+            }
+            .modern-table td:last-child {
+                border-radius: 0 12px 12px 0;
+            }
+
+            .row-shadow {
+                box-shadow: var(--shadow-sm);
+            }
+
+            .btn-modern {
+                background: var(--primary);
+                color: white;
+                border-radius: 8px;
+                padding: 8px 16px;
+                border: none;
+                font-weight: 600;
+                box-shadow: 0 4px 10px -2px rgba(125, 17, 17, 0.3);
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .btn-modern:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 6px 15px -2px rgba(125, 17, 17, 0.4);
+            }
+
+            .btn-secondary {
+                border: 1px solid var(--border);
+                background: #fff;
+                color: var(--text-secondary);
+                padding: 6px 14px;
+                border-radius: 8px;
+                font-weight: 600;
+                cursor: pointer;
+                font-size: 0.9rem;
+            }
+            .btn-secondary:hover {
+                border-color: #cbd5e1;
+                color: var(--text-main);
+            }
+
+            /* Input */
+            .search-input {
+                padding: 10px 16px;
+                border-radius: 10px;
+                border: 1px solid var(--border);
+                width: 300px;
+                background: #f8fafc;
+                color: var(--text-main);
+                outline: none;
+                transition: all 0.2s;
+            }
+            .search-input:focus {
+                background: #fff;
+                border-color: var(--primary);
+                box-shadow: 0 0 0 3px rgba(125, 17, 17, 0.1);
+            }
+
+            /* --- Data Entry Hub Specifics --- */
+            .hub-container {
+                max-width: 1000px;
+                margin: 0 auto;
+                width: 100%;
+            }
+            .sidebar-light {
+                width: 80px;
+                align-items: center;
+                justify-content: flex-start;
+                padding-top: 20px;
+            }
+
+            .actions-grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 24px;
+                margin-bottom: 40px;
+            }
+
+            .action-btn {
+                background: #fff;
+                border: 1px solid var(--border);
+                border-radius: 16px;
+                padding: 32px;
+                text-align: center;
+                cursor: pointer;
+                transition: all 0.2s;
+                box-shadow: var(--shadow-sm);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 200px;
+            }
+
+            .action-btn:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+                border-color: var(--primary);
+            }
+
+            .action-icon {
+                font-size: 48px;
+                margin-bottom: 16px;
+                display: block;
+            }
+            .action-title {
+                font-size: 18px;
+                font-weight: 700;
+                color: var(--text-main);
+                margin-bottom: 8px;
+            }
+            .action-desc {
+                font-size: 14px;
+                color: var(--text-secondary);
+            }
+
+            .recent-list {
+                background: #fff;
+                border-radius: 12px;
+                border: 1px solid var(--border);
+                overflow: hidden;
+                box-shadow: var(--shadow-sm);
+            }
+            .recent-header {
+                padding: 16px 24px;
+                border-bottom: 1px solid var(--border);
+                font-weight: 600;
+                background: #f8fafc;
+                display: flex;
+                justify-content: space-between;
+            }
+            .recent-item {
+                padding: 16px 24px;
+                border-bottom: 1px solid var(--border);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .recent-item:last-child {
+                border-bottom: none;
+            }
+
+            .status-tag {
+                padding: 4px 10px;
+                border-radius: 20px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            .status-pending {
+                background: #e0f2fe;
+                color: #0284c7;
+            }
+            .status-done {
+                background: #dcfce7;
+                color: #16a34a;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="preview-controls">
+            <div class="logo-area">
+                <span>Motaba Inventory</span>
+                <span class="logo-badge">FINAL DESIGN</span>
+            </div>
+            <div class="role-switcher">
+                <button class="role-btn active" onclick="showRole('admin')">
+                    <span>✨</span> Admin Modern Clean
+                </button>
+                <button class="role-btn" onclick="showRole('entry')">
+                    <span>⚡</span> Data Entry Hub
+                </button>
+            </div>
+            <div style="font-size: 0.9rem; color: #666">
+                Viewing:
+                <strong id="current-view-name">Admin Dashboard (Modern)</strong>
+            </div>
+        </div>
+
+        <div class="viewport">
+            <!-- === ADMIN ROLE: MODERN DASHBOARD === -->
+            <div class="mockup-frame active" id="mockup-admin">
+                <div class="sidebar">
+                    <div class="sidebar-header">🔴 Motaba</div>
+                    <!-- Menu -->
+                    <div class="sidebar-menu-item active">
+                        <span>📊</span> Dashboard
+                    </div>
+                    <div class="sidebar-menu-item">
+                        <span>📦</span> Stock Ledger
+                    </div>
+                    <div class="sidebar-menu-item">
+                        <span>🏭</span> Production
+                    </div>
+                    <div class="sidebar-menu-item">
+                        <span>👥</span> Suppliers
+                    </div>
+                    <div class="sidebar-menu-item"><span>📈</span> Reports</div>
+                    <div class="sidebar-menu-item">
+                        <span>⚙️</span> Settings
+                    </div>
+
+                    <div
+                        style="
+                            margin-top: auto;
+                            padding: 24px;
+                            border-top: 1px solid var(--border);
+                        "
+                    >
+                        <div
+                            style="
+                                display: flex;
+                                align-items: center;
+                                gap: 12px;
+                            "
+                        >
+                            <div
+                                style="
+                                    width: 40px;
+                                    height: 40px;
+                                    background: #e2e8f0;
+                                    border-radius: 50%;
+                                "
+                            ></div>
+                            <div style="font-size: 0.9rem">
+                                <div
+                                    style="
+                                        font-weight: 700;
+                                        color: var(--text-main);
+                                    "
+                                >
+                                    Darko
+                                </div>
+                                <div
+                                    style="
+                                        font-size: 0.8rem;
+                                        color: var(--text-secondary);
+                                    "
+                                >
+                                    Admin
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="main-content">
+                    <div class="header">
+                        <h3
+                            style="
+                                font-weight: 700;
+                                font-size: 1.5rem;
+                                margin: 0;
+                                letter-spacing: -0.5px;
+                            "
+                        >
+                            Dashboard
+                        </h3>
+                        <input
+                            type="text"
+                            placeholder="Search orders, items, batches..."
+                            class="search-input"
+                        />
+                    </div>
+
+                    <div class="content-body">
+                        <!-- KPI Cards (Modern) -->
+                        <div class="kpi-grid">
+                            <div class="kpi-card" style="color: var(--success)">
+                                <div class="kpi-label">Total Stock Value</div>
+                                <div class="kpi-val">₹ 42.5 Lakh</div>
+                                <div class="kpi-trend trend-up">
+                                    ▲ 12% vs last month
+                                </div>
+                            </div>
+                            <div class="kpi-card" style="color: var(--primary)">
+                                <div class="kpi-label">Active Batches</div>
+                                <div class="kpi-val">8</div>
+                                <div class="kpi-trend">All on schedule</div>
+                            </div>
+                            <div class="kpi-card" style="color: var(--warning)">
+                                <div class="kpi-label">Low Stock Items</div>
+                                <div class="kpi-val">3</div>
+                                <div
+                                    class="kpi-trend column-red"
+                                    style="
+                                        color: var(--error);
+                                        cursor: pointer;
+                                        text-decoration: underline;
+                                    "
+                                >
+                                    View Items
+                                </div>
+                            </div>
+                            <div class="kpi-card" style="color: #0ea5e9">
+                                <div class="kpi-label">Pending Orders</div>
+                                <div class="kpi-val">12</div>
+                                <div class="kpi-trend">4 Critical</div>
+                            </div>
+                        </div>
+
+                        <!-- Value Pipeline (Modern) -->
+                        <div class="pipeline-container">
+                            <div class="pipeline-stage">
+                                <div
+                                    style="
+                                        color: var(--text-secondary);
+                                        margin-bottom: 12px;
+                                        font-weight: 600;
+                                    "
+                                >
+                                    Raw Materials
+                                </div>
+                                <div class="pipeline-val">₹ 20.5 L</div>
+                                <div class="sub-badge">124 Items</div>
+                            </div>
+
+                            <div class="pipeline-arrow">➔</div>
+
+                            <div class="pipeline-stage">
+                                <div
+                                    style="
+                                        color: var(--text-secondary);
+                                        margin-bottom: 12px;
+                                        font-weight: 600;
+                                    "
+                                >
+                                    Work in Progress
+                                </div>
+                                <div class="pipeline-val">₹ 15.2 L</div>
+                                <div class="sub-badge">8 Batches</div>
+                            </div>
+
+                            <div class="pipeline-arrow">➔</div>
+
+                            <div class="pipeline-stage">
+                                <div
+                                    style="
+                                        color: var(--text-secondary);
+                                        margin-bottom: 12px;
+                                        font-weight: 600;
+                                    "
+                                >
+                                    Finished Goods
+                                </div>
+                                <div class="pipeline-val">₹ 7.5 L</div>
+                                <div class="sub-badge">Ready to Ship</div>
+                            </div>
+                        </div>
+
+                        <!-- Modern Table -->
+                        <div
+                            class="card"
+                            style="
+                                border: none;
+                                box-shadow: none;
+                                background: transparent;
+                                padding: 0;
+                            "
+                        >
+                            <div
+                                style="
+                                    display: flex;
+                                    justify-content: space-between;
+                                    align-items: center;
+                                    margin-bottom: 20px;
+                                "
+                            >
+                                <h4
+                                    style="
+                                        margin: 0;
+                                        font-size: 1.1rem;
+                                        font-weight: 700;
+                                    "
+                                >
+                                    Critical Alerts
+                                </h4>
+                                <button class="btn-modern">Resolve All</button>
+                            </div>
+                            <table class="modern-table">
+                                <thead>
+                                    <tr>
+                                        <th>Item/Alert</th>
+                                        <th>Severity</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="row-shadow">
+                                        <td>
+                                            <strong>Cumin Seeds</strong>
+                                            <span
+                                                style="
+                                                    color: var(
+                                                        --text-secondary
+                                                    );
+                                                "
+                                                >below min level (50kg)</span
+                                            >
+                                        </td>
+                                        <td>
+                                            <span
+                                                style="
+                                                    color: var(--error);
+                                                    background: #fef2f2;
+                                                    padding: 4px 12px;
+                                                    border-radius: 20px;
+                                                    font-size: 12px;
+                                                    font-weight: 700;
+                                                "
+                                                >High</span
+                                            >
+                                        </td>
+                                        <td>
+                                            <button class="btn-secondary">
+                                                Order Stock
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <!-- Spacer -->
+                                    </tr>
+                                    <tr class="row-shadow">
+                                        <td>
+                                            <strong>Batch #402</strong>
+                                            <span
+                                                style="
+                                                    color: var(
+                                                        --text-secondary
+                                                    );
+                                                "
+                                                >quality check pending</span
+                                            >
+                                        </td>
+                                        <td>
+                                            <span
+                                                style="
+                                                    color: var(--warning);
+                                                    background: #fffbeb;
+                                                    padding: 4px 12px;
+                                                    border-radius: 20px;
+                                                    font-size: 12px;
+                                                    font-weight: 700;
+                                                "
+                                                >Medium</span
+                                            >
+                                        </td>
+                                        <td>
+                                            <button class="btn-secondary">
+                                                Review Batch
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- === DATA ENTRY ROLE: ACTION HUB === -->
+            <div class="mockup-frame" id="mockup-entry">
+                <div class="sidebar sidebar-light">
+                    <div
+                        class="sidebar-menu-item active"
+                        title="Hub"
+                        style="justify-content: center; padding: 20px 0"
+                    >
+                        🏠
+                    </div>
+                    <div
+                        class="sidebar-menu-item"
+                        title="Search"
+                        style="justify-content: center; padding: 20px 0"
+                    >
+                        🔍
+                    </div>
+                    <div
+                        class="sidebar-menu-item"
+                        title="Profile"
+                        style="justify-content: center; padding: 20px 0"
+                    >
+                        👤
+                    </div>
+                </div>
+
+                <div class="main-content" style="background: #f5f7fa">
+                    <div class="header">
+                        <h3 style="font-weight: 700">Storekeeper Hub</h3>
+                        <button
+                            style="
+                                border: none;
+                                background: none;
+                                color: var(--primary);
+                                font-weight: bold;
+                                cursor: pointer;
+                            "
+                        >
+                            Log Out
+                        </button>
+                    </div>
+
+                    <div class="content-body">
+                        <div class="hub-container">
+                            <div style="margin-bottom: 30px">
+                                <h1
+                                    style="
+                                        color: var(--primary);
+                                        font-weight: 800;
+                                        letter-spacing: -1px;
+                                    "
+                                >
+                                    Good Morning, Mahesh!
+                                </h1>
+                                <p
+                                    style="
+                                        color: var(--text-secondary);
+                                        font-size: 1.1rem;
+                                    "
+                                >
+                                    Ready for high-speed entry. Scanner is
+                                    connected.
+                                </p>
+                            </div>
+
+                            <!-- Big Action Buttons -->
+                            <div class="actions-grid">
+                                <div class="action-btn">
+                                    <span class="action-icon">📥</span>
+                                    <div class="action-title">Inward (GRN)</div>
+                                    <div class="action-desc">
+                                        Receive Raw Materials
+                                    </div>
+                                </div>
+                                <div class="action-btn">
+                                    <span class="action-icon">📤</span>
+                                    <div class="action-title">Dispatch</div>
+                                    <div class="action-desc">
+                                        Ship Finished Goods
+                                    </div>
+                                </div>
+                                <div class="action-btn">
+                                    <span class="action-icon">🍳</span>
+                                    <div class="action-title">Production</div>
+                                    <div class="action-desc">
+                                        Create/Manage Batch
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Recent Activity -->
+                            <div class="recent-list">
+                                <div class="recent-header">
+                                    <span>Recent Transactions</span>
+                                    <a
+                                        href="#"
+                                        style="
+                                            font-weight: 600;
+                                            color: var(--primary);
+                                            text-decoration: none;
+                                        "
+                                        >View All</a
+                                    >
+                                </div>
+                                <div class="recent-item">
+                                    <div>
+                                        <div style="font-weight: 600">
+                                            GRN #4922 - SpiceWorld Impex
+                                        </div>
+                                        <div
+                                            style="
+                                                font-size: 12px;
+                                                color: var(--text-secondary);
+                                            "
+                                        >
+                                            Today, 10:42 AM • 4 Items
+                                        </div>
+                                    </div>
+                                    <span class="status-tag status-done"
+                                        >Completed</span
+                                    >
+                                </div>
+                                <div class="recent-item">
+                                    <div>
+                                        <div style="font-weight: 600">
+                                            Dispatch #9021 - Local Mart
+                                        </div>
+                                        <div
+                                            style="
+                                                font-size: 12px;
+                                                color: var(--text-secondary);
+                                            "
+                                        >
+                                            Today, 09:15 AM • 120 Pkts
+                                        </div>
+                                    </div>
+                                    <span class="status-tag status-pending"
+                                        >In Packing</span
+                                    >
+                                </div>
+                                <div class="recent-item">
+                                    <div>
+                                        <div style="font-weight: 600">
+                                            Batch #500 - Garam Masala
+                                        </div>
+                                        <div
+                                            style="
+                                                font-size: 12px;
+                                                color: var(--text-secondary);
+                                            "
+                                        >
+                                            Yesterday, 4:00 PM
+                                        </div>
+                                    </div>
+                                    <span class="status-tag status-done"
+                                        >Stored</span
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const views = {
+                admin: "Admin Dashboard (Modern)",
+                entry: "Data Entry Action Hub (Speed)",
+            };
+
+            function showRole(role) {
+                // Update buttons
+                document
+                    .querySelectorAll(".role-btn")
+                    .forEach(btn => btn.classList.remove("active"));
+                event.currentTarget.classList.add("active");
+
+                // Update Mockups
+                document
+                    .querySelectorAll(".mockup-frame")
+                    .forEach(frame => frame.classList.remove("active"));
+                document
+                    .getElementById("mockup-" + role)
+                    .classList.add("active");
+
+                // Update Title
+                document.getElementById("current-view-name").innerText =
+                    views[role];
+            }
+        </script>
+    </body>
+</html>

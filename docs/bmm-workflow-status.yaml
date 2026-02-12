@@ -1,0 +1,46 @@
+# Workflow Status Template
+# This tracks progress through BMM methodology phases
+# Phase 3/4 (Implementation) is tracked separately in sprint-status.yaml
+
+# generated: 2026-02-12
+# project: masala_inventory_managment
+# project_type: software
+# selected_track: method
+# field_type: greenfield
+# workflow_path: bmad/bmm/workflows/workflow-status/paths/method-greenfield.yaml
+
+# STATUS DEFINITIONS:
+# ==================
+# Initial Status (before completion):
+#   - required: Must be completed to progress
+#   - optional: Can be completed but not required
+#   - recommended: Strongly suggested but not required
+#   - conditional: Required only if certain conditions met (e.g., if_has_ui)
+#
+# Completion Status:
+#   - {file-path}: File created/found (e.g., "docs/product-brief.md")
+#   - skipped: Optional/conditional workflow that was skipped
+
+generated: "2026-02-12"
+project: "masala_inventory_managment"
+project_type: "software"
+selected_track: "method"
+field_type: "greenfield"
+workflow_path: "bmad/bmm/workflows/workflow-status/paths/method-greenfield.yaml"
+
+workflow_status: |
+    # Phase 0: Discovery (Optional)
+    product-brief: docs/product-brief.md
+
+    # Phase 1: Planning
+    prd: required
+    validate-prd: optional
+    create-design: conditional
+
+    # Phase 2: Solutioning
+    create-architecture: required
+    validate-architecture: optional
+    solutioning-gate-check: required
+
+    # Phase 3: Implementation
+    sprint-planning: required

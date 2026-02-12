@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Motaba Inventory UX - Color Theme Visualizer</title>
+        <style>
+            :root {
+                /* Base Variables - Will be overridden by JS */
+                --primary: #7d1111;
+                --primary-hover: #5a0c0c;
+                --bg-body: #ffffff;
+                --bg-card: #f7f7f7;
+                --text-main: #000000;
+                --text-secondary: #434343;
+                --border: #d9d9d9;
+                --success: #52c41a;
+                --warning: #faad14;
+                --error: #ff4d4f;
+                --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            }
+
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    "Helvetica Neue", Arial, sans-serif;
+                background-color: var(--bg-body);
+                color: var(--text-main);
+                margin: 0;
+                padding: 20px;
+                transition: all 0.3s ease;
+            }
+
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+
+            header {
+                margin-bottom: 40px;
+                text-align: center;
+            }
+
+            h1 {
+                margin-bottom: 10px;
+            }
+            p.subtitle {
+                color: var(--text-secondary);
+            }
+
+            .theme-switcher {
+                display: flex;
+                justify-content: center;
+                gap: 20px;
+                margin-bottom: 40px;
+            }
+
+            .theme-btn {
+                padding: 12px 24px;
+                border: 2px solid transparent;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 600;
+                background: #fff;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                transition: all 0.2s;
+                color: #333;
+            }
+
+            .theme-btn:hover {
+                transform: translateY(-2px);
+            }
+            .theme-btn.active {
+                border-color: var(--primary);
+                background: var(--primary);
+                color: white;
+            }
+
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                gap: 30px;
+            }
+
+            .card {
+                background: var(--bg-card);
+                border-radius: 8px;
+                padding: 24px;
+                box-shadow: var(--shadow);
+                border: 1px solid var(--border);
+            }
+
+            h2 {
+                margin-top: 0;
+                font-size: 1.25rem;
+                border-bottom: 1px solid var(--border);
+                padding-bottom: 12px;
+                margin-bottom: 20px;
+            }
+
+            /* Component Styles mimicking Ant Design */
+            .btn {
+                padding: 6px 16px;
+                border-radius: 6px;
+                border: 1px solid transparent;
+                cursor: pointer;
+                font-size: 14px;
+                transition: all 0.2s;
+                margin-right: 8px;
+                margin-bottom: 8px;
+            }
+
+            .btn-primary {
+                background: var(--primary);
+                color: white;
+            }
+            .btn-primary:hover {
+                background: var(--primary-hover);
+            }
+
+            .btn-default {
+                border-color: var(--border);
+                background: var(--bg-card);
+                color: var(--text-main);
+            }
+            .btn-default:hover {
+                border-color: var(--primary);
+                color: var(--primary);
+            }
+
+            .input {
+                padding: 6px 12px;
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                background: var(--bg-card);
+                color: var(--text-main);
+                width: 100%;
+                margin-bottom: 12px;
+            }
+            .input:focus {
+                outline: none;
+                border-color: var(--primary);
+                box-shadow: 0 0 0 2px rgba(125, 17, 17, 0.2);
+            }
+
+            .tag {
+                display: inline-block;
+                padding: 2px 8px;
+                border-radius: 4px;
+                font-size: 12px;
+                border: 1px solid;
+                margin-right: 4px;
+            }
+
+            .tag-success {
+                background: #f6ffed;
+                border-color: #b7eb8f;
+                color: #52c41a;
+            }
+            .tag-error {
+                background: #fff2f0;
+                border-color: #ffccc7;
+                color: #ff4d4f;
+            }
+            .tag-processing {
+                background: #e6f7ff;
+                border-color: #91d5ff;
+                color: #1890ff;
+            }
+
+            .alert {
+                padding: 12px;
+                border: 1px solid;
+                border-radius: 6px;
+                margin-bottom: 12px;
+                display: flex;
+                align-items: center;
+            }
+            .alert-info {
+                background: #e6f7ff;
+                border-color: #91d5ff;
+                color: #000;
+            }
+            .alert-error {
+                background: #fff2f0;
+                border-color: #ffccc7;
+                color: #000;
+            }
+
+            /* Stock Table Simulation */
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 14px;
+            }
+            th {
+                text-align: left;
+                background: rgba(0, 0, 0, 0.05);
+                padding: 12px;
+                border-bottom: 1px solid var(--border);
+                color: var(--text-secondary);
+                font-weight: 600;
+            }
+            td {
+                padding: 12px;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .swatch-container {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 20px;
+            }
+            .swatch {
+                width: 60px;
+                height: 60px;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 10px;
+                color: white;
+                flex-direction: column;
+                text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            }
+            .swatch span {
+                margin-top: 4px;
+                background: rgba(0, 0, 0, 0.3);
+                padding: 2px 4px;
+                border-radius: 4px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>🎨 Motaba Inventory - Theme Visualizer</h1>
+                <p class="subtitle">
+                    Select a theme to see how it affects the factory dashboard
+                    experience
+                </p>
+            </header>
+
+            <div class="theme-switcher">
+                <button class="theme-btn active" onclick="setTheme('classic')">
+                    🛑 Motaba Classic
+                    <div
+                        style="
+                            font-size: 0.8em;
+                            font-weight: normal;
+                            margin-top: 4px;
+                        "
+                    >
+                        High Contrast Pattern
+                    </div>
+                </button>
+                <button class="theme-btn" onclick="setTheme('dark')">
+                    🌚 Factory Dark
+                    <div
+                        style="
+                            font-size: 0.8em;
+                            font-weight: normal;
+                            margin-top: 4px;
+                        "
+                    >
+                        Low-Light Optimized
+                    </div>
+                </button>
+                <button class="theme-btn" onclick="setTheme('modern')">
+                    🏢 Modern Spice
+                    <div
+                        style="
+                            font-size: 0.8em;
+                            font-weight: normal;
+                            margin-top: 4px;
+                        "
+                    >
+                        Softer Enterprise
+                    </div>
+                </button>
+            </div>
+
+            <!-- Color Palette Display -->
+            <div class="card" style="margin-bottom: 30px">
+                <h2 id="palette-title">Selected Palette: Motaba Classic</h2>
+                <div class="swatch-container">
+                    <div
+                        class="swatch"
+                        id="s-primary"
+                        style="background: var(--primary)"
+                    >
+                        Pri.<span>Brand</span>
+                    </div>
+                    <div
+                        class="swatch"
+                        id="s-success"
+                        style="background: var(--success)"
+                    >
+                        Good<span>Stock</span>
+                    </div>
+                    <div
+                        class="swatch"
+                        id="s-warning"
+                        style="background: var(--warning)"
+                    >
+                        Warn<span>Low</span>
+                    </div>
+                    <div
+                        class="swatch"
+                        id="s-error"
+                        style="background: var(--error)"
+                    >
+                        Crit<span>Empty</span>
+                    </div>
+                    <div
+                        class="swatch"
+                        id="s-bg"
+                        style="
+                            background: var(--bg-body);
+                            color: var(--text-main);
+                            border: 1px solid var(--border);
+                            text-shadow: none;
+                        "
+                    >
+                        Bg<span>Base</span>
+                    </div>
+                </div>
+                <p
+                    id="theme-desc"
+                    style="color: var(--text-secondary); line-height: 1.5"
+                >
+                    <strong>Motaba Classic:</strong> High contrast deep maroon
+                    against stark white. Best for readability in bright factory
+                    environments. Matches the logo perfectly.
+                </p>
+            </div>
+
+            <div class="grid">
+                <!-- Component Showcase -->
+                <div class="card">
+                    <h2>Primary Actions (Batch & GRN)</h2>
+                    <div style="margin-bottom: 20px">
+                        <button class="btn btn-primary">
+                            Create Production Batch
+                        </button>
+                        <button class="btn btn-default">Export Report</button>
+                        <button
+                            class="btn btn-default"
+                            disabled
+                            style="opacity: 0.5; cursor: not-allowed"
+                        >
+                            Disabled
+                        </button>
+                    </div>
+
+                    <label
+                        style="
+                            font-size: 12px;
+                            color: var(--text-secondary);
+                            display: block;
+                            margin-bottom: 4px;
+                            font-weight: 500;
+                        "
+                        >Search Stock</label
+                    >
+                    <input
+                        type="text"
+                        class="input"
+                        placeholder="Scan barcode or type item name..."
+                    />
+
+                    <div class="alert alert-info">
+                        ℹ️ <strong>System Note:</strong> 3 new GRNs pending
+                        approval.
+                    </div>
+                </div>
+
+                <!-- Stock Grid Visualization -->
+                <div class="card" id="grid-card">
+                    <h2>Live Stock View</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Stock</th>
+                                <th>Status</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Chili Whole (Raw)</td>
+                                <td>5,200 KG</td>
+                                <td><span class="tag tag-success">OK</span></td>
+                                <td>₹12.5L</td>
+                            </tr>
+                            <tr>
+                                <td>Garam Masala (Bulk)</td>
+                                <td>120 KG</td>
+                                <td>
+                                    <span class="tag tag-error">CRITICAL</span>
+                                </td>
+                                <td>₹85K</td>
+                            </tr>
+                            <tr>
+                                <td>Turmeric Powder</td>
+                                <td>850 KG</td>
+                                <td>
+                                    <span class="tag tag-processing"
+                                        >In Pro..</span
+                                    >
+                                </td>
+                                <td>₹1.2L</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const themes = {
+                classic: {
+                    "--primary": "#7D1111", // Deep Motaba Maroon
+                    "--primary-hover": "#5a0c0c",
+                    "--bg-body": "#ffffff",
+                    "--bg-card": "#f7f7f7",
+                    "--text-main": "#000000",
+                    "--text-secondary": "#434343",
+                    "--border": "#d9d9d9",
+                    "--shadow": "0 2px 8px rgba(0,0,0,0.1)",
+                    desc: "<strong>Motaba Classic:</strong> High contrast deep maroon against stark white. Best for readability in bright factory environments. Matches the logo perfectly.",
+                },
+                dark: {
+                    "--primary": "#ff4d4f", // Lighter Red for visibility on dark
+                    "--primary-hover": "#cf1322",
+                    "--bg-body": "#141414",
+                    "--bg-card": "#1f1f1f",
+                    "--text-main": "#ffffff",
+                    "--text-secondary": "#a6a6a6",
+                    "--border": "#303030",
+                    "--shadow": "0 4px 12px rgba(0,0,0,0.5)",
+                    desc: "<strong>Factory Dark:</strong> Optimized for low-light conditions. Reduces eye strain for long shifts. Uses a lighter red for contrast against the dark background.",
+                },
+                modern: {
+                    "--primary": "#7D1111",
+                    "--primary-hover": "#5a0c0c",
+                    "--bg-body": "#f0f2f5", // Ant Design default grey
+                    "--bg-card": "#ffffff",
+                    "--text-main": "#000000",
+                    "--text-secondary": "#666666",
+                    "--border": "#e8e8e8",
+                    "--shadow": "0 4px 12px rgba(0,0,0,0.08)",
+                    desc: "<strong>Modern Spice:</strong> Softer shadows and off-white backgrounds standard in modern SaaS. Less harsh than Classic, but still branded.",
+                },
+            };
+
+            function setTheme(themeName) {
+                const root = document.documentElement;
+                const theme = themes[themeName];
+
+                // Update CSS Variables
+                for (const [key, value] of Object.entries(theme)) {
+                    if (key !== "desc") root.style.setProperty(key, value);
+                }
+
+                // Update Description & Title
+                document.getElementById("theme-desc").innerHTML = theme.desc;
+
+                const titles = {
+                    classic: "Selected Palette: Motaba Classic",
+                    dark: "Selected Palette: Factory Dark",
+                    modern: "Selected Palette: Modern Spice",
+                };
+                document.getElementById("palette-title").innerText =
+                    titles[themeName];
+
+                // Update Active Button
+                document
+                    .querySelectorAll(".theme-btn")
+                    .forEach(btn => btn.classList.remove("active"));
+                // Find the button that triggered this function
+                const buttons = document.querySelectorAll(".theme-btn");
+                if (themeName === "classic") buttons[0].classList.add("active");
+                if (themeName === "dark") buttons[1].classList.add("active");
+                if (themeName === "modern") buttons[2].classList.add("active");
+            }
+        </script>
+    </body>
+</html>
