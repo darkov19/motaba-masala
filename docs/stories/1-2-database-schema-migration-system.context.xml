@@ -1,0 +1,114 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>2</storyId>
+    <title>Database Schema & Migration System</title>
+    <status>drafted</status>
+    <generatedAt>2026-02-13</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-2-database-schema-migration-system.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Developer</asA>
+    <iWant>a robust local database setup with a migration strategy</iWant>
+    <soThat>we can reliably store data and handle schema updates on client machines without data loss</soThat>
+    <tasks>
+- Initialize Database Infrastructure (AC: 1, 2)
+    - Set up internal/infrastructure/db package
+    - Implement SQLite connection manager with WAL mode enabled
+    - Integrate golang-migrate with sqlite3 driver
+- Create Schema Migrations (AC: 3, 4)
+    - Create migrations/ directory and initial .sql files
+    - Implement users and roles table schema
+    - Implement items table schema
+    - Implement stock_ledger table schema
+- Integration and Verification (AC: 2, 3, 5)
+    - Use go:embed to include migrations in the binary
+    - Trigger migration check on Server startup in cmd/server/main.go
+    - Implement basic logging for migration status
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+1. **Database Manager**: `DatabaseManager` implemented in `internal/infrastructure/db` to handle SQLite connections.
+2. **Migration Integration**: `golang-migrate` integrated into the application startup flow.
+3. **Embedded Migrations**: SQL migration files are embedded in the binary and applied automatically on startup.
+4. **Initial Schema**: Tables for `users`, `roles`, `items`, and `stock_ledger` created via migrations.
+5. **Performance Configuration**: SQLite configured in WAL mode for optimized concurrency.
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <artifact>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification: Core Foundation & Infrastructure</title>
+        <section>Detailed Design - Database Manager</section>
+        <snippet>Manages SQLite connection and migrations via golang-migrate. SQLite in WAL mode to support simultaneous reads/writes from multiple LAN clients.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/architecture.md</path>
+        <title>Architecture: Masala Inventory Management</title>
+        <section>Implementation Patterns - Database Pattern</section>
+        <snippet>SQL migration files (.sql) are embedded into the Go binary using embed. On startup, the app checks the user's local SQLite DB version and applies pending migrations automatically.</snippet>
+      </artifact>
+    </docs>
+    <code>
+      <artifact>
+        <path>internal/infrastructure/db</path>
+        <kind>package</kind>
+        <reason>Target location for SQLite implementation and migration logic.</reason>
+      </artifact>
+      <artifact>
+        <path>cmd/server/main.go</path>
+        <kind>main</kind>
+        <symbol>main</symbol>
+        <reason>Entry point where the database initialization and migration trigger must be integrated.</reason>
+      </artifact>
+      <artifact>
+        <path>assets.go</path>
+        <kind>resource</kind>
+        <reason>Reference pattern for using go:embed to include static assets in the binary.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <dependency>
+        <key>Go</key>
+        <value>1.26</value>
+      </dependency>
+      <dependency>
+        <key>SQLite</key>
+        <value>^3.51.2</value>
+      </dependency>
+      <dependency>
+        <key>golang-migrate</key>
+        <value>^4.19.1</value>
+      </dependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+- Concurrency: SQLite MUST be configured with PRAGMA journal_mode=WAL.
+- Isolation: internal/domain must remain agnostic of the database implementation via repository interfaces.
+- Tooling: MUST use github.com/golang-migrate/migrate/v4.
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>DatabaseManager</name>
+      <kind>Go Struct/Interface</kind>
+      <signature>type DatabaseManager interface { ... }</signature>
+      <path>internal/infrastructure/db</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Go unit tests for connectivity and repository logic. Integration tests for verifying migration application on fresh and existing DB files.</standards>
+    <locations>
+- internal/infrastructure/db
+- internal/domain/services
+    </locations>
+    <ideas>
+- Manually drop a column and restart app to verify migration trigger (AC2).
+- Simulate power failure during DB write/backup to ensure WAL recovery works (AC5).
+    </ideas>
+  </tests>
+</story-context>
