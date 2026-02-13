@@ -106,7 +106,7 @@ _No novel UX patterns required. Standard CRUD, dashboard, and form patterns appl
 | --------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | **Speed**       | All key data visible in <2 seconds. Dashboard loads instantly. Forms submit with keyboard only.           | "Efficient & productive" — factory users have no patience for slow UIs           |
 | **Guidance**    | Minimal hand-holding. Clean labels, logical flow, contextual help via tooltips only. No wizards.          | Expert users (factory managers) who repeat tasks daily — never obstruct the flow |
-| **Flexibility** | Power users get keyboard shortcuts and bulk operations. No forced linear flows for data entry.            | Storekeepers enter 20+ GRNs/day — efficiency over safety rails                   |
+| **Flexibility** | Power users get keyboard shortcuts and bulk operations. No forced linear flows for data entry.            | Data Entry Operators enter 20+ GRNs/day — efficiency over safety rails           |
 | **Feedback**    | Subtle confirmations (toast notifications). Red/Green color coding for status. No celebratory animations. | "In control" — the system confirms quietly, doesn't demand attention             |
 
 ---

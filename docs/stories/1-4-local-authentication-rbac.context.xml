@@ -1,0 +1,176 @@
+<story-context id="1-4-local-authentication-rbac" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>4</storyId>
+    <title>Local Authentication &amp; RBAC</title>
+    <status>drafted</status>
+    <generatedAt>2026-02-13T13:57:30Z</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-4-local-authentication-rbac.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>System Admin</asA>
+    <iWant>to create users with specific roles (Admin, Data Entry Operator)</iWant>
+    <soThat>I can access control to sensitive features like stock valuation</soThat>
+    <tasks>
+- [ ] Implement Domain Models (AC: 1)
+    - [ ] Define `User`, `Role`, and `Permission` entities in `internal/domain/auth`
+    - [ ] Define `UserRepository` and `AuthService` interfaces
+- [ ] Implement Infrastructure (AC: 2, 3)
+    - [ ] Create `internal/infrastructure/auth/bcrypt_service.go` for password hashing
+    - [ ] Create `internal/infrastructure/auth/token_service.go` for session management (JWT/PASETO)
+    - [ ] Implement `SqliteUserRepository` in `internal/infrastructure/db`
+- [ ] Implement Application Logic (AC: 1, 3)
+    - [ ] Implement `CreateUser` command with validation
+    - [ ] Implement `Login` command with token generation
+- [ ] Implement RPC &amp; Middleware (AC: 4, 5)
+    - [ ] Implement Role-Based Access Control reasoning/interceptor for RPC methods
+    - [ ] Secure `Report.GetValuation` (future placeholder) or similar Admin-only method
+- [ ] Verification and Testing
+    - [ ] Unit Test: Verify `bcrypt` hashing and comparison
+    - [ ] Unit Test: Verify Token generation and validation (expiry, signature)
+    - [ ] Integration Test: Admin creates 'DataEntryOperator' user; 'DataEntryOperator' user denied access to Admin-only stub method
+</tasks>
+  </story>
+
+  <acceptanceCriteria>
+1. **User Management**: Admin can create new users with unique `username`, `password`, and assigned `role` (Admin, Data Entry Operator).
+2. **Secure Storage**: Passwords must be hashed using `bcrypt` before storage; no plain text passwords allowed.
+3. **Authentication**: Users can log in with valid credentials to receive a secure session token (JWT or equivalent).
+4. **RBAC Enforcement**: Users with "Data Entry Operator" role are restricted from accessing "Stock Value" reports/APIs; Admins have full access.
+5. **IPC Security**: All protected JSON-RPC calls must validate the session token and role permissions before execution.
+</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <artifact>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification: Core Foundation &amp; Infrastructure</title>
+        <section>Data Models and Contracts</section>
+        <snippet>
+```sql
+CREATE TABLE users (
+    id UUID PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role_id INTEGER REFERENCES roles(id),
+    role_name TEXT NOT NULL, -- Admin, DataEntryOperator
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+        </snippet>
+      </artifact>
+      <artifact>
+        <path>docs/architecture.md</path>
+        <title>Architecture: Masala Inventory Management</title>
+        <section>Implementation Patterns</section>
+        <snippet>
+### 1. IPC Pattern: Wails Bindings (Service Method)
+- **Client.exe**: Wails Bindings call Go "Proxy Services" -> Network RPC -> Server IP -> Server Service.
+### 4. Zero-Config Networking Pattern (UDP + RPC)
+- **Authentication**: Standard "Login" (Username/Password) is sent to Server. Server returns a Session Token.
+- **Authorization**: Session Token is required for all subsequent RPC calls.
+        </snippet>
+      </artifact>
+            <artifact>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Story 1.4: Local Authentication &amp; RBAC</section>
+        <snippet>
+**Technical Notes:** Stateless authentication recommended (e.g., token-based). Middleware for Role checks.
+        </snippet>
+      </artifact>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>cmd/server/main.go</path>
+        <kind>file</kind>
+        <symbol>main</symbol>
+        <reason>Reference for application startup and service initialization logic.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/infrastructure/db/db_manager.go</path>
+        <kind>file</kind>
+        <symbol>DBManager</symbol>
+        <reason>Reference for database connection management.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <dependency>
+        <ecosystem>Go</ecosystem>
+        <package>golang.org/x/crypto</package>
+        <version>v0.35.0</version>
+      </dependency>
+      <dependency>
+        <ecosystem>Go</ecosystem>
+        <package>github.com/golang-migrate/migrate/v4</package>
+        <version>v4.18.2</version>
+      </dependency>
+      <dependency>
+        <ecosystem>Go</ecosystem>
+        <package>github.com/mattn/go-sqlite3</package>
+        <version>v1.14.34</version>
+      </dependency>
+      <dependency>
+        <ecosystem>Frontend</ecosystem>
+        <package>antd</package>
+        <version>^6.2.1</version>
+      </dependency>
+       <dependency>
+        <ecosystem>Frontend</ecosystem>
+        <package>axios</package>
+        <version>^1.7.9</version>
+      </dependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+1. **Architecture**: Follow Hexagonal Architecture. `internal/domain/auth` for entities, `internal/infrastructure/auth` for implementation.
+2. **Security**: Passwords MUST be hashed with `bcrypt`. Do not roll your own crypto.
+3. **Concurrency**: Ensure `AuthService` is thread-safe if it maintains any in-memory state, though stateless tokens are preferred.
+4. **Data Persistence**: Use SQLite in WAL mode.
+5. **IPC Middleware**: Implement Role-Based Access Control reasoning/interceptor for RPC methods.
+</constraints>
+
+  <interfaces>
+    <interface>
+      <name>AuthService</name>
+      <kind>Go Interface</kind>
+      <signature>
+type AuthService interface {
+    Login(username, password string) (string, error)
+    CreateUser(username, password, role string) error
+    // ValidateToken(token string) (*UserClaims, error)
+}
+      </signature>
+      <path>internal/domain/auth/service.go</path>
+    </interface>
+    <interface>
+      <name>UserRepository</name>
+      <kind>Go Interface</kind>
+      <signature>
+type UserRepository interface {
+    Save(user *User) error
+    FindByUsername(username string) (*User, error)
+}
+      </signature>
+      <path>internal/domain/auth/repository.go</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Use standard Go `testing` package. Use `TestMain` for setup/teardown if needed. Mock external dependencies (like DB or Hardware) using interfaces. Verify `bcrypt` hashing and token validation with unit tests.</standards>
+    <locations>
+      <location>internal/infrastructure/auth/*_test.go</location>
+      <location>internal/domain/auth/*_test.go</location>
+    </locations>
+    <ideas>
+      <idea>Unit Test: Verify `bcrypt` hashing matches expected hash format and validates correct password.</idea>
+      <idea>Unit Test: Verify Token generation includes expected claims (role, user_id) and expiry.</idea>
+      <idea>Integration Test: Simulate Admin creating a 'DataEntryOperator' user and force-login as that user to verify access denial to Admin RPCs.</idea>
+    </ideas>
+  </tests>
+</story-context>

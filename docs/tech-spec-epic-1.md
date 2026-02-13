@@ -68,7 +68,7 @@ CREATE TABLE users (
 
 CREATE TABLE roles (
     id INTEGER PRIMARY KEY,
-    name TEXT UNIQUE NOT NULL, -- Admin, Store, Factory
+    name TEXT UNIQUE NOT NULL, -- Admin, DataEntryOperator
     permissions TEXT NOT NULL  -- JSON or bitmask
 );
 ```
@@ -121,6 +121,9 @@ CREATE TABLE items (
 ## Post-Review Follow-ups
 
 - Note: Ensure CI/CD pipeline builds with `-ldflags "-X main.LicensePublicKey=$PROD_KEY"` for release builds. (Ref: Story 1.3)
+- [x] [Story 1.4] Fix `users` schema inconsistency (migration vs repository). ✅ Resolved in Review #4.
+- [x] [Story 1.4] Implement database integration tests for repository layer. ✅ Resolved in Review #4.
+- [x] [Story 1.4] Fix test schema drift in `sqlite_user_repository_test.go` — remove extra `is_active` and `updated_at` columns to match migration. ✅ Fixed (Review #5).
 
 ### Security
 
@@ -156,18 +159,18 @@ CREATE TABLE items (
 1.  **Project Init**: Application initializes successfully as a Wails project with correct frontend (React+AntD) and backend (Go) structure.
 2.  **DB Migrations**: App runs embedded SQL migrations on startup to create `users`, `roles`, `items`, and `stock_ledger` tables.
 3.  **HW Licensing**: App extracts BIOS UUID and Disk Serial; blocks startup if a valid, machine-specific `license.key` is missing or tampered.
-4.  **RBAC Enforcement**: Admin users can create roles; "Factory" roles are restricted from accessing Stock Valuation reports via IPC middleware.
+4.  **RBAC Enforcement**: Admin users can create roles; "Data Entry Operator" roles are restricted from accessing Stock Valuation reports via IPC middleware.
 5.  **Auto-Backup**: A zipped database backup is created on the configured daily schedule with older files automatically pruned.
 
 ## Traceability Mapping
 
-| AC ID | Spec Section    | Component          | Test Idea                                                        |
-| :---- | :-------------- | :----------------- | :--------------------------------------------------------------- |
-| AC1   | 2.1 Services    | App Initialization | Verify `wails init` structure and binary build.                  |
-| AC2   | 2.2 Data Models | Database Manager   | Manually drop a column and restart app to trigger migration.     |
-| AC3   | 2.1 Services    | Licensing Service  | Swap `license.key` from another machine and verify lockout.      |
-| AC4   | 2.3 APIs        | Auth Service       | Attempt to call `Report.GetValuation()` from a 'Worker' session. |
-| AC5   | 2.1 Services    | Backup Service     | Force backup trigger and verify `.zip` content in backup dir.    |
+| AC ID | Spec Section    | Component          | Test Idea                                                                   |
+| :---- | :-------------- | :----------------- | :-------------------------------------------------------------------------- |
+| AC1   | 2.1 Services    | App Initialization | Verify `wails init` structure and binary build.                             |
+| AC2   | 2.2 Data Models | Database Manager   | Manually drop a column and restart app to trigger migration.                |
+| AC3   | 2.1 Services    | Licensing Service  | Swap `license.key` from another machine and verify lockout.                 |
+| AC4   | 2.3 APIs        | Auth Service       | Attempt to call `Report.GetValuation()` from a 'DataEntryOperator' session. |
+| AC5   | 2.1 Services    | Backup Service     | Force backup trigger and verify `.zip` content in backup dir.               |
 
 ## Risks, Assumptions, Open Questions
 

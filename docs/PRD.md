@@ -148,8 +148,8 @@ Unlike standard inventory apps that just count stock, this system models the _tr
 ### Authentication & Authorization
 
 - **User-Based RBAC:**
-    - Roles (Admin, Storekeeper, Worker) are tied to **User Accounts**, not Machines.
-    - _Example:_ Admin can log in solely on a Factory Client PC and access full Admin features.
+    - Roles (Admin, Data Entry Operator) are tied to **User Accounts**, not Machines.
+    - _Example:_ Admin can log in on any Client PC and access full Admin features.
 - **Secure Auth:** Setup SRP (Secure Remote Password) or hashed token exchange for LAN authentication.
 
 ### Multi-User Support
@@ -225,7 +225,7 @@ Unlike standard inventory apps that just count stock, this system models the _tr
 ### Scalability
 
 - **Data Volume:** Capable of handling 5+ years of transaction history without performance degradation.
-- **Concurrency:** Support multiple simultaneous users (Admin + Store + Factory) without locking.
+- **Concurrency:** Support multiple simultaneous users (Admin + Data Entry Operator) without locking.
 
 ### Accessibility
 
@@ -239,9 +239,8 @@ Unlike standard inventory apps that just count stock, this system models the _tr
 ### Data Integrity & Security
 
 - **Role-Based Access Control (RBAC):**
-    - _Admin/Owner:_ Full Access + Valuation Reports.
-    - _Storekeeper:_ GRN Entry + Dispatch Entry (No value visibility).
-    - _Production Manager:_ Recipe Access + Batch Entry.
+    - _Admin/Owner:_ Full Access + Valuation Reports + User Management.
+    - _Data Entry Operator:_ GRN Entry, Batch Entry, Dispatch Entry (No valuation visibility).
 - **Audit Trail:** Immutable logs for all stock adjustments (Who edited stock and when).
 
 ### Reliability

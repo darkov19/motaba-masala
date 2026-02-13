@@ -109,14 +109,14 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 ### Story 1.4: Local Authentication & RBAC
 
 **As a** System Admin,
-**I want** to create users with specific roles (Admin, Store, Factory),
+**I want** to create users with specific roles (Admin, Data Entry Operator),
 **So that** I can control access to sensitive features like stock valuation.
 
 **Acceptance Criteria:**
 
 - **Given** an Admin user logged in
-- **When** they create a new user and assign the "Factory" role
-- **Then** that user can access Production screens but CANNOT access "Stock Value" reports
+- **When** they create a new user and assign the "Data Entry Operator" role
+- **Then** that user can access operational screens but CANNOT access "Stock Value" reports
 - **And** passwords must be hashed (bcrypt)
 
 **Technical Notes:** Stateless authentication recommended (e.g., token-based). Middleware for Role checks.
@@ -174,7 +174,7 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 
 ### Story 2.3: Recipe (BOM) Management
 
-**As a** Production Manager,
+**As a** Data Entry Operator,
 **I want** to define Recipes for Bulk Powders, specifying input ingredients and expected output,
 **So that** production batches can auto-calculate consumption.
 
@@ -282,7 +282,7 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 
 ### Story 4.1: Production Batch Creation
 
-**As a** Production Manager,
+**As a** Data Entry Operator,
 **I want** to plan a Production Batch for a specific Product (e.g., 200KG Chili Powder),
 **So that** the floor team knows what to produce.
 
@@ -297,7 +297,7 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 
 ### Story 4.2: Recipe Execution & Material Consumption
 
-**As a** Production Manager,
+**As a** Data Entry Operator,
 **I want** to issue raw materials to the batch based on the recipe,
 **So that** raw material stock is consumed correctly.
 
@@ -313,7 +313,7 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 
 ### Story 4.3: Bulk Output & Wastage Recording
 
-**As a** Production Manager,
+**As a** Data Entry Operator,
 **I want** to record the final weight of the Bulk Powder produced and any wastage,
 **So that** we know the yield and close the loop.
 
@@ -353,7 +353,7 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 
 ### Story 5.1: Packing Run Creation
 
-**As a** Production Manager,
+**As a** Data Entry Operator,
 **I want** to execute a "Packing Run" to convert Bulk Powder into Retail Packs (e.g., 50g Pouches),
 **So that** we have sellable Finished Goods.
 
@@ -368,7 +368,7 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 
 ### Story 5.2: Packing Material Consumption
 
-**As a** Production Manager,
+**As a** Data Entry Operator,
 **I want** to track the consumption of pouches, boxes, and labels during packing,
 **So that** packing material inventory is accurate.
 

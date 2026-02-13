@@ -5,6 +5,10 @@ import (
 	"log"
 	"masala_inventory_managment"
 	"masala_inventory_managment/internal/app"
+	appAuth "masala_inventory_managment/internal/app/auth"
+	appReport "masala_inventory_managment/internal/app/report"
+	domainAuth "masala_inventory_managment/internal/domain/auth"
+	infraAuth "masala_inventory_managment/internal/infrastructure/auth"
 	"masala_inventory_managment/internal/infrastructure/db"
 	"masala_inventory_managment/internal/infrastructure/license"
 	"os"
@@ -51,9 +55,24 @@ func run() error {
 
 	// Run Migrations
 	migrator := db.NewMigrator(dbManager)
-	if err := migrator.RunMigrations(masala_inventory_managment.MigrationAssets, "migrations"); err != nil {
+	if err := migrator.RunMigrations(masala_inventory_managment.MigrationAssets, "internal/infrastructure/db/migrations"); err != nil {
 		return fmt.Errorf("migration failed: %w", err)
 	}
+
+	// Initialize Auth Components
+	userRepo := db.NewSqliteUserRepository(dbManager.GetDB())
+	bcryptService := infraAuth.NewBcryptService()
+	// TODO: Load secret from env/config
+	tokenService := infraAuth.NewTokenService("super-secret-key-change-me")
+	authService := appAuth.NewService(userRepo, bcryptService, tokenService)
+
+	// Initialize Report Service (Secured)
+	reportService := appReport.NewAppService(authService)
+
+	// Bootstrap Admin User
+	// Check if any users exist, if not create default admin
+	// For simplicity, we just try to create admin/admin and ignore error if exists
+	_ = authService.CreateUser("", "admin", "admin", domainAuth.RoleAdmin)
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -67,6 +86,8 @@ func run() error {
 		OnStartup:        application.Startup,
 		Bind: []interface{}{
 			application,
+			authService,   // Bind Auth Service to Wails
+			reportService, // Bind Report Service (Secured)
 		},
 	})
 

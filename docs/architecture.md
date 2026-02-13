@@ -123,7 +123,7 @@ export default function App() {
 - **Protocol:** We use a lightweight JSON-RPC over TCP.
 - **Security:**
     - **Authentication:** Standard "Login" (Username/Password) is sent to Server. Server returns a Session Token.
-    - **Authorization:** Session Token is required for all subsequent RPC calls.
+    - **Authorization:** Session Token is required for all subsequent RPC calls. RBAC enforces Admin / Data Entry Operator permissions.
 
 ### 5. Hardware Licensing Pattern
 
