@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Layout, Typography, Input, Button, Space, Card, Divider } from "antd";
-import { RocketOutlined } from "@ant-design/icons";
+import { RocketOutlined, ArrowDownOutlined } from "@ant-design/icons";
 import logo from "./assets/images/logo-universal.png";
 import "./App.css";
 // Note: Greet path will be updated once wails generates the JS bindings
@@ -11,7 +11,7 @@ const { Title, Text } = Typography;
 
 function App() {
     const [resultText, setResultText] = useState(
-        "Please enter your name below 👇",
+        "Please enter your name below:",
     );
     const [name, setName] = useState("");
     const [loading, setLoading] = useState(false);
@@ -77,7 +77,10 @@ function App() {
                                     padding: "20px 0",
                                 }}
                             >
-                                {resultText}
+                                {resultText}{" "}
+                                <ArrowDownOutlined
+                                    style={{ color: "#7D1111" }}
+                                />
                             </div>
                             <Space.Compact style={{ width: "100%" }}>
                                 <Input

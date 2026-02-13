@@ -118,6 +118,10 @@ CREATE TABLE items (
 - **Search Latency**: < 500ms for item/user lookup.
 - **DB Concurrency**: SQLite in WAL mode to support simultaneous reads/writes from multiple LAN clients.
 
+## Post-Review Follow-ups
+
+- Note: Ensure CI/CD pipeline builds with `-ldflags "-X main.LicensePublicKey=$PROD_KEY"` for release builds. (Ref: Story 1.3)
+
 ### Security
 
 - **Auth**: Passwords hashed with `bcrypt`. Ed25519-signed session tokens for IPC.

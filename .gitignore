@@ -46,4 +46,8 @@ frontend/wailsjs/
 db.test
 *.log
 tmp/
-.tmp/
+
+# Licensing
+license.key
+.hw_hb
+

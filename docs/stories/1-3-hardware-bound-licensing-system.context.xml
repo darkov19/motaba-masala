@@ -1,0 +1,81 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>3</storyId>
+    <title>Hardware-Bound Licensing System</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2026-02-13T13:01:28Z</generatedAt>
+    <generator>Antigravity Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-3-hardware-bound-licensing-system.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Business Owner</asA>
+    <iWant>the application to run only on authorized hardware with a valid license file</iWant>
+    <soThat>I can prevent unauthorized copying and enforce subscription limits.</soThat>
+    <tasks>
+- Implement LicensingService Infrastructure (AC: 1, 3)
+    - Create internal/infrastructure/license package
+    - Implement HW ID extraction logic for BIOS UUID and Disk Serial
+    - Integrate Ed25519 signature verification using a hardcoded Public Key
+- Implement Security Checks (AC: 2, 4)
+    - Implement encrypted heartbeat timestamp logic for clock check
+    - Create periodic background task to update heartbeat while app is running
+- System Integration (AC: 2, 5)
+    - Modify cmd/server/main.go to invoke license check within the run() loop
+    - Implement graceful shutdown fallback on license failure
+- Verification and Testing
+    - Write unit tests for signature validation with valid/invalid signatures
+    - Implement mockable HW ID provider for automated testing
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+1. HW Fingerprinting: Application extracts BIOS UUID and Disk Serial to uniquely identify host hardware.
+2. License Validation: Blocks startup with a critical error if license.key is missing, tampered with, or linked to a different machine.
+3. Cryptographic Security: License keys must be validated using Ed25519 asymmetric cryptography.
+4. Clock Tampering Protection: System detects backward clock adjustments using an encrypted "heartbeat" timestamp stored on disk.
+5. Enforcement Logic: On license failure, the RPC server is disabled, preventing clients from connecting or performing operations.
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+- path: docs/tech-spec-epic-1.md, title: Epic Technical Specification: Core Foundation & Infrastructure, section: Licensing Service, snippet: Extracts HW ID and validates against license.key using BIOS UUID, Disk Serial, and Ed25519 PubKey.
+- path: docs/architecture.md, title: Architecture: Masala Inventory Management, section: Licensing, snippet: Bound to Server Hardware. Clients validate session against Server.
+- path: docs/PRD.md, title: Product Requirements Document, section: Licensing & Subscription, snippet: License is tied strictly to the Server PC's Hardware ID (Motherboard + Disk).
+    </docs>
+    <code>
+- path: cmd/server/main.go, kind: entry point, symbol: run, lines: 23-60, reason: Needs to invoke licensing check during startup.
+- path: internal/infrastructure/license, kind: directory, symbol: N/A, lines: N/A, reason: Destination for licensing logic.
+- path: go.mod, kind: dependency manifest, symbol: golang.org/x/crypto, lines: 38, reason: Provides Ed25519 support.
+    </code>
+    <dependencies>
+- golang.org/x/crypto (Ed25519)
+- github.com/mattn/go-sqlite3 (Heartbeat storage potentially)
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+- Hexagonal Architecture (Ports and Adapters)
+- Native performance (Wails v2)
+- Zero internet required (Offline-first)
+- Clock tampering protection (Encrypted heartbeat)
+  </constraints>
+  <interfaces>
+- name: LicensingService
+- kind: function signature
+- signature: ValidateLicense() error
+- path: internal/infrastructure/license/license_service.go
+  </interfaces>
+  <tests>
+    <standards>Unit testing with Go's testing package. Integration tests for system startup. Mocking for hardware-specific calls.</standards>
+    <locations>internal/infrastructure/license/*_test.go, cmd/server/main_test.go</locations>
+    <ideas>
+- AC1: Verify BIOS UUID and Disk Serial extraction on multiple platforms (if possible) or via Mocks.
+- AC2: Test startup failure when license.key is missing.
+- AC3: Verify Ed25519 signature validation with valid and invalid keys.
+- AC4: Simulate clock rollback and verify heartbeat detection locks the app.
+- AC5: Verify clients receive "License Expired" when server license fails.
+    </ideas>
+  </tests>
+</story-context>
