@@ -1,0 +1,275 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>5</storyId>
+    <title>Automated Local Backup Service</title>
+    <status>drafted</status>
+    <generatedAt>2026-02-13</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-5-automated-local-backup-service.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>System Admin</asA>
+    <iWant>the system to automatically back up the database daily to a secondary location</iWant>
+    <soThat>I can recover data in case of corruption or accidental deletion</soThat>
+    <tasks>
+      <task id="1" acs="1,2">Implement Backup Domain Models
+        <subtask>Define BackupService interface in internal/domain/backup/ (Schedule, Execute, Prune, GetStatus)</subtask>
+        <subtask>Define BackupConfig value object (backup path, retention days, schedule cron expression)</subtask>
+        <subtask>Define BackupStatus entity (last backup time, file path, size, success/failure)</subtask>
+      </task>
+      <task id="2" acs="1,3">Implement Backup Infrastructure
+        <subtask>Create internal/infrastructure/backup/backup_service.go</subtask>
+        <subtask>Implement SQLite file copy using VACUUM INTO or file-level copy with WAL checkpoint</subtask>
+        <subtask>Implement zip compression of the copied database file (use archive/zip or archiver library per tech spec)</subtask>
+        <subtask>Ensure backup runs in a goroutine to avoid blocking application operations</subtask>
+        <subtask>Save zip to configured backup directory with timestamped filename (e.g., backup-2026-02-13T020000.zip)</subtask>
+      </task>
+      <task id="3" acs="2">Implement Retention/Pruning Logic
+        <subtask>Implement rolling 7-day daily retention pruning</subtask>
+        <subtask>Delete .zip backup files older than retention threshold after each successful backup</subtask>
+        <subtask>Log pruned files for audit trail</subtask>
+      </task>
+      <task id="4" acs="1,3">Implement Scheduler
+        <subtask>Implement background scheduling using Go time.Ticker or a cron library</subtask>
+        <subtask>Register backup schedule on application startup</subtask>
+        <subtask>Ensure graceful shutdown stops the scheduler without interrupting in-progress backups</subtask>
+      </task>
+      <task id="5" acs="4,5">Implement Status and Manual Trigger API
+        <subtask>Expose GetBackupStatus() method returning last backup time, health indicator, and backup path</subtask>
+        <subtask>Expose TriggerBackup() method for on-demand manual backup execution</subtask>
+        <subtask>Integrate with existing admin.GetSystemStatus() to include backup health</subtask>
+      </task>
+      <task id="6" acs="1">Integrate with Application Startup
+        <subtask>Wire BackupService into cmd/server/main.go startup flow</subtask>
+        <subtask>Create backup directory if it does not exist on startup</subtask>
+        <subtask>Read backup configuration (path, schedule, retention) from app config or defaults</subtask>
+      </task>
+      <task id="7" acs="1,2,3,4,5">Verification and Testing
+        <subtask>Unit Test: Verify backup file is created as valid zip containing SQLite DB</subtask>
+        <subtask>Unit Test: Verify pruning deletes files older than retention threshold</subtask>
+        <subtask>Unit Test: Verify backup is non-blocking (runs in goroutine, main thread continues)</subtask>
+        <subtask>Unit Test: Verify GetBackupStatus() returns correct last-backup info</subtask>
+        <subtask>Integration Test: Full cycle — trigger backup, verify zip content, trigger prune, verify old files removed</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="1">Scheduled Backup: A zipped copy of the SQLite database is created automatically at the configured daily schedule (e.g., 2 AM or configurable trigger), saved to the configured backup folder. [Source: docs/epics.md#Story-1.5, docs/tech-spec-epic-1.md#AC5]</ac>
+    <ac id="2">Rolling Retention: Backups older than 7 days are automatically deleted (rolling daily retention). [Source: docs/epics.md#Story-1.5, docs/PRD.md#L250]</ac>
+    <ac id="3">Non-Blocking Operation: The backup process must not block normal application operations (non-blocking/async). [Source: docs/epics.md#Story-1.5-Technical-Notes]</ac>
+    <ac id="4">Backup Status Indicator: Admin dashboard displays last backup timestamp and health status (e.g., "Last Backup: X hours ago ✅" or "⚠️ No backup in 48 hours!"). [Source: docs/PRD.md#L251]</ac>
+    <ac id="5">Manual Trigger: Admin can manually trigger an immediate backup via the admin panel or admin.GetSystemStatus() API. [Source: docs/tech-spec-epic-1.md#APIs]</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification: Core Foundation &amp; Infrastructure</title>
+        <section>Services and Modules — Backup Service</section>
+        <snippet>Backup Service: "Scheduled background task to zip and rotate DB files." Inputs: DB File, Backup Path. Outputs: .zip archive. AC5: "A zipped database backup is created on the configured daily schedule with older files automatically pruned."</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification: Core Foundation &amp; Infrastructure</title>
+        <section>Dependencies and Integrations</section>
+        <snippet>archiver v3.5.0 listed for Backup Zipping. Evaluate whether Go stdlib archive/zip is sufficient to avoid extra dependency.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification: Core Foundation &amp; Infrastructure</title>
+        <section>Reliability/Availability</section>
+        <snippet>Auto-Backup: Daily zipping to {ProjectRoot}/backups with rolling 7-day retention.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification: Core Foundation &amp; Infrastructure</title>
+        <section>Observability</section>
+        <snippet>Structured JSON logging to logs/server.log. Admin view showing real-time License and Backup health.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Reliability — Automated Local Backup</section>
+        <snippet>Daily automated database dump to secondary location. Rolling Retention: Keep last 7 daily backups + last 4 weekly snapshots. Backup Status Indicator on admin dashboard. Restore Capability via admin panel.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture: Masala Inventory Management</title>
+        <section>Project Structure</section>
+        <snippet>Hexagonal Architecture: internal/domain/ for entities and pure logic, internal/infrastructure/ for adapters, internal/app/ for use cases. New backup packages follow this pattern.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture: Masala Inventory Management</title>
+        <section>Database Pattern</section>
+        <snippet>Repository interfaces for data access. SQLite in WAL mode. DatabaseManager handles connection and migrations. Backup must coordinate with WAL mode (VACUUM INTO or checkpoint before copy).</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown — Epic 1: Core Foundation</title>
+        <section>Story 1.5: Automated Local Backup Service</section>
+        <snippet>As a System Admin, I want the system to automatically back up the database daily to a secondary location. When the scheduled time arrives, a zipped copy of the SQLite DB is saved. Backups older than 7 days are automatically deleted.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification: Core Foundation &amp; Infrastructure</title>
+        <section>APIs and Interfaces</section>
+        <snippet>admin.GetSystemStatus() — Role Required: Admin — Returns License status and Backup status. The backup service must integrate with this endpoint.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification: Core Foundation &amp; Infrastructure</title>
+        <section>Traceability Mapping — AC5</section>
+        <snippet>AC5 maps to Backup Service component. Test Idea: Force backup trigger and verify .zip content in backup dir.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>internal/infrastructure/db/db_manager.go</path>
+        <kind>service</kind>
+        <symbol>DatabaseManager</symbol>
+        <lines>14-94</lines>
+        <reason>Manages SQLite connection; stores dbPath (private field). Backup service needs to read db file path to perform VACUUM INTO or file copy. A GetDBPath() getter method must be added or the path passed to backup service at construction time.</reason>
+      </file>
+      <file>
+        <path>cmd/server/main.go</path>
+        <kind>entrypoint</kind>
+        <symbol>run</symbol>
+        <lines>31-99</lines>
+        <reason>Server startup wiring: initializes DB, auth, license services and binds to Wails. Backup service must be wired here — initialized after DB connect, scheduler started, and bound to Wails for frontend API access. Graceful shutdown must also be added.</reason>
+      </file>
+      <file>
+        <path>internal/domain/auth/service.go</path>
+        <kind>interface</kind>
+        <symbol>AuthService</symbol>
+        <lines>10-13</lines>
+        <reason>Reference pattern for defining domain-layer service interfaces. BackupService interface should follow the same pattern in internal/domain/backup/.</reason>
+      </file>
+      <file>
+        <path>internal/app/auth/service.go</path>
+        <kind>service</kind>
+        <symbol>Service</symbol>
+        <lines>12-83</lines>
+        <reason>Reference pattern for application-layer service implementation with dependency injection via constructor. BackupService app layer (if needed) should mirror this structure.</reason>
+      </file>
+      <file>
+        <path>internal/app/report/service.go</path>
+        <kind>service</kind>
+        <symbol>AppService</symbol>
+        <lines>1-end</lines>
+        <reason>Report service integrates with auth for permission checks. Backup status retrieval and manual trigger should follow the same protected-endpoint pattern (Admin-only).</reason>
+      </file>
+      <file>
+        <path>internal/infrastructure/db/db_manager_test.go</path>
+        <kind>test</kind>
+        <symbol>TestDatabaseManager</symbol>
+        <lines>1-end</lines>
+        <reason>Testing patterns for infrastructure-level DB operations. Backup tests should follow similar patterns using temp directories and real SQLite files.</reason>
+      </file>
+      <file>
+        <path>internal/infrastructure/db/sqlite_user_repository_test.go</path>
+        <kind>test</kind>
+        <symbol>TestMain, TestSqliteUserRepository</symbol>
+        <lines>1-end</lines>
+        <reason>TestMain pattern for integration tests with real SQLite. Backup integration tests should use similar setup/teardown with temporary DB files.</reason>
+      </file>
+      <file>
+        <path>internal/app/app.go</path>
+        <kind>service</kind>
+        <symbol>App</symbol>
+        <lines>9-31</lines>
+        <reason>Application struct with Startup/context pattern. Backup scheduler lifecycle may integrate here or directly in main.go run() function.</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <go>
+        <package name="github.com/mattn/go-sqlite3" version="v1.14.34" />
+        <package name="github.com/golang-migrate/migrate/v4" version="v4.18.2" />
+        <package name="github.com/wailsapp/wails/v2" version="v2.11.0" />
+        <package name="github.com/golang-jwt/jwt/v5" version="v5.3.1" />
+        <package name="github.com/google/uuid" version="v1.6.0" />
+        <package name="golang.org/x/crypto" version="v0.35.0" />
+        <!-- stdlib archive/zip available; evaluate vs archiver v3.5.0 per tech spec -->
+      </go>
+      <node>
+        <package name="react" version="^19.0.0" />
+        <package name="react-dom" version="^19.0.0" />
+        <package name="antd" version="^6.2.1" />
+        <package name="@ant-design/icons" version="^5.6.1" />
+        <package name="@tanstack/react-query" version="^5.66.0" />
+        <package name="typescript" version="^5.7.3" />
+        <package name="vite" version="^6.1.0" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Hexagonal Architecture: Domain layer (internal/domain/backup/) must contain only interfaces and value objects — NO infrastructure imports.</constraint>
+    <constraint>Infrastructure layer (internal/infrastructure/backup/) implements the concrete backup logic — file copy, zip, prune, scheduler.</constraint>
+    <constraint>SQLite WAL Mode: Database runs in WAL mode. Use VACUUM INTO for consistent point-in-time backup, or checkpoint WAL before file-level copy.</constraint>
+    <constraint>Non-blocking: Backup must run in a separate goroutine. Use sync.Mutex to prevent overlapping backup runs.</constraint>
+    <constraint>Config Defaults: If no backup config provided, use defaults: backup path = {project-root}/backups/, schedule = once daily, retention = 7 days.</constraint>
+    <constraint>Structured Logging: Use structured JSON logging for backup events (start, success, failure, prune) per tech spec observability requirements.</constraint>
+    <constraint>Admin-Only Access: GetBackupStatus() and TriggerBackup() APIs must be restricted to Admin role via existing auth middleware pattern.</constraint>
+    <constraint>Graceful Shutdown: Scheduler must stop cleanly on application exit without interrupting in-progress backups.</constraint>
+    <constraint>DatabaseManager.dbPath is private: Either add a GetDBPath() getter to DatabaseManager or pass DB path directly to backup service at construction.</constraint>
+    <constraint>Add backups/ directory to .gitignore.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>BackupService (new domain interface)</name>
+      <kind>Go interface</kind>
+      <signature>type BackupService interface {
+    Execute() error           // Perform immediate backup
+    GetStatus() (*BackupStatus, error)  // Return last backup info
+    StartScheduler() error    // Begin scheduled backups
+    StopScheduler() error     // Stop scheduler gracefully
+    Prune() (int, error)      // Remove old backups, return count pruned
+}</signature>
+      <path>internal/domain/backup/service.go (NEW)</path>
+    </interface>
+    <interface>
+      <name>admin.GetSystemStatus()</name>
+      <kind>Wails binding (JSON-RPC)</kind>
+      <signature>GET admin.GetSystemStatus() — Returns License status and Backup status. Role: Admin.</signature>
+      <path>docs/tech-spec-epic-1.md (APIs section)</path>
+    </interface>
+    <interface>
+      <name>DatabaseManager.GetDB()</name>
+      <kind>Go method</kind>
+      <signature>func (m *DatabaseManager) GetDB() *sql.DB</signature>
+      <path>internal/infrastructure/db/db_manager.go</path>
+    </interface>
+    <interface>
+      <name>DatabaseManager.GetDBPath() (new — needed)</name>
+      <kind>Go method</kind>
+      <signature>func (m *DatabaseManager) GetDBPath() string</signature>
+      <path>internal/infrastructure/db/db_manager.go (MODIFY — add getter)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Go testing with stdlib testing package. Unit tests use mocks and dependency injection. Integration tests use real SQLite files in temp directories with TestMain setup/teardown patterns. Follow existing test file naming convention (*_test.go) colocated with source. Use t.TempDir() for isolated test environments.</standards>
+    <locations>
+      <location>internal/infrastructure/backup/*_test.go (NEW)</location>
+      <location>internal/domain/backup/*_test.go (NEW, if any domain logic)</location>
+      <location>internal/infrastructure/db/*_test.go (existing patterns to follow)</location>
+      <location>internal/app/auth/*_test.go (existing patterns to follow)</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Create backup via Execute(), verify .zip file exists in backup dir with correct timestamped name, and contains valid SQLite data.</idea>
+      <idea ac="2">Populate backup dir with files spanning 10 days, call Prune(), verify only files within 7-day retention remain.</idea>
+      <idea ac="3">Trigger backup in goroutine, assert main goroutine is not blocked (completes before backup finishes).</idea>
+      <idea ac="4">Call GetStatus() after successful and failed backups, verify returned BackupStatus fields are correct.</idea>
+      <idea ac="5">Call TriggerBackup() (manual trigger API), verify new backup file is created immediately.</idea>
+      <idea ac="1,2">Integration test: full cycle — start scheduler, wait for trigger, verify zip created, age files artificially, trigger prune, verify cleanup.</idea>
+    </ideas>
+  </tests>
+</story-context>

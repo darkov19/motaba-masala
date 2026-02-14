@@ -47,6 +47,9 @@ db.test
 *.log
 tmp/
 
+# Backups
+backups/
+
 # Licensing
 license.key
 .hw_hb

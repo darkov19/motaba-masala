@@ -124,6 +124,10 @@ CREATE TABLE items (
 - [x] [Story 1.4] Fix `users` schema inconsistency (migration vs repository). ✅ Resolved in Review #4.
 - [x] [Story 1.4] Implement database integration tests for repository layer. ✅ Resolved in Review #4.
 - [x] [Story 1.4] Fix test schema drift in `sqlite_user_repository_test.go` — remove extra `is_active` and `updated_at` columns to match migration. ✅ Fixed (Review #5).
+- [x] [Story 1.5] Add `backups/` to `.gitignore`. ✅ Fixed.
+- [x] [Story 1.5] Wire `backupService.StopScheduler()` into graceful shutdown. ✅ Fixed.
+- [x] [Story 1.5] Log error from `backupService.Execute()` in `TriggerBackup` goroutine. ✅ Fixed.
+- [x] [Story 1.5] Remove unused `scheduler *time.Ticker` field or clean up `StopScheduler()`. ✅ Fixed.
 
 ### Security
 

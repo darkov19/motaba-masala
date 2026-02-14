@@ -3,12 +3,16 @@ package main
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"masala_inventory_managment"
 	"masala_inventory_managment/internal/app"
+	appAdmin "masala_inventory_managment/internal/app/admin"
 	appAuth "masala_inventory_managment/internal/app/auth"
 	appReport "masala_inventory_managment/internal/app/report"
 	domainAuth "masala_inventory_managment/internal/domain/auth"
+	domainBackup "masala_inventory_managment/internal/domain/backup"
 	infraAuth "masala_inventory_managment/internal/infrastructure/auth"
+	infraBackup "masala_inventory_managment/internal/infrastructure/backup"
 	"masala_inventory_managment/internal/infrastructure/db"
 	"masala_inventory_managment/internal/infrastructure/license"
 	"os"
@@ -69,9 +73,32 @@ func run() error {
 	// Initialize Report Service (Secured)
 	reportService := appReport.NewAppService(authService)
 
+	// Initialize Backup Service with structured logging (per tech spec observability requirements)
+	backupConfig := domainBackup.BackupConfig{
+		BackupPath:    "backups",
+		RetentionDays: 7,
+		ScheduleCron:  "0 2 * * *",
+	}
+	logInfo := func(format string, v ...interface{}) {
+		slog.Info(fmt.Sprintf(format, v...), "component", "backup")
+	}
+	logError := func(format string, v ...interface{}) {
+		slog.Error(fmt.Sprintf(format, v...), "component", "backup")
+	}
+
+	backupService := infraBackup.NewService(dbManager, backupConfig, logInfo, logError)
+	if err := backupService.StartScheduler(); err != nil {
+		slog.Error("Failed to start backup scheduler", "error", err, "component", "backup")
+	}
+	defer backupService.StopScheduler() // Graceful shutdown: stop scheduler when app exits
+
+	// Initialize Admin Service
+	adminService := appAdmin.NewService(authService, backupService, licenseSvc, logError)
+
 	// Bootstrap Admin User
-	// Check if any users exist, if not create default admin
-	// For simplicity, we just try to create admin/admin and ignore error if exists
+	// This uses an empty token to bypass auth checks during initial bootstrap.
+	// CreateUser internally allows empty-token calls for first-time setup only.
+	// The error is intentionally ignored: if the admin user already exists, this is a no-op.
 	_ = authService.CreateUser("", "admin", "admin", domainAuth.RoleAdmin)
 
 	// Create application with options
@@ -88,6 +115,7 @@ func run() error {
 			application,
 			authService,   // Bind Auth Service to Wails
 			reportService, // Bind Report Service (Secured)
+			adminService,  // Bind Admin Service (Secured)
 		},
 	})
 

@@ -23,7 +23,7 @@ func TestMigrator_RunMigrations_Integration(t *testing.T) {
 
 	migrator := NewMigrator(manager)
 	// Use the REAL migrations that we embedded in migration_assets.go
-	if err := migrator.RunMigrations(masala_inventory_managment.MigrationAssets, "migrations"); err != nil {
+	if err := migrator.RunMigrations(masala_inventory_managment.MigrationAssets, "internal/infrastructure/db/migrations"); err != nil {
 		t.Fatalf("Failed to run migrations: %v", err)
 	}
 

@@ -84,6 +84,11 @@ func (m *DatabaseManager) GetDB() *sql.DB {
 	return m.db
 }
 
+// GetDBPath returns the file path to the SQLite database
+func (m *DatabaseManager) GetDBPath() string {
+	return m.dbPath
+}
+
 // Close closes the database connection
 func (m *DatabaseManager) Close() error {
 	if m.db != nil {
