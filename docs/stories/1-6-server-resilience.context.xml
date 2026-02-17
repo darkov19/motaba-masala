@@ -1,0 +1,115 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>6</storyId>
+    <title>Server Resilience & Stability</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2026-02-15</generatedAt>
+    <sourceStoryPath>docs/stories/1-6-server-resilience.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>System Admin</asA>
+    <iWant>the server to be robust against common accidents</iWant>
+    <soThat>the production line isn't interrupted by minor errors</soThat>
+    <tasks>
+        <task id="1" acs="4">Implement Single Instance Lock & Window Focus
+            <subtask>Implement named mutex check in cmd/server/main.go startup sequence</subtask>
+            <subtask>Identify existing process window and bring to foreground if mutex exists</subtask>
+            <subtask>Gracefully exit if secondary instance detected</subtask>
+        </task>
+        <task id="2" acs="1,5">Implement System Tray & Window Management
+            <subtask>Configure Wails application options to handle window close event</subtask>
+            <subtask>Implement System Tray icon logic using Wails options</subtask>
+            <subtask>Create Tray Menu with Open and Exit items</subtask>
+            <subtask>Implement Exit confirmation dialog</subtask>
+            <subtask>Add notification bubble on minimize</subtask>
+        </task>
+        <task id="3" acs="2">Implement Watchdog Service
+            <subtask>Create internal/infrastructure/watchdog/service.go</subtask>
+            <subtask>Implement heartbeat mechanism for critical services</subtask>
+            <subtask>Implement monitoring loop log warnings if unresponsive</subtask>
+        </task>
+        <task id="4" acs="3">Implement Disk Space Monitor
+            <subtask>Create internal/infrastructure/monitor/disk.go</subtask>
+            <subtask>Use syscall/sys package to query free disk space</subtask>
+            <subtask>Expose GetDiskStatus via admin API</subtask>
+        </task>
+        <task id="5" acs="3">Integration & UI
+            <subtask>Update admin.GetSystemStatus to include Disk/Watchdog info</subtask>
+            <subtask>Update React Admin Dashboard to show Low Disk Space banner</subtask>
+        </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="1">System Tray Minimization: When the server window is closed (X button), the application minimizes to the system tray instead of terminating. A notification bubbles up: "Server is running in background". [Source: docs/resilience-audit-report.md#1.1]</ac>
+    <ac id="2">Watchdog Timer: A background goroutine monitors the main service loop. If the service becomes unresponsive for >30 seconds, the watchdog automatically beats/restarts the service layer. [Source: docs/resilience-audit-report.md#1.4]</ac>
+    <ac id="3">Disk Space Monitor: Checks available disk space on startup and every 30 minutes. If space < 500MB, a persistent warning banner appears in the Admin Dashboard. [Source: docs/resilience-audit-report.md#1.3]</ac>
+    <ac id="4">Single Instance Lock: The application ensures only one instance of MasalaServer.exe runs at a time using a named Mutex. [Source: docs/resilience-audit-report.md#6.2]</ac>
+    <ac id="5">Tray Menu: The system tray icon offers a context menu with "Open Dashboard" and "Exit Server" options. "Exit Server" prompts for confirmation. [Source: docs/resilience-audit-report.md#6.2]</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+        <doc>
+            <path>docs/resilience-audit-report.md</path>
+            <title>Resilience Audit Report</title>
+            <section>Category 1: Server Application Failures</section>
+            <snippet>1.1 Admin Clicks X -> Minimize to Tray. 1.3 server Runs Out of Disk Space -> Monitor. 1.4 Server Hangs -> Watchdog. 6.2 Two Server Instances -> Single Instance Lock.</snippet>
+        </doc>
+        <doc>
+            <path>docs/architecture.md</path>
+            <title>Architecture</title>
+            <section>6. Resilience & Stability Patterns</section>
+            <snippet>Server Stability Patterns: System Tray, Watchdog Goroutine, Disk Space Monitor, Single Instance Mutex.</snippet>
+        </doc>
+        <doc>
+            <path>docs/ux-design-specification.md</path>
+            <title>UX Design Spec</title>
+            <section>5.2 Resilience Components</section>
+            <snippet>Design specs for warning banners and system notifications.</snippet>
+        </doc>
+    </docs>
+    <dependencies>
+      <go>
+        <package name="golang.org/x/sys/windows" />
+        <package name="github.com/wailsapp/wails/v2" />
+      </go>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Hexagonal Architecture: Keep OS-level logic (mutex, disk) in internal/infrastructure/system. Wails UI logic belongs in app layer or cmd/server.</constraint>
+    <constraint>Windows Compatibility: Ensure Mutex and Disk Check logic works correctly on Windows 10/11.</constraint>
+    <constraint>Non-blocking Watchdog: Watchdog must run in separate goroutine and not block main thread.</constraint>
+    <constraint>Graceful Exit: "Exit Server" from tray must trigger standard application shutdown cleanup.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>SysMonitor</name>
+      <kind>Go interface</kind>
+      <signature>type SysMonitor interface { GetDiskSpace() (uint64, error); CheckMutex() bool }</signature>
+      <path>internal/domain/system/monitor.go (NEW)</path>
+    </interface>
+    <interface>
+        <name>admin.GetSystemStatus()</name>
+        <kind>Wails Binding</kind>
+        <signature>Existing API. Needs modification to include new health fields.</signature>
+        <path>internal/app/admin/service.go</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Go testing with standard library. Use explicit mocks for OS syscalls where possible.</standards>
+    <locations>
+      <location>internal/infrastructure/system/*_test.go</location>
+    </locations>
+    <ideas>
+      <idea ac="4">Mock mutex existence and assert app startup fails/focuses.</idea>
+      <idea ac="3">Mock disk space syscall to return < 500MB and verify warning flag.</idea>
+      <idea ac="2">Test watchdog ticker logic with a mocked controllable clock.</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -1,0 +1,67 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>10</storyId>
+    <title>Installer Hardening</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2026-02-15</generatedAt>
+    <sourceStoryPath>docs/stories/1-10-installer-hardening.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Deployment Technician</asA>
+    <iWant>installer to handle firewall and startup</iWant>
+    <soThat>deployment is plug-and-play</soThat>
+    <tasks>
+        <task id="1" acs="1">Implement Firewall Rule
+            <subtask>Add netsh command to NSIS script</subtask>
+            <subtask>Add uninstall cleanup</subtask>
+        </task>
+        <task id="2" acs="2">Implement Auto-Start Option
+            <subtask>Add UI checkbox</subtask>
+            <subtask>Create Startup shortcut logic</subtask>
+        </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="1">Firewall Rule: Adds rule to allow port 8090.</ac>
+    <ac id="2">Auto-Start: Optional shortcut in Startup folder.</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+        <doc>
+            <path>docs/resilience-audit-report.md</path>
+            <title>Resilience Audit Report</title>
+            <section>Category 3: Network Failures; Category 2: Client Failures</section>
+            <snippet>3.4 Firewall Blocks -> Auto-add Rule. 2.3 Client PC Reboot -> Auto-Start.</snippet>
+        </doc>
+    </docs>
+  </artifacts>
+
+  <constraints>
+    <constraint>Privileges: Installer must run as Admin.</constraint>
+    <constraint>Cleanliness: Uninstaller must remove firewall rules and shortcuts.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>NSIS Script</name>
+      <kind>Build Script</kind>
+      <signature>ExecToLog (netsh ...)</signature>
+      <path>build/windows/installer/project.nsi</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Manual verification in VM.</standards>
+    <locations>
+      <location>N/A (Installer script)</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Install on fresh VM, check Windows Firewall Advanced Security rules.</idea>
+      <idea ac="2">Reboot VM, check if App launches automatically.</idea>
+    </ideas>
+  </tests>
+</story-context>

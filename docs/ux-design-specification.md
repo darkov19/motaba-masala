@@ -223,6 +223,41 @@ We will implement **two distinct landing experiences** based on user role.
 6.  **Commit:** User confirms. Raw material stock deducts; Bulk stock increases (Work-in-Progress).
     - _Feeling:_ "The system stopped me from making a mistake."
 
+### 5.2 Resilience Components
+
+These components provide visual feedback and recovery options for system stability.
+
+1.  **Connection Status Indicator:**
+    - **Visual:** Small dot in Header (Right). 🟢 Green = Online, 🔴 Red = Offline.
+    - **Behavior:** Real-time ping. Hover shows "Connected to Server (12ms)" or "Disconnected".
+
+2.  **Reconnection Overlay:**
+    - **Visual:** Full-screen modal with semi-transparent dark background.
+    - **Content:** "Connection Lost. Attempting to reconnect..." + [Retry Now] button.
+    - **Behavior:** Auto-retries every 3s. Dismisses automatically when connection restores.
+
+3.  **Draft Recovery Dialog:**
+    - **Trigger:** User opens a form (e.g., GRN) that has a saved local draft.
+    - **Content:** "You have an unsaved draft from [Time]. Resume?"
+    - **Actions:** [Resume Draft] (Primary), [Discard] (Secondary).
+
+4.  **Unsaved Changes Warning:**
+    - **Trigger:** User clicks Back/Menu/Close while form is dirty.
+    - **Visual:** Blocking Modal. "You have unsaved changes. Leave anyway?"
+    - **Actions:** [Stay] (Primary), [Leave] (Destructive).
+
+5.  **Warning Banners:**
+    - **Visual:** Persistent colored bar below Header.
+    - **Types:**
+        - 🟠 **Disk Space:** "Low Disk Space (< 500MB). Free up space to prevent data loss."
+        - 🟠 **License:** "License expires in X days. Renew now."
+        - 🔴 **Expired:** "License Expired. Read-only mode active."
+
+6.  **Hardware Change Error Screen:**
+    - **Visual:** Full-screen blocking error.
+    - **Content:** "Hardware ID Mismatch. Application is locked."
+    - **Action:** [Copy Hardware ID] button to send to support.
+
 ---
 
 ## 6. Component Library

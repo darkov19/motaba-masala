@@ -9,6 +9,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.34
 	github.com/wailsapp/wails/v2 v2.11.0
 	golang.org/x/crypto v0.35.0
+	golang.org/x/sys v0.30.0
 )
 
 require (
@@ -38,7 +39,6 @@ require (
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	golang.org/x/net v0.36.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
 )
 

@@ -1,0 +1,90 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>7</storyId>
+    <title>Client Resilience & Recovery</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2026-02-15</generatedAt>
+    <sourceStoryPath>docs/stories/1-7-client-resilience-recovery.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Factory Data Operator</asA>
+    <iWant>my work saved automatically and connection glitches handled</iWant>
+    <soThat>I don't lose data when network drops or PC restarts</soThat>
+    <tasks>
+        <task id="1" acs="2,3">Implement Connection Monitoring
+            <subtask>Create ConnectionContext and Provider</subtask>
+            <subtask>Implement heartbeat/polling mechanism</subtask>
+            <subtask>Build UI components: Status Indicator, Reconnection Overlay</subtask>
+        </task>
+        <task id="2" acs="1">Implement Auto-Draft Hook
+            <subtask>Develop useAutoSave hook with localStorage integration</subtask>
+            <subtask>Implement Resume/Discard prompt logic</subtask>
+            <subtask>Integrate into key forms (GRN, Batch)</subtask>
+        </task>
+        <task id="3" acs="4">Implement Unsaved Changes Guard
+            <subtask>Develop useUnsavedChanges hook</subtask>
+            <subtask>Integrate with React Router navigation blocking</subtask>
+            <subtask>Integrate with Wails window close prevention</subtask>
+        </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="1">Auto-Draft: Every 5 seconds, form data is saved to localStorage. On next load, if a draft exists, the user is prompted to resume.</ac>
+    <ac id="2">Connection Status Indicator: A visual indicator (🟢/🔴) in the header shows real-time server connection status.</ac>
+    <ac id="3">Reconnection Overlay: When the connection drops, a full-screen overlay appears with auto-retry logic.</ac>
+    <ac id="4">Unsaved Changes Warning: Navigation away or closing window with dirty data triggers a confirmation modal.</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+        <doc>
+            <path>docs/resilience-audit-report.md</path>
+            <title>Resilience Audit Report</title>
+            <section>Category 2: Client Application Failures</section>
+            <snippet>2.1 Client Crash -> Auto-Draft. 2.2 Client X Button -> Unsaved Warning. 3.1 LAN Cable -> Connection Indicator.</snippet>
+        </doc>
+        <doc>
+            <path>docs/ux-design-specification.md</path>
+            <title>UX Design Spec</title>
+            <section>5.2 Resilience Components</section>
+            <snippet>Connection Status Indicator, Reconnection Overlay, Draft Recovery Dialog, Unsaved Changes Warning.</snippet>
+        </doc>
+    </docs>
+    <dependencies>
+      <node>
+        <package name="react-router-dom" />
+        <package name="ahooks" description="Optional: useful hooks like useLocalStorageState" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>UX Priority: Overlays and warnings must not be intrusive during normal operation.</constraint>
+    <constraint>Data Privacy: LocalStorage data should be cleared on successful submit.</constraint>
+    <constraint>Wails IPC: Navigation blocking needs to coordinate with Wails Go backend to prevent native window close.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>useAutoSave</name>
+      <kind>React Hook</kind>
+      <signature>(key: string, data: T) => void</signature>
+      <path>src/hooks/useAutoSave.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>React Testing Library for components. Jest for hooks logic.</standards>
+    <locations>
+      <location>src/hooks/__tests__/useAutoSave.test.ts</location>
+      <location>src/components/layout/__tests__/ConnectionOverlay.test.tsx</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test useAutoSave writes to localStorage after delay.</idea>
+      <idea ac="3">Render ConnectionOverlay, simulate retry click.</idea>
+    </ideas>
+  </tests>
+</story-context>

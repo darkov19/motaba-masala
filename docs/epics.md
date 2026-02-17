@@ -153,6 +153,104 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 - **Given** the Item Master screen
 - **When** I create a new Raw Material "Coriander Seeds" with Base Unit "KG"
 - **Then** it is saved to the database
+
+### Story 1.6: Server Resilience & Stability
+
+**As a** System Admin,
+**I want** the server to be robust against common accidents (accidental closure, hangs),
+**So that** the production line isn't interrupted by minor errors.
+
+**Acceptance Criteria:**
+
+- **Given** the Server is running
+- **When** I click the "X" button
+- **Then** it minimizes to System Tray instead of quitting
+- **And** shows a notification "Server is running in background"
+- **Given** the server process becomes unresponsive (>30s)
+- **When** the Watchdog detects this
+- **Then** it automatically restarts the service layer
+- **Given** a second instance of Server.exe is launched
+- **When** it tries to start
+- **Then** it focuses the existing window and terminates itself
+
+### Story 1.7: Client Resilience & Recovery
+
+**As a** Factory Data Operator,
+**I want** my work to be saved automatically and connection glitches handled gracefully,
+**So that** I don't lose data when the network drops or my PC restarts.
+
+**Acceptance Criteria:**
+
+- **Given** I am typing a long GRN
+- **When** the network cable is unplugged
+- **Then** the UI shows a "Reconnecting..." overlay
+- **And** when plugged back in, it reconnects automatically
+- **Given** I have unsaved data in a form
+- **When** the client app crashes or I accidentally close it
+- **Then** upon restarting, it offers to "Resume Draft" with my data intact
+- **Given** I try to navigate away with unsaved changes
+- **When** I click a menu item
+- **Then** a modal warns "Unsaved Changes. Leave anyway?"
+
+### Story 1.8: Data Integrity Protection
+
+**As a** Business Owner,
+**I want** to ensure data is never corrupted by concurrent edits or crashes,
+**So that** the inventory numbers are legally reliable.
+
+**Acceptance Criteria:**
+
+- **Given** User A and User B open the same Item
+- **When** User A saves changes
+- **And** User B tries to save afterwards
+- **Then** User B gets an error: "Record modified by another user. Reload required."
+- **Given** the server boots up
+- **When** it detects a corrupted SQLite file (integrity check fails)
+- **Then** it alerts the admin and offers to restore from the latest backup
+
+### Story 1.9: License & Security UX
+
+**As a** System Admin,
+**I want** clear warnings about license expiry and hardware changes,
+**So that** I can resolve issues without production downtime.
+
+**Acceptance Criteria:**
+
+- **Given** the license expires in < 30 days
+- **Then** a warning banner is shown daily
+- **Given** the license has expired < 7 days ago
+- **Then** the system allows Read-Only access (Grace Period)
+- **Given** the Server hardware (Motherboard/Disk) has changed
+- **When** I start the app
+- **Then** it shows a "Hardware ID Mismatch" error with a "Copy ID" button
+
+### Story 1.10: Installer Hardening
+
+**As a** Deployment Technician,
+**I want** the installer to handle firewall rules and shortcuts,
+**So that** deployment is plug-and-play.
+
+**Acceptance Criteria:**
+
+- **Given** the Server Installer is running
+- **Then** it adds an Inbound Rule to Windows Firewall for the app port (8090)
+- **Given** the Client Installer is running
+- **Then** it offers a checkbox "Start automatically when Windows starts"
+
+### Story 1.11: Resilience Verification Suite
+
+**As a** QA Tester,
+**I want** a set of verification tests for these resilience features,
+**So that** we can prove the system is robust.
+
+**Acceptance Criteria:**
+
+- **Given** a running system
+- **When** I kill the server process (Simulate Crash)
+- **Then** the DB handles recovery via WAL on restart
+- **When** I change the Server IP address
+- **Then** Clients reconnect via UDP discovery within 5 seconds
+
 - **And** I can set a "Re-order Level" alert threshold
 
 **Technical Notes:** Item types: RAW, BULK_POWDER, PACKING_MATERIAL, FINISHED_GOOD.
