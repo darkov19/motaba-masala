@@ -128,6 +128,11 @@ CREATE TABLE items (
 - [x] [Story 1.5] Wire `backupService.StopScheduler()` into graceful shutdown. ✅ Fixed.
 - [x] [Story 1.5] Log error from `backupService.Execute()` in `TriggerBackup` goroutine. ✅ Fixed.
 - [x] [Story 1.5] Remove unused `scheduler *time.Ticker` field or clean up `StopScheduler()`. ✅ Fixed.
+- [ ] [Story 1.7] Implement route-level navigation blocking for dirty forms (AC 4). Ref: `frontend/src/App.tsx:41`.
+- [ ] [Story 1.7] Implement client-side Wails close interception with dirty-state confirmation (AC 4). Ref: `cmd/client/main.go:17`.
+- [ ] [Story 1.7] Align connection indicator with explicit 🟢/🔴 requirement or update AC wording (AC 2). Ref: `frontend/src/components/layout/ConnectionStatus.tsx:11`.
+- [ ] [Story 1.7] Add automated tests for connection provider reconnect cadence/state transitions (AC 3). Ref: `frontend/src/context/ConnectionContext.tsx:85`.
+- [ ] [Story 1.7] Guard autosave localStorage writes against storage/quota exceptions (AC 1). Ref: `frontend/src/hooks/useAutoSave.ts:87`.
 
 ### Security
 

@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"masala_inventory_managment"
 	"masala_inventory_managment/internal/app"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 func main() {
@@ -23,6 +25,14 @@ func main() {
 		},
 		BackgroundColour: &options.RGBA{R: 125, G: 17, B: 17, A: 1}, // Motaba Deep Maroon
 		OnStartup:        application.Startup,
+		OnBeforeClose: func(ctx context.Context) (prevent bool) {
+			if application.IsForceQuit() {
+				return false
+			}
+
+			runtime.EventsEmit(ctx, "app:before-close")
+			return true
+		},
 		Bind: []interface{}{
 			application,
 		},
