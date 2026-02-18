@@ -2,13 +2,13 @@ export default function InstructionsPage({ onStart }: { onStart: () => void }) {
     return (
         <div className="instructions-page">
             <div className="instructions-hero">
-                <h1>🌶️ Motaba Masala Demo</h1>
+                <h1>Motaba Masala Demo</h1>
                 <p>Walk through the complete spice manufacturing workflow — from raw material procurement to finished goods dispatch. Every action is real and fully operational.</p>
             </div>
 
             {/* Visual Flow Diagram */}
-            <h2 style={{ fontFamily: 'var(--font-display)', marginBottom: 8 }}>Business Workflow</h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: 16, fontSize: '0.9rem' }}>This is how materials flow through the factory:</p>
+            <h2 style={{ fontFamily: 'var(--font-display)', marginBottom: 8, fontSize: '1.15rem', fontWeight: 700 }}>Business Workflow</h2>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 16, fontSize: '0.88rem' }}>This is how materials flow through the factory:</p>
 
             <div className="flow-diagram">
                 <div className="flow-step" style={{ borderColor: 'var(--color-raw)' }}>
@@ -50,17 +50,15 @@ export default function InstructionsPage({ onStart }: { onStart: () => void }) {
 
             {/* Worked Example */}
             <div className="example-section">
-                <h3>📋 Walkthrough Example</h3>
+                <h3>Walkthrough Example</h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>Follow this step-by-step scenario to see the complete workflow in action:</p>
 
                 <div className="example-step">
                     <span className="example-num">1</span>
                     <div>
-                        <strong>Master Data (Pre-loaded)</strong>
+                        <strong>Master Data — Configure Your Factory</strong>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                            The demo comes with 5 raw materials (Chili Seeds, Coriander Seeds, Cumin Seeds, Turmeric Root, Black Pepper),
-                            3 bulk powders, 4 packing materials, 4 finished goods, 3 recipes, 3 suppliers, and 3 customers.
-                            You can add, edit, or delete any of these.
+                            The demo comes with pre-loaded spice data. Explore the tabs to <strong>Create custom manufacturing recipes</strong>, <strong>Define Packing BOMs</strong> (specifying pouches/labels per unit), and <strong>Link Finished Goods</strong> to their specific bulk powder source for smart workflow automation.
                         </p>
                     </div>
                 </div>
@@ -80,12 +78,11 @@ export default function InstructionsPage({ onStart }: { onStart: () => void }) {
                 <div className="example-step">
                     <span className="example-num">3</span>
                     <div>
-                        <strong>Production — Make 95 KG Red Chili Powder</strong>
+                        <strong>Production — No-Gimmick Batch Execution</strong>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                            Select "Red Chili Powder" recipe → Create batch with 95 KG planned output.
-                            The system shows you need ~100 KG Chili Seeds. Enter actual consumed: 100 KG, Output: 95 KG, Wastage: 5 KG.
-                            Yield = 95%. Cost per KG = ₹(100×Avg Cost)/95.
-                            Raw stock ↓ 100 KG, Bulk stock ↑ 95 KG.
+                            Select "Red Chili Powder" recipe. Instead of forecasting output, enter <strong>Planned Input KG</strong> (e.g., 100 KG seeds).
+                            The system sums your inputs into a "Targeted Output" (100 KG). During execution, enter your <strong>Actual Output</strong> (e.g., 95 KG).
+                            The system <strong>auto-calculates Wastage</strong> (5 KG) and yield (95%).
                         </p>
                     </div>
                 </div>
@@ -93,11 +90,11 @@ export default function InstructionsPage({ onStart }: { onStart: () => void }) {
                 <div className="example-step">
                     <span className="example-num">4</span>
                     <div>
-                        <strong>Packing — Create 1000 × "Red Chili Powder 50g" Pouches</strong>
+                        <strong>Packing — Smart SKU Filtering & Auto-Fill</strong>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                            Select the completed batch as source. Pack into 50g pouches (1000 units = 50 KG bulk consumed).
-                            System deducts 50 KG bulk powder + 1000 pouches + 1000 labels.
-                            FG stock increases by 1000 pieces. FG cost = (Bulk cost per 50g) + (Pouch + Label cost).
+                            Select your source: either a <strong>Production Batch</strong> or <strong>Direct Bulk Stock</strong>.
+                            Notice that the SKU dropdown <strong>automatically filters</strong> to show only relevant items (e.g., Red Chili Batch only shows Red Chili SKUs).
+                            The system then <strong>Auto-Fills the Packing BOM</strong> (Pouches and Labels) ensuring perfect material inventory consumption.
                         </p>
                     </div>
                 </div>
@@ -127,7 +124,7 @@ export default function InstructionsPage({ onStart }: { onStart: () => void }) {
             </div>
 
             {/* Key Concepts */}
-            <h2 style={{ fontFamily: 'var(--font-display)', marginBottom: 12, marginTop: 32 }}>Key Concepts</h2>
+            <h2 style={{ fontFamily: 'var(--font-display)', marginBottom: 12, marginTop: 32, fontSize: '1.15rem', fontWeight: 700 }}>Key Concepts</h2>
             <div className="glossary">
                 <div className="glossary-item">
                     <strong>GRN</strong>
@@ -135,11 +132,12 @@ export default function InstructionsPage({ onStart }: { onStart: () => void }) {
                 </div>
                 <div className="glossary-item">
                     <strong>BOM / Recipe</strong>
-                    <p>Bill of Materials — defines ingredients and quantities needed to produce a specific bulk powder</p>
+                    <p>Bill of Materials — defines ingredients (for bulk powders) or packing materials (for retail SKUs) needed per unit produced.</p>
                 </div>
                 <div className="glossary-item">
+                    <span className="icon">🏭</span>
                     <strong>Batch</strong>
-                    <p>A production run that converts raw materials into bulk powder, with yield and wastage tracking</p>
+                    <p>Input-driven production run. Targeted output is the sum of ingredients; wastage is auto-calculated upon completion.</p>
                 </div>
                 <div className="glossary-item">
                     <strong>Packing Run</strong>
@@ -164,9 +162,9 @@ export default function InstructionsPage({ onStart }: { onStart: () => void }) {
             </div>
 
             {/* CTA */}
-            <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                <button className="btn btn-primary btn-lg" onClick={onStart} style={{ fontSize: '1.1rem', padding: '16px 48px' }}>
-                    🚀 Start the Demo
+            <div style={{ textAlign: 'center', padding: '36px 0' }}>
+                <button className="btn btn-primary btn-lg" onClick={onStart} style={{ fontSize: '1rem', padding: '14px 40px' }}>
+                    Start the Demo →
                 </button>
                 <p style={{ color: 'var(--text-dim)', marginTop: 12, fontSize: '0.82rem' }}>
                     Tip: Watch the <strong>Live Stock sidebar</strong> on the right — it updates in real-time as you operate!

@@ -9,11 +9,12 @@ export default function PackingPage() {
     const [fgItemId, setFgItemId] = useState('');
     const [outputQty, setOutputQty] = useState(0);
     const [packMats, setPackMats] = useState([{ itemId: '', quantity: 0 }]);
+    const [formOpen, setFormOpen] = useState(true);
 
     const completedBatches = data.batches.filter(b => b.status === 'COMPLETED');
     const bulkItemsWithStock = data.items.filter(i => i.type === 'BULK' && i.currentStock > 0);
     const packItems = data.items.filter(i => i.type === 'PACKING');
-    // Find the selected source item (either from a batch or direct selection)
+
     let selectedSourceItem: Item | undefined;
     if (batchId.startsWith('BATCH-')) {
         const batch = data.batches.find(b => b.id === batchId);
@@ -29,7 +30,6 @@ export default function PackingPage() {
         ? data.items.filter(i => i.type === 'FG' && i.sourceBulkItemId === selectedSourceItem?.id)
         : data.items.filter(i => i.type === 'FG');
 
-    // Reset FG selection if it's no longer in the filtered list
     useEffect(() => {
         if (fgItemId && !fgItems.find(i => i.id === fgItemId)) {
             setFgItemId('');
@@ -39,7 +39,6 @@ export default function PackingPage() {
     const selectedFg = data.items.find(i => i.id === fgItemId);
     const bulkNeeded = selectedFg && outputQty > 0 ? ((selectedFg.packWeight || 100) / 1000) * outputQty : 0;
 
-    // Auto-fill packing materials when SKU/Qty changes
     useEffect(() => {
         if (selectedFg?.packingMaterials && outputQty > 0) {
             const autoMats = selectedFg.packingMaterials.map(m => ({
@@ -64,102 +63,136 @@ export default function PackingPage() {
 
     return (
         <div>
-            <h1 className="page-title">📦 Packing</h1>
-            <p className="page-subtitle">Convert bulk powder into retail packs. Consumes bulk stock and packing materials, creates finished goods.</p>
+            <div className="flex justify-between items-center" style={{ marginBottom: 24 }}>
+                <div>
+                    <h1 className="page-title">Packing</h1>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', margin: 0 }}>Convert bulk powder into retail packs. Consumes bulk stock and packing materials.</p>
+                </div>
+                <button className="btn btn-primary" onClick={() => setFormOpen(!formOpen)}>
+                    {formOpen ? 'Hide Form' : '+ New Packing Run'}
+                </button>
+            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-                <div className="card">
-                    <div className="card-title" style={{ marginBottom: 20 }}>New Packing Run</div>
+            {/* Collapsible Form */}
+            {formOpen && (
+                <div className="form-panel" style={{ marginBottom: 24 }}>
+                    <div style={{ padding: 24 }}>
+                        <h3 style={{ fontSize: '0.92rem', fontWeight: 700, marginBottom: 20, color: 'var(--text-primary)' }}>New Packing Run</h3>
 
-                    <div className="form-group">
-                        <label>Source Batch (Completed)</label>
-                        <select value={batchId} onChange={e => setBatchId(e.target.value)}>
-                            <option value="">Select source...</option>
-                            <optgroup label="Production Batches (Completed)">
-                                {completedBatches.map(b => {
-                                    const r = data.recipes.find(x => x.id === b.recipeId)!;
-                                    const bulkItem = data.items.find(i => i.id === r.outputItemId);
-                                    return <option key={b.id} value={b.id}>{b.id} — {bulkItem?.name} ({b.actualOutput} KG produced)</option>;
-                                })}
-                            </optgroup>
-                            <optgroup label="Direct Bulk Stock (Purchased)">
-                                {bulkItemsWithStock.map(i => (
-                                    <option key={i.id} value={`DIR-${i.id}`}>{i.id} — {i.name} ({i.currentStock} KG available)</option>
-                                ))}
-                            </optgroup>
-                        </select>
-                    </div>
-
-                    <div className="form-row">
                         <div className="form-group">
-                            <label>Finished Good Item (SKU)</label>
-                            <select value={fgItemId} onChange={e => setFgItemId(e.target.value)}>
-                                <option value="">Select FG...</option>
-                                {fgItems.map(fg => <option key={fg.id} value={fg.id}>{fg.name} ({fg.packWeight}g)</option>)}
+                            <label>Source (Batch or Bulk Stock)</label>
+                            <select value={batchId} onChange={e => setBatchId(e.target.value)}>
+                                <option value="">Select source...</option>
+                                <optgroup label="Production Batches (Completed)">
+                                    {completedBatches.map(b => {
+                                        const r = data.recipes.find(x => x.id === b.recipeId)!;
+                                        const bulkItem = data.items.find(i => i.id === r.outputItemId);
+                                        return <option key={b.id} value={b.id}>{b.id} — {bulkItem?.name} ({b.actualOutput} KG produced)</option>;
+                                    })}
+                                </optgroup>
+                                <optgroup label="Direct Bulk Stock (Purchased)">
+                                    {bulkItemsWithStock.map(i => (
+                                        <option key={i.id} value={`DIR-${i.id}`}>{i.id} — {i.name} ({i.currentStock} KG available)</option>
+                                    ))}
+                                </optgroup>
                             </select>
                         </div>
-                        <div className="form-group">
-                            <label>Quantity to Pack (PCS)</label>
-                            <input type="number" value={outputQty || ''} onChange={e => setOutputQty(+e.target.value)} placeholder="e.g. 1000" />
-                        </div>
-                    </div>
 
-                    {selectedFg && outputQty > 0 && (
-                        <div style={{ background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)', padding: 12, marginBottom: 16, fontSize: '0.82rem' }}>
-                            <strong>Calculation Preview:</strong>
-                            <div style={{ marginTop: 6, color: 'var(--text-secondary)' }}>
-                                {outputQty} pcs × {selectedFg.packWeight}g = <strong className="text-bulk">{bulkNeeded.toFixed(2)} KG</strong> bulk powder needed
-                            </div>
-                        </div>
-                    )}
-
-                    <label>Packing Materials Used</label>
-                    {packMats.map((pm, idx) => (
-                        <div key={idx} className="flex gap-8 mb-16" style={{ alignItems: 'end' }}>
-                            <div style={{ flex: 2 }}>
-                                <select value={pm.itemId} onChange={e => { const n = [...packMats]; n[idx] = { ...n[idx], itemId: e.target.value }; setPackMats(n); }}>
-                                    <option value="">Select material...</option>
-                                    {packItems.map(p => <option key={p.id} value={p.id}>{p.name} (Stock: {p.currentStock.toLocaleString()})</option>)}
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Finished Good Item (SKU)</label>
+                                <select value={fgItemId} onChange={e => setFgItemId(e.target.value)}>
+                                    <option value="">Select FG...</option>
+                                    {fgItems.map(fg => <option key={fg.id} value={fg.id}>{fg.name} ({fg.packWeight}g)</option>)}
                                 </select>
                             </div>
-                            <div style={{ flex: 1 }}>
-                                <input type="number" value={pm.quantity || ''} onChange={e => { const n = [...packMats]; n[idx] = { ...n[idx], quantity: +e.target.value }; setPackMats(n); }} placeholder="Qty" />
+                            <div className="form-group">
+                                <label>Quantity to Pack (PCS)</label>
+                                <input type="number" value={outputQty || ''} onChange={e => setOutputQty(+e.target.value)} placeholder="e.g. 1000" />
                             </div>
-                            {packMats.length > 1 && <button className="btn btn-outline btn-sm" onClick={() => setPackMats(packMats.filter((_, i) => i !== idx))}>✕</button>}
                         </div>
-                    ))}
-                    <button className="add-line-btn" onClick={() => setPackMats([...packMats, { itemId: '', quantity: 0 }])}>+ Add Packing Material</button>
 
-                    <div className="modal-actions" style={{ marginTop: 20 }}>
-                        <button className="btn btn-success w-full" onClick={handleSubmit}>✓ Complete Packing Run</button>
+                        {selectedFg && outputQty > 0 && (
+                            <div className="preview-strip">
+                                <strong>Requirements:</strong> {outputQty} pcs × {selectedFg.packWeight}g = <strong className="text-primary">{bulkNeeded.toFixed(2)} KG</strong> bulk powder needed
+                            </div>
+                        )}
+
+                        <div style={{ marginTop: 16 }}>
+                            <label>Packing Materials</label>
+                            <div className="table-container" style={{ marginBottom: 8 }}>
+                                <table>
+                                    <thead>
+                                        <tr><th>Material</th><th style={{ width: 120 }}>Quantity</th><th style={{ width: 40 }}></th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {packMats.map((pm, idx) => (
+                                            <tr key={idx}>
+                                                <td>
+                                                    <select value={pm.itemId} onChange={e => { const n = [...packMats]; n[idx] = { ...n[idx], itemId: e.target.value }; setPackMats(n); }} style={{ margin: 0 }}>
+                                                        <option value="">Select material...</option>
+                                                        {packItems.map(p => <option key={p.id} value={p.id}>{p.name} (Stock: {p.currentStock.toLocaleString()})</option>)}
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <input type="number" value={pm.quantity || ''} onChange={e => { const n = [...packMats]; n[idx] = { ...n[idx], quantity: +e.target.value }; setPackMats(n); }} placeholder="Qty" style={{ margin: 0 }} />
+                                                </td>
+                                                <td>{packMats.length > 1 && <button className="btn btn-ghost btn-sm" onClick={() => setPackMats(packMats.filter((_, i) => i !== idx))}>✕</button>}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <button className="add-line-btn" onClick={() => setPackMats([...packMats, { itemId: '', quantity: 0 }])}>+ Add Packing Material</button>
+                        </div>
+
+                        <div style={{ marginTop: 20 }}>
+                            <button className="btn btn-success w-full" onClick={handleSubmit}>Complete Packing Run</button>
+                        </div>
                     </div>
                 </div>
+            )}
 
-                <div className="card">
-                    <div className="card-title" style={{ marginBottom: 20 }}>Packing History ({data.packingRuns.length})</div>
-                    {!data.packingRuns.length ? (
-                        <div className="empty-state"><div className="icon">📦</div><p>No packing runs yet. Complete a production batch first, then pack!</p></div>
-                    ) : [...data.packingRuns].reverse().map(pr => {
-                        const fg = data.items.find(i => i.id === pr.fgItemId);
-                        const bulk = data.items.find(i => i.id === pr.bulkItemId);
-                        return (
-                            <div key={pr.id} className="card" style={{ background: 'var(--bg-elevated)', padding: 14, marginBottom: 10 }}>
-                                <div className="flex justify-between items-center">
-                                    <strong className="mono">{pr.id}</strong>
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{pr.date}</span>
-                                </div>
-                                <div style={{ fontSize: '0.85rem', marginTop: 6 }}>
-                                    <span className="text-fg">{fg?.name}</span> × <strong>{pr.outputQuantity.toLocaleString()}</strong> pcs
-                                </div>
-                                <div className="flex gap-16" style={{ marginTop: 6, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                    <span>Bulk Used: {pr.bulkConsumed} KG ({bulk?.name})</span>
-                                    <span>FG Cost: <strong className="text-primary">₹{pr.fgCostPerUnit}/unit</strong></span>
-                                </div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: 4 }}>Source: {pr.sourceBatchId}</div>
-                            </div>
-                        );
-                    })}
+            {/* History Table */}
+            <div className="history-section">
+                <div className="section-header">
+                    <h3>Packing History</h3>
+                    <span className="record-count">{data.packingRuns.length} records</span>
                 </div>
+                {!data.packingRuns.length ? (
+                    <div className="empty-state"><div className="icon">📦</div><p>No packing runs yet. Complete a production batch first, then pack!</p></div>
+                ) : (
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Pack ID</th>
+                                <th>Date</th>
+                                <th>Finished Good</th>
+                                <th>Qty Packed</th>
+                                <th>Bulk Used</th>
+                                <th>FG Cost/Unit</th>
+                                <th>Source</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {[...data.packingRuns].reverse().map(pr => {
+                                const fg = data.items.find(i => i.id === pr.fgItemId);
+                                const bulk = data.items.find(i => i.id === pr.bulkItemId);
+                                return (
+                                    <tr key={pr.id}>
+                                        <td><span className="mono">{pr.id}</span></td>
+                                        <td>{pr.date}</td>
+                                        <td><strong>{fg?.name}</strong></td>
+                                        <td><strong>{pr.outputQuantity.toLocaleString()}</strong> pcs</td>
+                                        <td>{pr.bulkConsumed} KG <span style={{ color: 'var(--text-dim)', fontSize: '0.78rem' }}>({bulk?.name})</span></td>
+                                        <td><strong className="text-primary">₹{pr.fgCostPerUnit}</strong></td>
+                                        <td><span className="mono">{pr.sourceBatchId}</span></td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                )}
             </div>
         </div>
     );

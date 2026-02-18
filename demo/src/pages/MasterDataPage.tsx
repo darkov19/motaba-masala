@@ -92,123 +92,130 @@ export default function MasterDataPage() {
 
     return (
         <div>
-            <h1 className="page-title">⚙️ Master Data</h1>
+            <h1 className="page-title">Master Data</h1>
             <p className="page-subtitle">Configure items, recipes, suppliers, and customers. Pre-loaded with sample spice data.</p>
 
             <div className="tabs">
                 {(['items', 'recipes', 'suppliers', 'customers'] as const).map(t => (
                     <button key={t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => { setTab(t); setShowModal(false); }}>
-                        {t === 'items' ? '📦 Items' : t === 'recipes' ? '📝 Recipes' : t === 'suppliers' ? '🏢 Suppliers' : '👥 Customers'}
+                        {t === 'items' ? 'Items' : t === 'recipes' ? 'Recipes' : t === 'suppliers' ? 'Suppliers' : 'Customers'}
                     </button>
                 ))}
             </div>
 
             {/* Items Tab */}
             {tab === 'items' && (
-                <div className="card">
-                    <div className="card-header">
-                        <span className="card-title">Item Master ({data.items.length})</span>
-                        <button className="btn btn-primary btn-sm" onClick={() => { resetForm(); setShowModal(true); }}>+ Add Item</button>
+                <div className="history-section">
+                    <div className="section-header">
+                        <h3>Item Master</h3>
+                        <div className="flex gap-8 items-center">
+                            <span className="record-count">{data.items.length} items</span>
+                            <button className="btn btn-primary btn-sm" onClick={() => { resetForm(); setShowModal(true); }}>+ Add Item</button>
+                        </div>
                     </div>
-                    <div className="table-container">
-                        <table>
-                            <thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Unit</th><th>Stock</th><th>Avg Cost</th><th>Value</th><th>Reorder</th><th></th></tr></thead>
-                            <tbody>
-                                {data.items.map(it => (
-                                    <tr key={it.id}>
-                                        <td className="mono">{it.id}</td>
-                                        <td><strong>{it.name}</strong></td>
-                                        <td><span className={`badge-type ${BADGE_CLASS[it.type]}`}>{TYPE_LABELS[it.type]}</span></td>
-                                        <td>{it.baseUnit}</td>
-                                        <td className={it.currentStock <= it.reorderLevel ? 'text-danger' : ''}><strong>{it.currentStock.toLocaleString()}</strong></td>
-                                        <td className="currency">₹{it.avgCost.toFixed(2)}</td>
-                                        <td className="currency">₹{(it.currentStock * it.avgCost).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
-                                        <td>{it.reorderLevel}</td>
-                                        <td>
-                                            <div className="flex gap-8">
-                                                <button className="btn btn-outline btn-sm" onClick={() => handleEditItem(it)}>✏️</button>
-                                                <button className="btn btn-outline btn-sm" onClick={() => { if (confirm(`Delete ${it.name}?`)) { setData(deleteItem(data, it.id)); toast(`Deleted "${it.name}"`); } }}>✕</button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <table>
+                        <thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Unit</th><th>Stock</th><th>Avg Cost</th><th>Value</th><th>Reorder</th><th></th></tr></thead>
+                        <tbody>
+                            {data.items.map(it => (
+                                <tr key={it.id}>
+                                    <td className="mono">{it.id}</td>
+                                    <td><strong>{it.name}</strong></td>
+                                    <td><span className={`badge-type ${BADGE_CLASS[it.type]}`}>{TYPE_LABELS[it.type]}</span></td>
+                                    <td>{it.baseUnit}</td>
+                                    <td className={it.currentStock <= it.reorderLevel ? 'text-danger' : ''}><strong>{it.currentStock.toLocaleString()}</strong></td>
+                                    <td className="currency">₹{it.avgCost.toFixed(2)}</td>
+                                    <td className="currency">₹{(it.currentStock * it.avgCost).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
+                                    <td>{it.reorderLevel}</td>
+                                    <td>
+                                        <div className="flex gap-8">
+                                            <button className="btn btn-ghost btn-sm" onClick={() => handleEditItem(it)}>Edit</button>
+                                            <button className="btn btn-ghost btn-sm" style={{ color: 'var(--color-danger)' }} onClick={() => { if (confirm(`Delete ${it.name}?`)) { setData(deleteItem(data, it.id)); toast(`Deleted "${it.name}"`); } }}>Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             )}
 
             {/* Recipes Tab */}
             {tab === 'recipes' && (
-                <div className="card">
-                    <div className="card-header">
-                        <span className="card-title">Recipes / BOM ({data.recipes.length})</span>
-                        <button className="btn btn-primary btn-sm" onClick={() => { setRecipeForm({ name: '', outputItemId: '', outputQty: 0, wastePct: 5, ingredients: [{ itemId: '', quantity: 0 }] }); setShowModal(true); }}>+ Add Recipe</button>
+                <div className="history-section">
+                    <div className="section-header">
+                        <h3>Recipes / BOM</h3>
+                        <div className="flex gap-8 items-center">
+                            <span className="record-count">{data.recipes.length} recipes</span>
+                            <button className="btn btn-primary btn-sm" onClick={() => { setRecipeForm({ name: '', outputItemId: '', outputQty: 0, wastePct: 5, ingredients: [{ itemId: '', quantity: 0 }] }); setShowModal(true); }}>+ Add Recipe</button>
+                        </div>
                     </div>
-                    {data.recipes.map(r => {
-                        const outItem = data.items.find(i => i.id === r.outputItemId);
-                        return (
-                            <div key={r.id} className="card" style={{ marginBottom: 12, background: 'var(--bg-elevated)' }}>
-                                <div className="flex justify-between items-center" style={{ marginBottom: 12 }}>
-                                    <div>
-                                        <strong style={{ fontSize: '1rem' }}>{r.name}</strong>
-                                        <span className="mono" style={{ marginLeft: 8, color: 'var(--text-dim)', fontSize: '0.75rem' }}>{r.id}</span>
-                                    </div>
-                                    <button className="btn btn-outline btn-sm" onClick={() => { setData(deleteRecipe(data, r.id)); toast(`Deleted recipe "${r.name}"`); }}>✕</button>
-                                </div>
-                                <div className="flex gap-24" style={{ fontSize: '0.85rem' }}>
-                                    <div><span style={{ color: 'var(--text-dim)' }}>Output:</span> <strong className="text-bulk">{outItem?.name || r.outputItemId}</strong> ({r.outputQuantity} {r.outputUnit})</div>
-                                    <div><span style={{ color: 'var(--text-dim)' }}>Expected Waste:</span> <strong className="text-warning">{r.expectedWastePct}%</strong></div>
-                                </div>
-                                <div style={{ marginTop: 8, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                                    <strong>Ingredients:</strong> {r.ingredients.map(ing => {
-                                        const item = data.items.find(i => i.id === ing.itemId);
-                                        return `${item?.name || ing.itemId} (${ing.quantity} ${ing.unit})`;
-                                    }).join(' + ')}
-                                </div>
-                            </div>
-                        );
-                    })}
+                    <table>
+                        <thead><tr><th>ID</th><th>Name</th><th>Output</th><th>Expected Waste</th><th>Ingredients</th><th></th></tr></thead>
+                        <tbody>
+                            {data.recipes.map(r => {
+                                const outItem = data.items.find(i => i.id === r.outputItemId);
+                                return (
+                                    <tr key={r.id}>
+                                        <td className="mono">{r.id}</td>
+                                        <td><strong>{r.name}</strong></td>
+                                        <td><span className="text-bulk">{outItem?.name || r.outputItemId}</span> ({r.outputQuantity} {r.outputUnit})</td>
+                                        <td><span className="text-warning">{r.expectedWastePct}%</span></td>
+                                        <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                            {r.ingredients.map(ing => {
+                                                const item = data.items.find(i => i.id === ing.itemId);
+                                                return `${item?.name || ing.itemId} (${ing.quantity} ${ing.unit})`;
+                                            }).join(' + ')}
+                                        </td>
+                                        <td>
+                                            <button className="btn btn-ghost btn-sm" style={{ color: 'var(--color-danger)' }} onClick={() => { setData(deleteRecipe(data, r.id)); toast(`Deleted recipe "${r.name}"`); }}>Delete</button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
                 </div>
             )}
 
             {/* Suppliers Tab */}
             {tab === 'suppliers' && (
-                <div className="card">
-                    <div className="card-header">
-                        <span className="card-title">Suppliers ({data.suppliers.length})</span>
-                        <button className="btn btn-primary btn-sm" onClick={() => { setSupplierForm({ name: '', contact: '', phone: '', leadTimeDays: 7 }); setShowModal(true); }}>+ Add Supplier</button>
+                <div className="history-section">
+                    <div className="section-header">
+                        <h3>Suppliers</h3>
+                        <div className="flex gap-8 items-center">
+                            <span className="record-count">{data.suppliers.length} suppliers</span>
+                            <button className="btn btn-primary btn-sm" onClick={() => { setSupplierForm({ name: '', contact: '', phone: '', leadTimeDays: 7 }); setShowModal(true); }}>+ Add Supplier</button>
+                        </div>
                     </div>
-                    <div className="table-container">
-                        <table>
-                            <thead><tr><th>ID</th><th>Name</th><th>Contact</th><th>Phone</th><th>Lead Time</th></tr></thead>
-                            <tbody>
-                                {data.suppliers.map(s => (
-                                    <tr key={s.id}><td className="mono">{s.id}</td><td><strong>{s.name}</strong></td><td>{s.contact}</td><td>{s.phone}</td><td>{s.leadTimeDays} days</td></tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <table>
+                        <thead><tr><th>ID</th><th>Name</th><th>Contact</th><th>Phone</th><th>Lead Time</th></tr></thead>
+                        <tbody>
+                            {data.suppliers.map(s => (
+                                <tr key={s.id}><td className="mono">{s.id}</td><td><strong>{s.name}</strong></td><td>{s.contact}</td><td>{s.phone}</td><td>{s.leadTimeDays} days</td></tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             )}
 
             {/* Customers Tab */}
             {tab === 'customers' && (
-                <div className="card">
-                    <div className="card-header">
-                        <span className="card-title">Customers ({data.customers.length})</span>
-                        <button className="btn btn-primary btn-sm" onClick={() => { setCustomerForm({ name: '', contact: '', phone: '', channel: '' }); setShowModal(true); }}>+ Add Customer</button>
+                <div className="history-section">
+                    <div className="section-header">
+                        <h3>Customers</h3>
+                        <div className="flex gap-8 items-center">
+                            <span className="record-count">{data.customers.length} customers</span>
+                            <button className="btn btn-primary btn-sm" onClick={() => { setCustomerForm({ name: '', contact: '', phone: '', channel: '' }); setShowModal(true); }}>+ Add Customer</button>
+                        </div>
                     </div>
-                    <div className="table-container">
-                        <table>
-                            <thead><tr><th>ID</th><th>Name</th><th>Contact</th><th>Phone</th><th>Channel</th></tr></thead>
-                            <tbody>
-                                {data.customers.map(c => (
-                                    <tr key={c.id}><td className="mono">{c.id}</td><td><strong>{c.name}</strong></td><td>{c.contact}</td><td>{c.phone}</td><td>{c.channel}</td></tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <table>
+                        <thead><tr><th>ID</th><th>Name</th><th>Contact</th><th>Phone</th><th>Channel</th></tr></thead>
+                        <tbody>
+                            {data.customers.map(c => (
+                                <tr key={c.id}><td className="mono">{c.id}</td><td><strong>{c.name}</strong></td><td>{c.contact}</td><td>{c.phone}</td><td>{c.channel}</td></tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             )}
 
@@ -216,7 +223,7 @@ export default function MasterDataPage() {
             {showModal && tab === 'items' && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header"><span className="modal-title">Add New Item</span><button className="modal-close" onClick={() => setShowModal(false)}>×</button></div>
+                        <div className="modal-header"><span className="modal-title">{editingId ? 'Edit Item' : 'Add New Item'}</span><button className="modal-close" onClick={() => setShowModal(false)}>×</button></div>
                         <div className="form-group"><label>Name</label><input value={itemForm.name} onChange={e => setItemForm({ ...itemForm, name: e.target.value })} placeholder="e.g. Fennel Seeds" /></div>
                         <div className="form-row">
                             <div className="form-group"><label>Type</label><select value={itemForm.type} onChange={e => setItemForm({ ...itemForm, type: e.target.value as ItemType })}><option value="RAW">Raw Material</option><option value="BULK">Bulk Powder</option><option value="PACKING">Packing Material</option><option value="FG">Finished Good</option></select></div>
@@ -261,7 +268,7 @@ export default function MasterDataPage() {
                                             }}
                                             style={{ flex: 1 }}
                                         />
-                                        <button className="btn btn-outline btn-sm" onClick={() => setItemForm({ ...itemForm, packingMaterials: itemForm.packingMaterials.filter((_, i) => i !== idx) })}>✕</button>
+                                        <button className="btn btn-ghost btn-sm" onClick={() => setItemForm({ ...itemForm, packingMaterials: itemForm.packingMaterials.filter((_, i) => i !== idx) })}>✕</button>
                                     </div>
                                 ))}
                                 <button className="add-line-btn" onClick={() => setItemForm({ ...itemForm, packingMaterials: [...itemForm.packingMaterials, { itemId: '', quantityPerUnit: 1 }] })}>+ Add Requirement</button>

@@ -7,6 +7,7 @@ export default function ProcurementPage() {
     const [supplierId, setSupplierId] = useState('');
     const [invoiceNum, setInvoiceNum] = useState('');
     const [lines, setLines] = useState([{ itemId: '', quantity: 0, unitPrice: 0 }]);
+    const [formOpen, setFormOpen] = useState(true);
 
     const receivableItems = data.items.filter(i => i.type === 'RAW' || i.type === 'PACKING' || i.type === 'BULK');
 
@@ -30,69 +31,128 @@ export default function ProcurementPage() {
 
     return (
         <div>
-            <h1 className="page-title">📦 Procurement / GRN</h1>
-            <p className="page-subtitle">Record incoming materials. Stock and costs update automatically on submission.</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-                <div className="card">
-                    <div className="card-title" style={{ marginBottom: 20 }}>New Goods Received Note</div>
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label>Supplier</label>
-                            <select value={supplierId} onChange={e => setSupplierId(e.target.value)}>
-                                <option value="">Select...</option>
-                                {data.suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label>Invoice #</label>
-                            <input value={invoiceNum} onChange={e => setInvoiceNum(e.target.value)} placeholder="INV-2026-001" />
-                        </div>
-                    </div>
-                    <label>Line Items</label>
-                    {lines.map((line, idx) => (
-                        <div key={idx} className="flex gap-8 mb-16" style={{ alignItems: 'end' }}>
-                            <div style={{ flex: 3 }}>
-                                <select value={line.itemId} onChange={e => updateLine(idx, 'itemId', e.target.value)}>
-                                    <option value="">Select item...</option>
-                                    {receivableItems.map(i => <option key={i.id} value={i.id}>{i.name} ({i.type})</option>)}
+            <div className="flex justify-between items-center" style={{ marginBottom: 24 }}>
+                <div>
+                    <h1 className="page-title">Procurement / GRN</h1>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', margin: 0 }}>Record incoming materials. Stock and costs update automatically on submission.</p>
+                </div>
+                <button className="btn btn-primary" onClick={() => setFormOpen(!formOpen)}>
+                    {formOpen ? 'Hide Form' : '+ New GRN'}
+                </button>
+            </div>
+
+            {/* Collapsible Form */}
+            {formOpen && (
+                <div className="form-panel" style={{ marginBottom: 24 }}>
+                    <div style={{ padding: 24 }}>
+                        <h3 style={{ fontSize: '0.92rem', fontWeight: 700, marginBottom: 20, color: 'var(--text-primary)' }}>New Goods Received Note</h3>
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Supplier</label>
+                                <select value={supplierId} onChange={e => setSupplierId(e.target.value)}>
+                                    <option value="">Select supplier...</option>
+                                    {data.suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                 </select>
                             </div>
-                            <div style={{ flex: 1 }}><input type="number" value={line.quantity || ''} onChange={e => updateLine(idx, 'quantity', +e.target.value)} placeholder="Qty" /></div>
-                            <div style={{ flex: 1 }}><input type="number" value={line.unitPrice || ''} onChange={e => updateLine(idx, 'unitPrice', +e.target.value)} placeholder="₹/Unit" /></div>
-                            <div style={{ flex: 1, padding: '10px 0', fontWeight: 600, color: 'var(--color-primary)' }}>₹{(line.quantity * line.unitPrice).toLocaleString('en-IN')}</div>
-                            {lines.length > 1 && <button className="btn btn-outline btn-sm" onClick={() => setLines(lines.filter((_, i) => i !== idx))}>✕</button>}
+                            <div className="form-group">
+                                <label>Invoice #</label>
+                                <input value={invoiceNum} onChange={e => setInvoiceNum(e.target.value)} placeholder="INV-2026-001" />
+                            </div>
                         </div>
-                    ))}
-                    <button className="add-line-btn" onClick={() => setLines([...lines, { itemId: '', quantity: 0, unitPrice: 0 }])}>+ Add Line</button>
-                    <div className="modal-actions">
-                        <div style={{ flex: 1, fontWeight: 600 }}>Total: <span className="text-primary" style={{ fontSize: '1.1rem' }}>₹{grandTotal.toLocaleString('en-IN')}</span></div>
-                        <button className="btn btn-success" onClick={handleSubmit}>✓ Create GRN</button>
+
+                        <label>Line Items</label>
+                        <div className="table-container" style={{ marginBottom: 12 }}>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th style={{ width: 120 }}>Quantity</th>
+                                        <th style={{ width: 120 }}>Unit Price (₹)</th>
+                                        <th style={{ width: 100 }}>Amount</th>
+                                        <th style={{ width: 40 }}></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {lines.map((line, idx) => (
+                                        <tr key={idx}>
+                                            <td>
+                                                <select value={line.itemId} onChange={e => updateLine(idx, 'itemId', e.target.value)} style={{ margin: 0 }}>
+                                                    <option value="">Select item...</option>
+                                                    {receivableItems.map(i => <option key={i.id} value={i.id}>{i.name} ({i.type})</option>)}
+                                                </select>
+                                            </td>
+                                            <td><input type="number" value={line.quantity || ''} onChange={e => updateLine(idx, 'quantity', +e.target.value)} placeholder="0" style={{ margin: 0 }} /></td>
+                                            <td><input type="number" value={line.unitPrice || ''} onChange={e => updateLine(idx, 'unitPrice', +e.target.value)} placeholder="0.00" style={{ margin: 0 }} /></td>
+                                            <td style={{ fontWeight: 600, color: 'var(--color-primary)' }}>₹{(line.quantity * line.unitPrice).toLocaleString('en-IN')}</td>
+                                            <td>{lines.length > 1 && <button className="btn btn-ghost btn-sm" onClick={() => setLines(lines.filter((_, i) => i !== idx))}>✕</button>}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <button className="add-line-btn" onClick={() => setLines([...lines, { itemId: '', quantity: 0, unitPrice: 0 }])}>+ Add Line</button>
+
+                        <div className="form-summary-bar">
+                            <div>
+                                <span className="total-label">Grand Total: </span>
+                                <span className="total-value">₹{grandTotal.toLocaleString('en-IN')}</span>
+                            </div>
+                            <button className="btn btn-success" onClick={handleSubmit}>Create GRN</button>
+                        </div>
                     </div>
                 </div>
+            )}
 
-                <div className="card">
-                    <div className="card-title" style={{ marginBottom: 20 }}>Recent GRNs ({data.grns.length})</div>
-                    {!data.grns.length ? (
-                        <div className="empty-state"><div className="icon">📭</div><p>No GRNs yet. Create one to see materials flow in!</p></div>
-                    ) : [...data.grns].reverse().map(grn => {
-                        const sup = data.suppliers.find(s => s.id === grn.supplierId);
-                        const tot = grn.items.reduce((s, gi) => s + gi.quantity * gi.unitPrice, 0);
-                        return (
-                            <div key={grn.id} className="card" style={{ background: 'var(--bg-elevated)', padding: 16, marginBottom: 12 }}>
-                                <div className="flex justify-between items-center"><strong className="mono">{grn.id}</strong><span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{grn.date}</span></div>
-                                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '4px 0 8px' }}>{sup?.name} • Inv: {grn.invoiceNumber}</div>
-                                {grn.items.map((gi, idx) => {
-                                    const item = data.items.find(i => i.id === gi.itemId);
-                                    return (<div key={idx} style={{ fontSize: '0.8rem', padding: '4px 0', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>{item?.name} <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Lot:{gi.lotNumber}</span></span>
-                                        <span>{gi.quantity} × ₹{gi.unitPrice} = <strong>₹{(gi.quantity * gi.unitPrice).toLocaleString('en-IN')}</strong></span>
-                                    </div>);
-                                })}
-                                <div style={{ textAlign: 'right', marginTop: 8, fontWeight: 700, color: 'var(--color-primary)' }}>Total: ₹{tot.toLocaleString('en-IN')}</div>
-                            </div>
-                        );
-                    })}
+            {/* History Table */}
+            <div className="history-section">
+                <div className="section-header">
+                    <h3>GRN History</h3>
+                    <span className="record-count">{data.grns.length} records</span>
                 </div>
+                {!data.grns.length ? (
+                    <div className="empty-state"><div className="icon">📋</div><p>No GRNs yet. Create one to see materials flow in!</p></div>
+                ) : (
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>GRN ID</th>
+                                <th>Date</th>
+                                <th>Supplier</th>
+                                <th>Invoice #</th>
+                                <th>Items</th>
+                                <th>Total Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {[...data.grns].reverse().map(grn => {
+                                const sup = data.suppliers.find(s => s.id === grn.supplierId);
+                                const tot = grn.items.reduce((s, gi) => s + gi.quantity * gi.unitPrice, 0);
+                                return (
+                                    <tr key={grn.id}>
+                                        <td><span className="mono">{grn.id}</span></td>
+                                        <td>{grn.date}</td>
+                                        <td><strong>{sup?.name}</strong></td>
+                                        <td>{grn.invoiceNumber}</td>
+                                        <td>
+                                            <div style={{ fontSize: '0.8rem' }}>
+                                                {grn.items.map((gi, idx) => {
+                                                    const item = data.items.find(i => i.id === gi.itemId);
+                                                    return (
+                                                        <div key={idx} style={{ padding: '2px 0' }}>
+                                                            {item?.name}: {gi.quantity} × ₹{gi.unitPrice}
+                                                            <span className="mono" style={{ marginLeft: 6, fontSize: '0.7rem', color: 'var(--text-dim)' }}>Lot:{gi.lotNumber}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </td>
+                                        <td><strong style={{ color: 'var(--color-primary)' }}>₹{tot.toLocaleString('en-IN')}</strong></td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                )}
             </div>
         </div>
     );

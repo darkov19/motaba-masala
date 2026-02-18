@@ -1,4 +1,4 @@
-import { useState, createContext, useContext, useCallback } from 'react';
+import { useState, createContext, useContext, useCallback, useEffect, useRef } from 'react';
 import { DemoData } from './types';
 import { loadData, resetDemo, getItemsByType, getValueByType, getTotalValue } from './store/demoStore';
 import InstructionsPage from './pages/InstructionsPage';
@@ -15,13 +15,13 @@ const DemoContext = createContext<DemoCtx>({} as DemoCtx);
 export const useDemo = () => useContext(DemoContext);
 
 const STEPS = [
-    { id: 'instructions', label: 'Instructions', icon: '📖', num: 0 },
-    { id: 'master', label: 'Master Data', icon: '⚙️', num: 1 },
-    { id: 'procurement', label: 'Procurement / GRN', icon: '📦', num: 2 },
-    { id: 'production', label: 'Production', icon: '🏭', num: 3 },
-    { id: 'packing', label: 'Packing', icon: '📦', num: 4 },
-    { id: 'dispatch', label: 'Dispatch', icon: '🚛', num: 5 },
-    { id: 'reporting', label: 'Reporting', icon: '📊', num: 6 },
+    { id: 'instructions', label: 'Instructions', num: 0 },
+    { id: 'master', label: 'Master Data', num: 1 },
+    { id: 'procurement', label: 'Procurement', num: 2 },
+    { id: 'production', label: 'Production', num: 3 },
+    { id: 'packing', label: 'Packing', num: 4 },
+    { id: 'dispatch', label: 'Dispatch', num: 5 },
+    { id: 'reporting', label: 'Reports', num: 6 },
 ];
 
 function App() {
@@ -43,6 +43,43 @@ function App() {
             toast('Demo reset to initial state', 'info');
         }
     };
+
+    // Scrollbar hide/show logic
+    useEffect(() => {
+        const handleScroll = (e: Event) => {
+            const el = e.target as HTMLElement;
+            if (el.classList.contains('app-content') || el.classList.contains('stock-sidebar')) {
+                el.classList.add('is-scrolling');
+                const timeoutId = (el as any)._scrollTimeout;
+                if (timeoutId) clearTimeout(timeoutId);
+                (el as any)._scrollTimeout = setTimeout(() => {
+                    el.classList.remove('is-scrolling');
+                }, 1000);
+            }
+        };
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const containers = document.querySelectorAll('.app-content, .stock-sidebar');
+            containers.forEach(el => {
+                const rect = el.getBoundingClientRect();
+                const isOverEdge = e.clientX >= rect.right - 12 && e.clientX <= rect.right &&
+                    e.clientY >= rect.top && e.clientY <= rect.bottom;
+
+                if (isOverEdge) {
+                    el.classList.add('is-hovering-scrollbar');
+                } else {
+                    el.classList.remove('is-hovering-scrollbar');
+                }
+            });
+        };
+
+        window.addEventListener('scroll', handleScroll, true);
+        window.addEventListener('mousemove', handleMouseMove);
+        return () => {
+            window.removeEventListener('scroll', handleScroll, true);
+            window.removeEventListener('mousemove', handleMouseMove);
+        };
+    }, []);
 
     const rawItems = getItemsByType(data, 'RAW');
     const bulkItems = getItemsByType(data, 'BULK');
@@ -70,12 +107,15 @@ function App() {
                 {/* Header */}
                 <header className="app-header">
                     <div className="app-logo">
-                        <span style={{ fontSize: '1.8rem' }}>🌶️</span>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="24" height="24" rx="6" fill="var(--color-primary)" />
+                            <path d="M7 8h10M7 12h10M7 16h6" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
                         <h1>Motaba Masala</h1>
                         <span className="badge">DEMO</span>
                     </div>
                     <div className="btn-group">
-                        <button className="btn btn-outline btn-sm" onClick={handleReset}>🔄 Reset Demo</button>
+                        <button className="btn btn-outline btn-sm" onClick={handleReset}>Reset Demo</button>
                     </div>
                 </header>
 
@@ -87,7 +127,7 @@ function App() {
                             className={`stepper-item ${step === i ? 'active' : ''} ${i < step ? 'completed' : ''}`}
                             onClick={() => setStep(i)}
                         >
-                            <span className="step-num">{i < step ? '✓' : s.icon}</span>
+                            <span className="step-num">{i < step ? '✓' : i + 1}</span>
                             <span>{s.label}</span>
                         </div>
                     ))}
@@ -102,7 +142,7 @@ function App() {
                     {/* Stock Sidebar */}
                     {step > 0 && (
                         <aside className="stock-sidebar">
-                            <div className="sidebar-title">📊 Live Stock</div>
+                            <div className="sidebar-title">Live Stock</div>
 
                             <div className="sidebar-section">
                                 <div className="sidebar-section-title"><span className="type-dot raw"></span>Raw Materials</div>
@@ -158,10 +198,10 @@ function App() {
 
                             <div className="sidebar-section" style={{ marginTop: 16 }}>
                                 <div className="sidebar-section-title">Inventory Value</div>
-                                <div className="sidebar-item"><span className="text-raw">Raw Materials</span><span className="currency">{formatCurrency(getValueByType(data, 'RAW'))}</span></div>
-                                <div className="sidebar-item"><span className="text-bulk">Bulk Powders</span><span className="currency">{formatCurrency(getValueByType(data, 'BULK'))}</span></div>
-                                <div className="sidebar-item"><span className="text-packing">Packing</span><span className="currency">{formatCurrency(getValueByType(data, 'PACKING'))}</span></div>
-                                <div className="sidebar-item"><span className="text-fg">Finished Goods</span><span className="currency">{formatCurrency(getValueByType(data, 'FG'))}</span></div>
+                                <div className="sidebar-item"><span>Raw Materials</span><span className="currency">{formatCurrency(getValueByType(data, 'RAW'))}</span></div>
+                                <div className="sidebar-item"><span>Bulk Powders</span><span className="currency">{formatCurrency(getValueByType(data, 'BULK'))}</span></div>
+                                <div className="sidebar-item"><span>Packing</span><span className="currency">{formatCurrency(getValueByType(data, 'PACKING'))}</span></div>
+                                <div className="sidebar-item"><span>Finished Goods</span><span className="currency">{formatCurrency(getValueByType(data, 'FG'))}</span></div>
                                 <div className="sidebar-total">
                                     <span>Total</span>
                                     <span className="amount">{formatCurrency(getTotalValue(data))}</span>

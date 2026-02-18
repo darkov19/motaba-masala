@@ -9,6 +9,7 @@ export default function ProductionPage() {
     const [activeBatch, setActiveBatch] = useState<string | null>(null);
     const [actuals, setActuals] = useState<Record<string, number>>({});
     const [output, setOutput] = useState(0);
+    const [formOpen, setFormOpen] = useState(true);
 
     const handleRecipeSelect = (id: string) => {
         setRecipeId(id);
@@ -41,6 +42,7 @@ export default function ProductionPage() {
         setActuals(defaults);
         setOutput(batch.plannedQty);
         setActiveBatch(batchId);
+        setFormOpen(true);
     };
 
     const activeBatchData = activeBatch ? data.batches.find(b => b.id === activeBatch) : null;
@@ -65,157 +67,210 @@ export default function ProductionPage() {
 
     return (
         <div>
-            <h1 className="page-title">🏭 Production</h1>
-            <p className="page-subtitle">Create batches by specifying inputs. Targeted output is the sum of inputs. Recording actual output calculates wastage automatically.</p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-                {/* Create / Execute */}
+            <div className="flex justify-between items-center" style={{ marginBottom: 24 }}>
                 <div>
-                    {!activeBatch ? (
-                        <div className="card">
-                            <div className="card-title" style={{ marginBottom: 20 }}>Create Production Batch</div>
-                            <div className="form-group">
-                                <label>Recipe</label>
-                                <select value={recipeId} onChange={e => handleRecipeSelect(e.target.value)}>
-                                    <option value="">Select recipe...</option>
-                                    {data.recipes.map(r => {
-                                        const out = data.items.find(i => i.id === r.outputItemId);
-                                        return <option key={r.id} value={r.id}>{r.name} → {out?.name}</option>;
-                                    })}
-                                </select>
-                            </div>
-
-                            {recipeId && (
-                                <div style={{ marginBottom: 20 }}>
-                                    <label>Planned Input Quantities (KG)</label>
-                                    {Object.entries(plannedInputs).map(([itemId, qty]) => {
-                                        const item = data.items.find(i => i.id === itemId);
-                                        return (
-                                            <div key={itemId} className="flex gap-8 items-center mb-8">
-                                                <div style={{ flex: 2, fontSize: '0.85rem' }}>{item?.name} ({itemId})</div>
-                                                <input
-                                                    type="number"
-                                                    style={{ flex: 1 }}
-                                                    value={qty || ''}
-                                                    onChange={e => setPlannedInputs({ ...plannedInputs, [itemId]: +e.target.value })}
-                                                    placeholder="Qty KG"
-                                                />
-                                            </div>
-                                        );
-                                    })}
-                                    <div style={{ marginTop: 12, padding: '10px', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)', textAlign: 'right' }}>
-                                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Targeted Output: </span>
-                                        <strong style={{ fontSize: '1.1rem', color: 'var(--color-primary)' }}>{targetedOutput.toFixed(2)} KG</strong>
-                                    </div>
-                                </div>
-                            )}
-
-                            <button className="btn btn-primary w-full" onClick={handleCreate} disabled={targetedOutput <= 0}>🏭 Create Batch</button>
-                        </div>
-                    ) : (() => {
-                        const batch = data.batches.find(b => b.id === activeBatch)!;
-                        const recipe = data.recipes.find(r => r.id === batch.recipeId)!;
-                        const totalInput = Object.values(actuals).reduce((s, v) => s + v, 0);
-                        const yieldPct = batch.plannedQty > 0 ? ((output / batch.plannedQty) * 100).toFixed(1) : '0';
-                        let totalCost = 0;
-                        batch.consumedMaterials.forEach(cm => {
-                            const it = data.items.find(i => i.id === cm.itemId);
-                            totalCost += (actuals[cm.itemId] || 0) * (it?.avgCost || 0);
-                        });
-                        const costPerKg = output > 0 ? (totalCost / output).toFixed(2) : '0';
-
-                        return (
-                            <div className="card" style={{ borderColor: 'var(--color-warning)' }}>
-                                <div className="card-title" style={{ marginBottom: 4 }}>⚡ Execute Batch {activeBatch}</div>
-                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginBottom: 16 }}>Recipe: {recipe.name} • Targeted: {batch.plannedQty} KG</p>
-
-                                <label>Material Consumption (Actuals)</label>
-                                {batch.consumedMaterials.map(cm => {
-                                    const item = data.items.find(i => i.id === cm.itemId)!;
-                                    return (
-                                        <div key={cm.itemId} className="flex gap-8 items-center mb-16" style={{ fontSize: '0.85rem' }}>
-                                            <div style={{ flex: 2 }}>
-                                                <strong>{item.name}</strong>
-                                                <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Planned: {cm.standardQty} KG • Available: {item.currentStock} KG</div>
-                                            </div>
-                                            <div style={{ flex: 1 }}>
-                                                <input type="number" value={actuals[cm.itemId] || ''} onChange={e => setActuals({ ...actuals, [cm.itemId]: +e.target.value })} placeholder="Actual KG" />
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-
-                                <div className="form-row" style={{ marginTop: 16 }}>
-                                    <div className="form-group">
-                                        <label>Actual Output (KG)</label>
-                                        <input type="number" value={output || ''} onChange={e => setOutput(+e.target.value)} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Wastage (KG)</label>
-                                        <input type="number" value={computedWastage.toFixed(2)} readOnly style={{ background: 'var(--bg-secondary)', color: 'var(--text-dim)', cursor: 'not-allowed' }} />
-                                    </div>
-                                </div>
-
-                                <div className="stats-row" style={{ marginTop: 16 }}>
-                                    <div className="stat-card"><div className="stat-label">Yield</div><div className="stat-value text-success">{yieldPct}%</div></div>
-                                    <div className="stat-card"><div className="stat-label">Cost/KG</div><div className="stat-value text-primary">₹{costPerKg}</div></div>
-                                    <div className="stat-card"><div className="stat-label">Total Cost</div><div className="stat-value">₹{Math.round(totalCost).toLocaleString('en-IN')}</div></div>
-                                </div>
-
-                                <div className="btn-group" style={{ marginTop: 16 }}>
-                                    <button className="btn btn-outline" onClick={() => setActiveBatch(null)}>Cancel</button>
-                                    <button className="btn btn-success" style={{ flex: 1 }} onClick={handleComplete}>✓ Complete Batch</button>
-                                </div>
-                            </div>
-                        );
-                    })()}
+                    <h1 className="page-title">Production</h1>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', margin: 0 }}>Create batches, execute production, and track yields.</p>
                 </div>
+                <button className="btn btn-primary" onClick={() => { setFormOpen(!formOpen); if (activeBatch) setActiveBatch(null); }}>
+                    {formOpen ? 'Hide Form' : '+ New Batch'}
+                </button>
+            </div>
 
-                {/* Batch List */}
-                <div>
-                    {planned.length > 0 && (
-                        <div className="card" style={{ marginBottom: 16 }}>
-                            <div className="card-title" style={{ marginBottom: 16 }}>Planned Batches ({planned.length})</div>
+            {/* Create or Execute Form */}
+            {formOpen && (
+                <div className="form-panel" style={{ marginBottom: 24 }}>
+                    <div style={{ padding: 24 }}>
+                        {!activeBatch ? (
+                            <>
+                                <h3 style={{ fontSize: '0.92rem', fontWeight: 700, marginBottom: 20, color: 'var(--text-primary)' }}>Create Production Batch</h3>
+                                <div className="form-group">
+                                    <label>Recipe</label>
+                                    <select value={recipeId} onChange={e => handleRecipeSelect(e.target.value)}>
+                                        <option value="">Select recipe...</option>
+                                        {data.recipes.map(r => {
+                                            const out = data.items.find(i => i.id === r.outputItemId);
+                                            return <option key={r.id} value={r.id}>{r.name} → {out?.name}</option>;
+                                        })}
+                                    </select>
+                                </div>
+
+                                {recipeId && (
+                                    <>
+                                        <label>Planned Input Quantities (KG)</label>
+                                        <div className="table-container" style={{ marginBottom: 12 }}>
+                                            <table>
+                                                <thead>
+                                                    <tr><th>Ingredient</th><th style={{ width: 150 }}>Quantity (KG)</th></tr>
+                                                </thead>
+                                                <tbody>
+                                                    {Object.entries(plannedInputs).map(([itemId, qty]) => {
+                                                        const item = data.items.find(i => i.id === itemId);
+                                                        return (
+                                                            <tr key={itemId}>
+                                                                <td>{item?.name} <span className="mono">({itemId})</span></td>
+                                                                <td>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={qty || ''}
+                                                                        onChange={e => setPlannedInputs({ ...plannedInputs, [itemId]: +e.target.value })}
+                                                                        placeholder="Qty KG"
+                                                                        style={{ margin: 0 }}
+                                                                    />
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div className="preview-strip">
+                                            Targeted Output: <strong style={{ color: 'var(--color-primary)' }}>{targetedOutput.toFixed(2)} KG</strong>
+                                        </div>
+                                    </>
+                                )}
+
+                                <div style={{ marginTop: 20 }}>
+                                    <button className="btn btn-primary w-full" onClick={handleCreate} disabled={targetedOutput <= 0}>Create Batch</button>
+                                </div>
+                            </>
+                        ) : (() => {
+                            const batch = data.batches.find(b => b.id === activeBatch)!;
+                            const recipe = data.recipes.find(r => r.id === batch.recipeId)!;
+                            const totalInput = Object.values(actuals).reduce((s, v) => s + v, 0);
+                            const yieldPct = batch.plannedQty > 0 ? ((output / batch.plannedQty) * 100).toFixed(1) : '0';
+                            let totalCost = 0;
+                            batch.consumedMaterials.forEach(cm => {
+                                const it = data.items.find(i => i.id === cm.itemId);
+                                totalCost += (actuals[cm.itemId] || 0) * (it?.avgCost || 0);
+                            });
+                            const costPerKg = output > 0 ? (totalCost / output).toFixed(2) : '0';
+
+                            return (
+                                <>
+                                    <div className="flex justify-between items-center" style={{ marginBottom: 16 }}>
+                                        <div>
+                                            <h3 style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Execute Batch: {activeBatch}</h3>
+                                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: 0 }}>Recipe: {recipe.name} · Targeted: {batch.plannedQty} KG</p>
+                                        </div>
+                                        <span className="badge-status badge-in-progress">IN PROGRESS</span>
+                                    </div>
+
+                                    <label>Material Consumption (Actuals)</label>
+                                    <div className="table-container" style={{ marginBottom: 16 }}>
+                                        <table>
+                                            <thead>
+                                                <tr><th>Material</th><th>Available</th><th>Planned</th><th style={{ width: 140 }}>Actual (KG)</th></tr>
+                                            </thead>
+                                            <tbody>
+                                                {batch.consumedMaterials.map(cm => {
+                                                    const item = data.items.find(i => i.id === cm.itemId)!;
+                                                    return (
+                                                        <tr key={cm.itemId}>
+                                                            <td><strong>{item.name}</strong></td>
+                                                            <td>{item.currentStock} KG</td>
+                                                            <td>{cm.standardQty} KG</td>
+                                                            <td>
+                                                                <input type="number" value={actuals[cm.itemId] || ''} onChange={e => setActuals({ ...actuals, [cm.itemId]: +e.target.value })} placeholder="Actual KG" style={{ margin: 0 }} />
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <div className="form-row">
+                                        <div className="form-group">
+                                            <label>Actual Output (KG)</label>
+                                            <input type="number" value={output || ''} onChange={e => setOutput(+e.target.value)} />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Wastage (KG)</label>
+                                            <input type="number" value={computedWastage.toFixed(2)} readOnly style={{ background: 'var(--bg-elevated)', color: 'var(--text-dim)', cursor: 'not-allowed' }} />
+                                        </div>
+                                    </div>
+
+                                    <div className="stats-row" style={{ marginTop: 16 }}>
+                                        <div className="stat-card"><div className="stat-label">Yield</div><div className="stat-value text-success">{yieldPct}%</div></div>
+                                        <div className="stat-card"><div className="stat-label">Cost/KG</div><div className="stat-value text-primary">₹{costPerKg}</div></div>
+                                        <div className="stat-card"><div className="stat-label">Total Cost</div><div className="stat-value">₹{Math.round(totalCost).toLocaleString('en-IN')}</div></div>
+                                    </div>
+
+                                    <div className="btn-group" style={{ marginTop: 20 }}>
+                                        <button className="btn btn-outline" onClick={() => setActiveBatch(null)}>Cancel</button>
+                                        <button className="btn btn-success" style={{ flex: 1 }} onClick={handleComplete}>Complete Batch</button>
+                                    </div>
+                                </>
+                            );
+                        })()}
+                    </div>
+                </div>
+            )}
+
+            {/* Planned Batches */}
+            {planned.length > 0 && (
+                <div className="history-section" style={{ marginBottom: 24 }}>
+                    <div className="section-header">
+                        <h3>Planned Batches</h3>
+                        <span className="record-count">{planned.length} pending</span>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr><th>Batch ID</th><th>Date</th><th>Recipe</th><th>Targeted Output</th><th>Status</th><th style={{ width: 100 }}></th></tr>
+                        </thead>
+                        <tbody>
                             {planned.map(b => {
                                 const r = data.recipes.find(x => x.id === b.recipeId)!;
                                 return (
-                                    <div key={b.id} className="card" style={{ background: 'var(--bg-elevated)', padding: 14, marginBottom: 8 }}>
-                                        <div className="flex justify-between items-center">
-                                            <div><strong className="mono">{b.id}</strong> <span className="badge-status badge-planned">PLANNED</span></div>
-                                            <button className="btn btn-primary btn-sm" onClick={() => handleExecute(b.id)} disabled={!!activeBatch}>▶ Execute</button>
-                                        </div>
-                                        <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 4 }}>{r.name} • Targeted: {b.plannedQty} KG • {b.date}</div>
-                                    </div>
+                                    <tr key={b.id}>
+                                        <td><span className="mono">{b.id}</span></td>
+                                        <td>{b.date}</td>
+                                        <td><strong>{r.name}</strong></td>
+                                        <td>{b.plannedQty} KG</td>
+                                        <td><span className="badge-status badge-planned">PLANNED</span></td>
+                                        <td><button className="btn btn-primary btn-sm" onClick={() => handleExecute(b.id)} disabled={!!activeBatch}>Execute</button></td>
+                                    </tr>
                                 );
                             })}
-                        </div>
-                    )}
-
-                    <div className="card">
-                        <div className="card-title" style={{ marginBottom: 16 }}>Completed Batches ({completed.length})</div>
-                        {!completed.length ? (
-                            <div className="empty-state"><div className="icon">🏭</div><p>No completed batches yet</p></div>
-                        ) : completed.map(b => {
-                            const r = data.recipes.find(x => x.id === b.recipeId)!;
-                            const out = data.items.find(i => i.id === r.outputItemId);
-                            return (
-                                <div key={b.id} className="card" style={{ background: 'var(--bg-elevated)', padding: 14, marginBottom: 8 }}>
-                                    <div className="flex justify-between items-center">
-                                        <div><strong className="mono">{b.id}</strong> <span className="badge-status badge-completed">COMPLETED</span></div>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{b.date}</span>
-                                    </div>
-                                    <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 4 }}>{r.name} → {out?.name}</div>
-                                    <div className="flex gap-16" style={{ marginTop: 8, fontSize: '0.8rem' }}>
-                                        <span>Output: <strong className="text-success">{b.actualOutput} KG</strong></span>
-                                        <span>Waste: <strong className="text-danger">{b.wastage} KG</strong></span>
-                                        <span>Yield: <strong className={b.yieldPct >= 90 ? 'text-success' : 'text-warning'}>{b.yieldPct}%</strong></span>
-                                        <span>Cost: <strong className="text-primary">₹{b.costPerUnit}/KG</strong></span>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                        </tbody>
+                    </table>
                 </div>
+            )}
+
+            {/* Completed Batches */}
+            <div className="history-section">
+                <div className="section-header">
+                    <h3>Completed Batches</h3>
+                    <span className="record-count">{completed.length} records</span>
+                </div>
+                {!completed.length ? (
+                    <div className="empty-state"><div className="icon">🏭</div><p>No completed batches yet</p></div>
+                ) : (
+                    <table>
+                        <thead>
+                            <tr><th>Batch ID</th><th>Date</th><th>Recipe</th><th>Output</th><th>Waste</th><th>Yield</th><th>Cost/KG</th><th>Status</th></tr>
+                        </thead>
+                        <tbody>
+                            {completed.map(b => {
+                                const r = data.recipes.find(x => x.id === b.recipeId)!;
+                                const out = data.items.find(i => i.id === r.outputItemId);
+                                return (
+                                    <tr key={b.id}>
+                                        <td><span className="mono">{b.id}</span></td>
+                                        <td>{b.date}</td>
+                                        <td><strong>{r.name}</strong> <span style={{ color: 'var(--text-dim)', fontSize: '0.78rem' }}>→ {out?.name}</span></td>
+                                        <td><strong className="text-success">{b.actualOutput} KG</strong></td>
+                                        <td><strong className="text-danger">{Number(b.wastage.toFixed(2))} KG</strong></td>
+                                        <td><strong className={b.yieldPct >= 90 ? 'text-success' : 'text-warning'}>{b.yieldPct}%</strong></td>
+                                        <td>₹{b.costPerUnit}/KG</td>
+                                        <td><span className="badge-status badge-completed">COMPLETED</span></td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                )}
             </div>
         </div>
     );
