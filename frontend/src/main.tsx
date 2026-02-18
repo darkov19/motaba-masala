@@ -4,11 +4,14 @@ import { ConfigProvider, theme } from "antd";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "./style.css";
 import App from "./App";
+import DemoApp from "./demo/DemoApp";
 
 const queryClient = new QueryClient();
 
 const container = document.getElementById("root");
 const root = createRoot(container!);
+
+const isDemoMode = import.meta.env.MODE === "demo";
 
 root.render(
     <React.StrictMode>
@@ -17,12 +20,12 @@ root.render(
                 theme={{
                     algorithm: theme.defaultAlgorithm,
                     token: {
-                        colorPrimary: "#7D1111", // Motaba Deep Maroon
+                        colorPrimary: "#7D1111",
                         borderRadius: 6,
                     },
                 }}
             >
-                <App />
+                {isDemoMode ? <DemoApp /> : <App />}
             </ConfigProvider>
         </QueryClientProvider>
     </React.StrictMode>,

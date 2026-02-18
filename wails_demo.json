@@ -1,0 +1,14 @@
+{
+    "name": "masala_inventory_demo",
+    "outputfilename": "masala_inventory_demo",
+    "frontend:install": "npm install",
+    "frontend:build": "npm run build -- --mode demo",
+    "frontend:dev:watcher": "npm run dev -- --mode demo",
+    "frontend:dev:serverUrl": "http://localhost:5173",
+    "author": {
+        "name": "darko",
+        "email": ""
+    },
+    "main": "cmd/demo",
+    "tags": "webkit2_41"
+}
