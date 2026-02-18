@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useDemo } from '../App';
-import { addItem, deleteItem, addRecipe, deleteRecipe, addSupplier, addCustomer } from '../store/demoStore';
+import { addItem, updateItem, deleteItem, addRecipe, deleteRecipe, addSupplier, addCustomer } from '../store/demoStore';
 import { Item, ItemType, UnitType } from '../types';
 
 const TYPE_LABELS: Record<ItemType, string> = { RAW: 'Raw Material', BULK: 'Bulk Powder', PACKING: 'Packing Material', FG: 'Finished Good' };
@@ -10,17 +10,54 @@ export default function MasterDataPage() {
     const { data, setData, toast } = useDemo();
     const [tab, setTab] = useState<'items' | 'recipes' | 'suppliers' | 'customers'>('items');
     const [showModal, setShowModal] = useState(false);
-    const [itemForm, setItemForm] = useState({ name: '', type: 'RAW' as ItemType, baseUnit: 'KG' as UnitType, reorderLevel: 0, packWeight: 0 });
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [itemForm, setItemForm] = useState({
+        name: '',
+        type: 'RAW' as ItemType,
+        baseUnit: 'KG' as UnitType,
+        reorderLevel: 0,
+        packWeight: 0,
+        sourceBulkItemId: '',
+        packingMaterials: [] as { itemId: string; quantityPerUnit: number }[]
+    });
     const [recipeForm, setRecipeForm] = useState({ name: '', outputItemId: '', outputQty: 0, wastePct: 5, ingredients: [{ itemId: '', quantity: 0 }] });
     const [supplierForm, setSupplierForm] = useState({ name: '', contact: '', phone: '', leadTimeDays: 7 });
     const [customerForm, setCustomerForm] = useState({ name: '', contact: '', phone: '', channel: '' });
 
-    const handleAddItem = () => {
+    const resetForm = () => {
+        setEditingId(null);
+        setItemForm({ name: '', type: 'RAW', baseUnit: 'KG', reorderLevel: 0, packWeight: 0, sourceBulkItemId: '', packingMaterials: [] });
+        setSupplierForm({ name: '', contact: '', phone: '', leadTimeDays: 7 });
+        setCustomerForm({ name: '', contact: '', phone: '', channel: '' });
+    };
+
+    const handleSaveItem = () => {
         if (!itemForm.name) { toast('Item name required', 'error'); return; }
-        setData(addItem(data, { ...itemForm, currentStock: 0, avgCost: 0 }));
+
+        if (editingId) {
+            setData(updateItem(data, editingId, itemForm));
+            toast(`Item "${itemForm.name}" updated`);
+        } else {
+            setData(addItem(data, { ...itemForm, currentStock: 0, avgCost: 0 }));
+            toast(`Item "${itemForm.name}" added`);
+        }
+
         setShowModal(false);
-        setItemForm({ name: '', type: 'RAW', baseUnit: 'KG', reorderLevel: 0, packWeight: 0 });
-        toast(`Item "${itemForm.name}" added`);
+        resetForm();
+    };
+
+    const handleEditItem = (item: Item) => {
+        setEditingId(item.id);
+        setItemForm({
+            name: item.name,
+            type: item.type,
+            baseUnit: item.baseUnit,
+            reorderLevel: item.reorderLevel,
+            packWeight: item.packWeight || 0,
+            sourceBulkItemId: item.sourceBulkItemId || '',
+            packingMaterials: item.packingMaterials || []
+        });
+        setShowModal(true);
     };
 
     const handleAddRecipe = () => {
@@ -71,7 +108,7 @@ export default function MasterDataPage() {
                 <div className="card">
                     <div className="card-header">
                         <span className="card-title">Item Master ({data.items.length})</span>
-                        <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>+ Add Item</button>
+                        <button className="btn btn-primary btn-sm" onClick={() => { resetForm(); setShowModal(true); }}>+ Add Item</button>
                     </div>
                     <div className="table-container">
                         <table>
@@ -87,7 +124,12 @@ export default function MasterDataPage() {
                                         <td className="currency">₹{it.avgCost.toFixed(2)}</td>
                                         <td className="currency">₹{(it.currentStock * it.avgCost).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
                                         <td>{it.reorderLevel}</td>
-                                        <td><button className="btn btn-outline btn-sm" onClick={() => { setData(deleteItem(data, it.id)); toast(`Deleted "${it.name}"`); }}>✕</button></td>
+                                        <td>
+                                            <div className="flex gap-8">
+                                                <button className="btn btn-outline btn-sm" onClick={() => handleEditItem(it)}>✏️</button>
+                                                <button className="btn btn-outline btn-sm" onClick={() => { if (confirm(`Delete ${it.name}?`)) { setData(deleteItem(data, it.id)); toast(`Deleted "${it.name}"`); } }}>✕</button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -182,9 +224,54 @@ export default function MasterDataPage() {
                         </div>
                         <div className="form-row">
                             <div className="form-group"><label>Reorder Level</label><input type="number" value={itemForm.reorderLevel} onChange={e => setItemForm({ ...itemForm, reorderLevel: +e.target.value })} /></div>
-                            {itemForm.type === 'FG' && <div className="form-group"><label>Pack Weight (grams)</label><input type="number" value={itemForm.packWeight} onChange={e => setItemForm({ ...itemForm, packWeight: +e.target.value })} /></div>}
+                            {itemForm.type === 'FG' && (
+                                <>
+                                    <div className="form-group"><label>Pack Weight (grams)</label><input type="number" value={itemForm.packWeight} onChange={e => setItemForm({ ...itemForm, packWeight: +e.target.value })} /></div>
+                                    <div className="form-group"><label>Source Bulk Powder</label><select value={itemForm.sourceBulkItemId} onChange={e => setItemForm({ ...itemForm, sourceBulkItemId: e.target.value })}><option value="">Select Bulk...</option>{data.items.filter(i => i.type === 'BULK').map(i => <option key={i.id} value={i.id}>{i.name}</option>)}</select></div>
+                                </>
+                            )}
                         </div>
-                        <div className="modal-actions"><button className="btn btn-outline" onClick={() => setShowModal(false)}>Cancel</button><button className="btn btn-primary" onClick={handleAddItem}>Add Item</button></div>
+
+                        {itemForm.type === 'FG' && (
+                            <div style={{ marginTop: 16 }}>
+                                <label>Packing Requirements (BOM)</label>
+                                <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginBottom: 12 }}>Define materials used per piece produced.</p>
+                                {itemForm.packingMaterials.map((pm, idx) => (
+                                    <div key={idx} className="flex gap-8 mb-8">
+                                        <select
+                                            value={pm.itemId}
+                                            onChange={e => {
+                                                const nm = [...itemForm.packingMaterials];
+                                                nm[idx].itemId = e.target.value;
+                                                setItemForm({ ...itemForm, packingMaterials: nm });
+                                            }}
+                                            style={{ flex: 2 }}
+                                        >
+                                            <option value="">Select Packing Material...</option>
+                                            {data.items.filter(i => i.type === 'PACKING').map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                                        </select>
+                                        <input
+                                            type="number"
+                                            placeholder="Qty/Unit"
+                                            value={pm.quantityPerUnit || ''}
+                                            onChange={e => {
+                                                const nm = [...itemForm.packingMaterials];
+                                                nm[idx].quantityPerUnit = +e.target.value;
+                                                setItemForm({ ...itemForm, packingMaterials: nm });
+                                            }}
+                                            style={{ flex: 1 }}
+                                        />
+                                        <button className="btn btn-outline btn-sm" onClick={() => setItemForm({ ...itemForm, packingMaterials: itemForm.packingMaterials.filter((_, i) => i !== idx) })}>✕</button>
+                                    </div>
+                                ))}
+                                <button className="add-line-btn" onClick={() => setItemForm({ ...itemForm, packingMaterials: [...itemForm.packingMaterials, { itemId: '', quantityPerUnit: 1 }] })}>+ Add Requirement</button>
+                            </div>
+                        )}
+
+                        <div className="modal-actions">
+                            <button className="btn btn-outline" onClick={() => { setShowModal(false); resetForm(); }}>Cancel</button>
+                            <button className="btn btn-primary" onClick={handleSaveItem}>{editingId ? 'Update Item' : 'Add Item'}</button>
+                        </div>
                     </div>
                 </div>
             )}

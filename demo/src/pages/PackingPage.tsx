@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useDemo } from '../App';
 import { completePackingRun } from '../store/demoStore';
+import { Item } from '../types';
 
 export default function PackingPage() {
     const { data, setData, toast } = useDemo();
@@ -10,12 +11,44 @@ export default function PackingPage() {
     const [packMats, setPackMats] = useState([{ itemId: '', quantity: 0 }]);
 
     const completedBatches = data.batches.filter(b => b.status === 'COMPLETED');
-    const fgItems = data.items.filter(i => i.type === 'FG');
+    const bulkItemsWithStock = data.items.filter(i => i.type === 'BULK' && i.currentStock > 0);
     const packItems = data.items.filter(i => i.type === 'PACKING');
+    // Find the selected source item (either from a batch or direct selection)
+    let selectedSourceItem: Item | undefined;
+    if (batchId.startsWith('BATCH-')) {
+        const batch = data.batches.find(b => b.id === batchId);
+        if (batch) {
+            const recipe = data.recipes.find(r => r.id === batch.recipeId);
+            selectedSourceItem = data.items.find(i => i.id === recipe?.outputItemId);
+        }
+    } else if (batchId.startsWith('DIR-')) {
+        selectedSourceItem = data.items.find(i => i.id === batchId.replace('DIR-', ''));
+    }
 
-    const selectedBatch = data.batches.find(b => b.id === batchId);
+    const fgItems = selectedSourceItem
+        ? data.items.filter(i => i.type === 'FG' && i.sourceBulkItemId === selectedSourceItem?.id)
+        : data.items.filter(i => i.type === 'FG');
+
+    // Reset FG selection if it's no longer in the filtered list
+    useEffect(() => {
+        if (fgItemId && !fgItems.find(i => i.id === fgItemId)) {
+            setFgItemId('');
+        }
+    }, [batchId, fgItems, fgItemId]);
+
     const selectedFg = data.items.find(i => i.id === fgItemId);
     const bulkNeeded = selectedFg && outputQty > 0 ? ((selectedFg.packWeight || 100) / 1000) * outputQty : 0;
+
+    // Auto-fill packing materials when SKU/Qty changes
+    useEffect(() => {
+        if (selectedFg?.packingMaterials && outputQty > 0) {
+            const autoMats = selectedFg.packingMaterials.map(m => ({
+                itemId: m.itemId,
+                quantity: m.quantityPerUnit * outputQty
+            }));
+            setPackMats(autoMats);
+        }
+    }, [fgItemId, outputQty, selectedFg]);
 
     const handleSubmit = () => {
         if (!batchId) { toast('Select source batch', 'error'); return; }
@@ -41,18 +74,25 @@ export default function PackingPage() {
                     <div className="form-group">
                         <label>Source Batch (Completed)</label>
                         <select value={batchId} onChange={e => setBatchId(e.target.value)}>
-                            <option value="">Select batch...</option>
-                            {completedBatches.map(b => {
-                                const r = data.recipes.find(x => x.id === b.recipeId)!;
-                                const bulkItem = data.items.find(i => i.id === r.outputItemId);
-                                return <option key={b.id} value={b.id}>{b.id} — {bulkItem?.name} ({bulkItem?.currentStock} KG available)</option>;
-                            })}
+                            <option value="">Select source...</option>
+                            <optgroup label="Production Batches (Completed)">
+                                {completedBatches.map(b => {
+                                    const r = data.recipes.find(x => x.id === b.recipeId)!;
+                                    const bulkItem = data.items.find(i => i.id === r.outputItemId);
+                                    return <option key={b.id} value={b.id}>{b.id} — {bulkItem?.name} ({b.actualOutput} KG produced)</option>;
+                                })}
+                            </optgroup>
+                            <optgroup label="Direct Bulk Stock (Purchased)">
+                                {bulkItemsWithStock.map(i => (
+                                    <option key={i.id} value={`DIR-${i.id}`}>{i.id} — {i.name} ({i.currentStock} KG available)</option>
+                                ))}
+                            </optgroup>
                         </select>
                     </div>
 
                     <div className="form-row">
                         <div className="form-group">
-                            <label>Finished Good Item</label>
+                            <label>Finished Good Item (SKU)</label>
                             <select value={fgItemId} onChange={e => setFgItemId(e.target.value)}>
                                 <option value="">Select FG...</option>
                                 {fgItems.map(fg => <option key={fg.id} value={fg.id}>{fg.name} ({fg.packWeight}g)</option>)}

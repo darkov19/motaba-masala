@@ -3,6 +3,11 @@ export type BatchStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED';
 export type DispatchStatus = 'DRAFT' | 'CONFIRMED' | 'DISPATCHED';
 export type UnitType = 'KG' | 'GRAM' | 'PCS' | 'BOX';
 
+export interface ItemPackingMaterial {
+    itemId: string;
+    quantityPerUnit: number;
+}
+
 export interface Item {
     id: string;
     name: string;
@@ -12,6 +17,8 @@ export interface Item {
     avgCost: number;
     reorderLevel: number;
     packWeight?: number;
+    sourceBulkItemId?: string;
+    packingMaterials?: ItemPackingMaterial[];
     createdAt: string;
 }
 

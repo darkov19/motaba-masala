@@ -5,18 +5,32 @@ import { createBatch, completeBatch } from '../store/demoStore';
 export default function ProductionPage() {
     const { data, setData, toast } = useDemo();
     const [recipeId, setRecipeId] = useState('');
-    const [plannedQty, setPlannedQty] = useState(0);
+    const [plannedInputs, setPlannedInputs] = useState<Record<string, number>>({});
     const [activeBatch, setActiveBatch] = useState<string | null>(null);
     const [actuals, setActuals] = useState<Record<string, number>>({});
     const [output, setOutput] = useState(0);
-    const [wastage, setWastage] = useState(0);
+
+    const handleRecipeSelect = (id: string) => {
+        setRecipeId(id);
+        if (id) {
+            const r = data.recipes.find(x => x.id === id)!;
+            const initialInputs: Record<string, number> = {};
+            r.ingredients.forEach(ing => { initialInputs[ing.itemId] = ing.quantity; });
+            setPlannedInputs(initialInputs);
+        } else {
+            setPlannedInputs({});
+        }
+    };
+
+    const targetedOutput = Object.values(plannedInputs).reduce((s, v) => s + (v || 0), 0);
 
     const handleCreate = () => {
-        if (!recipeId || plannedQty <= 0) { toast('Select recipe and enter qty', 'error'); return; }
+        if (!recipeId || targetedOutput <= 0) { toast('Select recipe and enter input quantities', 'error'); return; }
+        const inputs = Object.entries(plannedInputs).map(([itemId, quantity]) => ({ itemId, quantity }));
         try {
-            setData(createBatch(data, recipeId, plannedQty));
+            setData(createBatch(data, recipeId, inputs));
             toast('Batch created! Click "Execute" to start production.');
-            setRecipeId(''); setPlannedQty(0);
+            setRecipeId(''); setPlannedInputs({});
         } catch (e: any) { toast(e.message, 'error'); }
     };
 
@@ -26,9 +40,11 @@ export default function ProductionPage() {
         batch.consumedMaterials.forEach(cm => { defaults[cm.itemId] = cm.standardQty; });
         setActuals(defaults);
         setOutput(batch.plannedQty);
-        setWastage(0);
         setActiveBatch(batchId);
     };
+
+    const activeBatchData = activeBatch ? data.batches.find(b => b.id === activeBatch) : null;
+    const computedWastage = activeBatchData ? Math.max(0, activeBatchData.plannedQty - output) : 0;
 
     const handleComplete = () => {
         if (!activeBatch) return;
@@ -38,8 +54,8 @@ export default function ProductionPage() {
         }));
         if (output <= 0) { toast('Enter output quantity', 'error'); return; }
         try {
-            setData(completeBatch(data, activeBatch, consumptions, output, wastage));
-            toast(`Batch ${activeBatch} completed! Yield: ${(output / consumptions.reduce((s, c) => s + c.actualQty, 0) * 100).toFixed(1)}%`);
+            setData(completeBatch(data, activeBatch, consumptions, output, computedWastage));
+            toast(`Batch ${activeBatch} completed! Yield: ${(output / batch.plannedQty * 100).toFixed(1)}%`);
             setActiveBatch(null);
         } catch (e: any) { toast(e.message, 'error'); }
     };
@@ -50,7 +66,7 @@ export default function ProductionPage() {
     return (
         <div>
             <h1 className="page-title">🏭 Production</h1>
-            <p className="page-subtitle">Create batches, execute recipes, record output and wastage. Raw materials are consumed, bulk powder is produced.</p>
+            <p className="page-subtitle">Create batches by specifying inputs. Targeted output is the sum of inputs. Recording actual output calculates wastage automatically.</p>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
                 {/* Create / Execute */}
@@ -60,37 +76,47 @@ export default function ProductionPage() {
                             <div className="card-title" style={{ marginBottom: 20 }}>Create Production Batch</div>
                             <div className="form-group">
                                 <label>Recipe</label>
-                                <select value={recipeId} onChange={e => setRecipeId(e.target.value)}>
+                                <select value={recipeId} onChange={e => handleRecipeSelect(e.target.value)}>
                                     <option value="">Select recipe...</option>
                                     {data.recipes.map(r => {
                                         const out = data.items.find(i => i.id === r.outputItemId);
-                                        return <option key={r.id} value={r.id}>{r.name} → {out?.name} ({r.outputQuantity} KG std)</option>;
+                                        return <option key={r.id} value={r.id}>{r.name} → {out?.name}</option>;
                                     })}
                                 </select>
                             </div>
-                            {recipeId && (() => {
-                                const r = data.recipes.find(x => x.id === recipeId)!;
-                                return (
-                                    <div style={{ background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)', padding: 12, marginBottom: 16, fontSize: '0.82rem' }}>
-                                        <strong>Recipe: {r.name}</strong>
-                                        <div style={{ marginTop: 8, color: 'var(--text-secondary)' }}>
-                                            <div>Ingredients: {r.ingredients.map(ing => { const it = data.items.find(i => i.id === ing.itemId); return `${it?.name} (${ing.quantity} KG)`; }).join(' + ')}</div>
-                                            <div>Expected Output: {r.outputQuantity} KG • Waste: {r.expectedWastePct}%</div>
-                                        </div>
+
+                            {recipeId && (
+                                <div style={{ marginBottom: 20 }}>
+                                    <label>Planned Input Quantities (KG)</label>
+                                    {Object.entries(plannedInputs).map(([itemId, qty]) => {
+                                        const item = data.items.find(i => i.id === itemId);
+                                        return (
+                                            <div key={itemId} className="flex gap-8 items-center mb-8">
+                                                <div style={{ flex: 2, fontSize: '0.85rem' }}>{item?.name} ({itemId})</div>
+                                                <input
+                                                    type="number"
+                                                    style={{ flex: 1 }}
+                                                    value={qty || ''}
+                                                    onChange={e => setPlannedInputs({ ...plannedInputs, [itemId]: +e.target.value })}
+                                                    placeholder="Qty KG"
+                                                />
+                                            </div>
+                                        );
+                                    })}
+                                    <div style={{ marginTop: 12, padding: '10px', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)', textAlign: 'right' }}>
+                                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Targeted Output: </span>
+                                        <strong style={{ fontSize: '1.1rem', color: 'var(--color-primary)' }}>{targetedOutput.toFixed(2)} KG</strong>
                                     </div>
-                                );
-                            })()}
-                            <div className="form-group">
-                                <label>Planned Output (KG)</label>
-                                <input type="number" value={plannedQty || ''} onChange={e => setPlannedQty(+e.target.value)} placeholder="e.g. 95" />
-                            </div>
-                            <button className="btn btn-primary w-full" onClick={handleCreate}>🏭 Create Batch</button>
+                                </div>
+                            )}
+
+                            <button className="btn btn-primary w-full" onClick={handleCreate} disabled={targetedOutput <= 0}>🏭 Create Batch</button>
                         </div>
                     ) : (() => {
                         const batch = data.batches.find(b => b.id === activeBatch)!;
                         const recipe = data.recipes.find(r => r.id === batch.recipeId)!;
                         const totalInput = Object.values(actuals).reduce((s, v) => s + v, 0);
-                        const yieldPct = totalInput > 0 ? ((output / totalInput) * 100).toFixed(1) : '0';
+                        const yieldPct = batch.plannedQty > 0 ? ((output / batch.plannedQty) * 100).toFixed(1) : '0';
                         let totalCost = 0;
                         batch.consumedMaterials.forEach(cm => {
                             const it = data.items.find(i => i.id === cm.itemId);
@@ -101,16 +127,16 @@ export default function ProductionPage() {
                         return (
                             <div className="card" style={{ borderColor: 'var(--color-warning)' }}>
                                 <div className="card-title" style={{ marginBottom: 4 }}>⚡ Execute Batch {activeBatch}</div>
-                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginBottom: 16 }}>Recipe: {recipe.name} • Planned: {batch.plannedQty} KG</p>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginBottom: 16 }}>Recipe: {recipe.name} • Targeted: {batch.plannedQty} KG</p>
 
-                                <label>Material Consumption (Enter Actual Quantities)</label>
+                                <label>Material Consumption (Actuals)</label>
                                 {batch.consumedMaterials.map(cm => {
                                     const item = data.items.find(i => i.id === cm.itemId)!;
                                     return (
                                         <div key={cm.itemId} className="flex gap-8 items-center mb-16" style={{ fontSize: '0.85rem' }}>
                                             <div style={{ flex: 2 }}>
                                                 <strong>{item.name}</strong>
-                                                <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Standard: {cm.standardQty} KG • Available: {item.currentStock} KG</div>
+                                                <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Planned: {cm.standardQty} KG • Available: {item.currentStock} KG</div>
                                             </div>
                                             <div style={{ flex: 1 }}>
                                                 <input type="number" value={actuals[cm.itemId] || ''} onChange={e => setActuals({ ...actuals, [cm.itemId]: +e.target.value })} placeholder="Actual KG" />
@@ -126,7 +152,7 @@ export default function ProductionPage() {
                                     </div>
                                     <div className="form-group">
                                         <label>Wastage (KG)</label>
-                                        <input type="number" value={wastage || ''} onChange={e => setWastage(+e.target.value)} />
+                                        <input type="number" value={computedWastage.toFixed(2)} readOnly style={{ background: 'var(--bg-secondary)', color: 'var(--text-dim)', cursor: 'not-allowed' }} />
                                     </div>
                                 </div>
 
@@ -158,7 +184,7 @@ export default function ProductionPage() {
                                             <div><strong className="mono">{b.id}</strong> <span className="badge-status badge-planned">PLANNED</span></div>
                                             <button className="btn btn-primary btn-sm" onClick={() => handleExecute(b.id)} disabled={!!activeBatch}>▶ Execute</button>
                                         </div>
-                                        <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 4 }}>{r.name} • Target: {b.plannedQty} KG • {b.date}</div>
+                                        <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 4 }}>{r.name} • Targeted: {b.plannedQty} KG • {b.date}</div>
                                     </div>
                                 );
                             })}

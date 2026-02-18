@@ -35,10 +35,10 @@ export function createSeedData(): DemoData {
             { id: 'PACK-002', name: '100g Pouches', type: 'PACKING', baseUnit: 'PCS', currentStock: 8000, avgCost: 3, reorderLevel: 800, createdAt: d },
             { id: 'PACK-003', name: '200g Boxes', type: 'PACKING', baseUnit: 'PCS', currentStock: 5000, avgCost: 8, reorderLevel: 500, createdAt: d },
             { id: 'PACK-004', name: 'Printed Labels', type: 'PACKING', baseUnit: 'PCS', currentStock: 20000, avgCost: 0.5, reorderLevel: 2000, createdAt: d },
-            { id: 'FG-001', name: 'Red Chili Powder 50g', type: 'FG', baseUnit: 'PCS', currentStock: 0, avgCost: 0, reorderLevel: 100, packWeight: 50, createdAt: d },
-            { id: 'FG-002', name: 'Red Chili Powder 100g', type: 'FG', baseUnit: 'PCS', currentStock: 0, avgCost: 0, reorderLevel: 80, packWeight: 100, createdAt: d },
-            { id: 'FG-003', name: 'Garam Masala 100g', type: 'FG', baseUnit: 'PCS', currentStock: 0, avgCost: 0, reorderLevel: 80, packWeight: 100, createdAt: d },
-            { id: 'FG-004', name: 'Garam Masala 200g Box', type: 'FG', baseUnit: 'PCS', currentStock: 0, avgCost: 0, reorderLevel: 50, packWeight: 200, createdAt: d },
+            { id: 'FG-001', name: 'Red Chili Powder 50g', type: 'FG', baseUnit: 'PCS', currentStock: 0, avgCost: 0, reorderLevel: 100, packWeight: 50, sourceBulkItemId: 'BULK-001', packingMaterials: [{ itemId: 'PACK-001', quantityPerUnit: 1 }, { itemId: 'PACK-004', quantityPerUnit: 1 }], createdAt: d },
+            { id: 'FG-002', name: 'Red Chili Powder 100g', type: 'FG', baseUnit: 'PCS', currentStock: 0, avgCost: 0, reorderLevel: 80, packWeight: 100, sourceBulkItemId: 'BULK-001', packingMaterials: [{ itemId: 'PACK-002', quantityPerUnit: 1 }, { itemId: 'PACK-004', quantityPerUnit: 1 }], createdAt: d },
+            { id: 'FG-003', name: 'Garam Masala 100g', type: 'FG', baseUnit: 'PCS', currentStock: 0, avgCost: 0, reorderLevel: 80, packWeight: 100, sourceBulkItemId: 'BULK-003', packingMaterials: [{ itemId: 'PACK-002', quantityPerUnit: 1 }, { itemId: 'PACK-004', quantityPerUnit: 1 }], createdAt: d },
+            { id: 'FG-004', name: 'Garam Masala 200g Box', type: 'FG', baseUnit: 'PCS', currentStock: 0, avgCost: 0, reorderLevel: 50, packWeight: 200, sourceBulkItemId: 'BULK-003', packingMaterials: [{ itemId: 'PACK-003', quantityPerUnit: 1 }, { itemId: 'PACK-004', quantityPerUnit: 1 }], createdAt: d },
         ],
         recipes: [
             {
@@ -198,13 +198,12 @@ export function processGRN(data: DemoData, supplierId: string, invoiceNumber: st
 }
 
 // ===== PRODUCTION =====
-export function createBatch(data: DemoData, recipeId: string, plannedQty: number): DemoData {
+export function createBatch(data: DemoData, recipeId: string, plannedInputs: { itemId: string; quantity: number }[]): DemoData {
     const batchId = genId('BATCH', data.nextIds.batch);
-    const recipe = data.recipes.find(r => r.id === recipeId)!;
-    const ratio = plannedQty / recipe.outputQuantity;
+    const plannedQty = round2(plannedInputs.reduce((s, i) => s + i.quantity, 0));
 
-    const consumedMaterials: BatchConsumption[] = recipe.ingredients.map(ing => ({
-        itemId: ing.itemId, standardQty: round2(ing.quantity * ratio), actualQty: 0,
+    const consumedMaterials: BatchConsumption[] = plannedInputs.map(pi => ({
+        itemId: pi.itemId, standardQty: pi.quantity, actualQty: 0,
     }));
 
     const batch: Batch = {
@@ -262,19 +261,33 @@ export function completeBatch(data: DemoData, batchId: string, actuals: { itemId
 export function completePackingRun(data: DemoData, sourceBatchId: string, fgItemId: string, outputQty: number, packMats: { itemId: string; quantity: number }[]): DemoData {
     let nd = { ...data };
     const fgItem = nd.items.find(i => i.id === fgItemId)!;
-    const batch = nd.batches.find(b => b.id === sourceBatchId)!;
-    const recipe = nd.recipes.find(r => r.id === batch.recipeId)!;
-    const bulkItem = nd.items.find(i => i.id === recipe.outputItemId)!;
-    const packWeightKg = (fgItem.packWeight || 100) / 1000;
-    const bulkConsumed = round2(outputQty * packWeightKg);
     const packRef = genId('PACK', nd.nextIds.packing);
     const txns: StockTransaction[] = [];
+    const packWeightKg = (fgItem.packWeight || 100) / 1000;
+    const bulkConsumed = round2(outputQty * packWeightKg);
+
+    let bulkItemId = '';
+    let bulkCostPerKg = 0;
+    let traceRef = sourceBatchId;
+
+    if (sourceBatchId.startsWith('BATCH-')) {
+        const batch = nd.batches.find(b => b.id === sourceBatchId)!;
+        const recipe = nd.recipes.find(r => r.id === batch.recipeId)!;
+        bulkItemId = recipe.outputItemId;
+        bulkCostPerKg = batch.costPerUnit;
+    } else if (sourceBatchId.startsWith('DIR-')) {
+        bulkItemId = sourceBatchId.replace('DIR-', '');
+        const item = nd.items.find(i => i.id === bulkItemId)!;
+        bulkCostPerKg = item.avgCost;
+    }
+
+    const bulkItem = nd.items.find(i => i.id === bulkItemId)!;
 
     if (bulkItem.currentStock < bulkConsumed) throw new Error(`Insufficient ${bulkItem.name}: need ${bulkConsumed} KG, have ${bulkItem.currentStock} KG`);
 
-    nd.items = nd.items.map(i => i.id === recipe.outputItemId ? { ...i, currentStock: round2(i.currentStock - bulkConsumed) } : i);
+    nd.items = nd.items.map(i => i.id === bulkItemId ? { ...i, currentStock: round2(i.currentStock - bulkConsumed) } : i);
     let txId = genId('TXN', nd.nextIds.transaction); nd.nextIds.transaction++;
-    txns.push({ id: txId, date: today(), type: 'PACKING_OUT', itemId: recipe.outputItemId, quantity: -bulkConsumed, reference: packRef, description: `Consumed ${bulkConsumed} KG of ${bulkItem.name} for packing` });
+    txns.push({ id: txId, date: today(), type: 'PACKING_OUT', itemId: bulkItemId, quantity: -bulkConsumed, reference: packRef, description: `Consumed ${bulkConsumed} KG of ${bulkItem.name} for packing` });
 
     let packingCostTotal = 0;
     for (const pm of packMats) {
@@ -286,7 +299,7 @@ export function completePackingRun(data: DemoData, sourceBatchId: string, fgItem
         txns.push({ id: txId, date: today(), type: 'PACKING_OUT', itemId: pm.itemId, quantity: -pm.quantity, reference: packRef, description: `Used ${pm.quantity} ${pi.name} for packing` });
     }
 
-    const bulkCostPerUnit = bulkItem.avgCost * packWeightKg;
+    const bulkCostPerUnit = bulkCostPerKg * packWeightKg;
     const packCostPerUnit = outputQty > 0 ? round2(packingCostTotal / outputQty) : 0;
     const fgCostPerUnit = round2(bulkCostPerUnit + packCostPerUnit);
 
@@ -299,7 +312,7 @@ export function completePackingRun(data: DemoData, sourceBatchId: string, fgItem
     txId = genId('TXN', nd.nextIds.transaction); nd.nextIds.transaction++;
     txns.push({ id: txId, date: today(), type: 'PACKING_IN', itemId: fgItemId, quantity: outputQty, reference: packRef, description: `Packed ${outputQty} units of ${fgItem.name} @ ₹${fgCostPerUnit}/unit` });
 
-    const pr: PackingRun = { id: packRef, sourceBatchId, fgItemId, bulkItemId: recipe.outputItemId, outputQuantity: outputQty, bulkConsumed, packingMaterials: packMats, fgCostPerUnit, date: today(), createdAt: today() };
+    const pr: PackingRun = { id: packRef, sourceBatchId: traceRef, fgItemId, bulkItemId, outputQuantity: outputQty, bulkConsumed, packingMaterials: packMats, fgCostPerUnit, date: today(), createdAt: today() };
     nd.packingRuns = [...nd.packingRuns, pr];
     nd.transactions = [...nd.transactions, ...txns];
     nd.nextIds.packing++;
