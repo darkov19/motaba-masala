@@ -17,4 +17,10 @@ type BackupService interface {
 	// Prune removes old backups based on retention policy
 	// Returns the number of files pruned and any error
 	Prune() (int, error)
+
+	// ListBackups returns available backup archive paths.
+	ListBackups() ([]string, error)
+
+	// Restore restores the database from a backup archive path.
+	Restore(backupPath string) error
 }

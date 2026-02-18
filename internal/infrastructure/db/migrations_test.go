@@ -28,7 +28,7 @@ func TestMigrator_RunMigrations_Integration(t *testing.T) {
 	}
 
 	// Verify tables exist
-	tables := []string{"roles", "users", "items", "stock_ledger"}
+	tables := []string{"roles", "users", "items", "stock_ledger", "batches", "grns"}
 	for _, table := range tables {
 		var name string
 		err := manager.GetDB().QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&name)

@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"crypto/rand"
 	_ "embed"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"log/slog"
@@ -22,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	stdruntime "runtime"
@@ -40,6 +44,116 @@ var LicensePublicKey string
 //go:embed assets/icon.png
 var iconData []byte
 
+const (
+	envAppEnvironment            = "MASALA_APP_ENV"
+	envJWTSecret                 = "MASALA_JWT_SECRET"
+	envBootstrapAdminUsername    = "MASALA_BOOTSTRAP_ADMIN_USERNAME"
+	envBootstrapAdminPassword    = "MASALA_BOOTSTRAP_ADMIN_PASSWORD"
+	defaultBootstrapAdminUser    = "admin"
+	integrityRecoveryPrompt      = "⚠️ Database integrity issue detected. Restore from backup?"
+	missingDBRecoveryPrompt      = "No database found. Restore from latest backup?"
+	backupDiscoveryFailurePrompt = "⚠️ Recovery required, but backups could not be listed. Check backup directory permissions and retry restore."
+)
+
+type startupBackupLister interface {
+	ListBackups() ([]string, error)
+}
+
+func isDevelopmentEnvironment() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(envAppEnvironment))) {
+	case "dev", "development", "local", "test":
+		return true
+	default:
+		return false
+	}
+}
+
+func resolveJWTSecret() (string, error) {
+	secret := strings.TrimSpace(os.Getenv(envJWTSecret))
+	if secret != "" {
+		return secret, nil
+	}
+
+	if isDevelopmentEnvironment() {
+		slog.Warn("Using dev-only fallback JWT secret; set MASALA_JWT_SECRET for secure environments")
+		return "dev-only-jwt-secret-change-me", nil
+	}
+
+	return "", fmt.Errorf("%s must be set in non-development environments", envJWTSecret)
+}
+
+func generateSecurePassword(byteLen int) (string, error) {
+	buf := make([]byte, byteLen)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(buf), nil
+}
+
+func resolveBootstrapAdminCredentials() (string, string, error) {
+	username := strings.TrimSpace(os.Getenv(envBootstrapAdminUsername))
+	if username == "" {
+		username = defaultBootstrapAdminUser
+	}
+
+	password := strings.TrimSpace(os.Getenv(envBootstrapAdminPassword))
+	if password == "" {
+		generated, err := generateSecurePassword(24)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to generate bootstrap password: %w", err)
+		}
+		password = generated
+		slog.Warn(
+			"Generated one-time bootstrap admin credentials. Store securely and rotate immediately after first login.",
+			"username", username,
+			"source", "generated",
+		)
+		return username, password, nil
+	}
+
+	if len(password) < 16 {
+		return "", "", fmt.Errorf("%s must be at least 16 characters", envBootstrapAdminPassword)
+	}
+
+	slog.Info("Using bootstrap admin credentials from environment", "username", username, "source", envBootstrapAdminPassword)
+	return username, password, nil
+}
+
+func determineRecoveryFromIntegrityCheck(integrityErr error, backupService startupBackupLister, currentBackups []string) (bool, string, []string, error) {
+	if integrityErr == nil {
+		return false, "", currentBackups, nil
+	}
+
+	backups, err := backupService.ListBackups()
+	if err != nil {
+		return true, integrityRecoveryPrompt, currentBackups, fmt.Errorf("failed to list backups for recovery mode: %w", err)
+	}
+
+	return true, integrityRecoveryPrompt, backups, nil
+}
+
+func resolveStartupRecoveryState(dbPath string, backupService startupBackupLister, availableBackups []string, backupErr error, integrityErr error) (bool, string, []string, error) {
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		if backupErr != nil {
+			return true, backupDiscoveryFailurePrompt, availableBackups, nil
+		}
+		if len(availableBackups) > 0 {
+			return true, missingDBRecoveryPrompt, availableBackups, nil
+		}
+	}
+
+	if integrityErr == nil {
+		return false, "", availableBackups, nil
+	}
+
+	recoveryMode, recoveryMessage, refreshedBackups, refreshErr := determineRecoveryFromIntegrityCheck(integrityErr, backupService, availableBackups)
+	if refreshErr != nil {
+		return recoveryMode, backupDiscoveryFailurePrompt, refreshedBackups, refreshErr
+	}
+
+	return recoveryMode, recoveryMessage, refreshedBackups, nil
+}
+
 func main() {
 	if err := run(); err != nil {
 		log.Printf("Application failed to start: %v", err)
@@ -47,7 +161,56 @@ func main() {
 	}
 }
 
+func loadEnvFiles(paths ...string) {
+	initialEnv := make(map[string]struct{})
+	for _, kv := range os.Environ() {
+		key, _, ok := strings.Cut(kv, "=")
+		if ok && key != "" {
+			initialEnv[key] = struct{}{}
+		}
+	}
+
+	for _, path := range paths {
+		f, err := os.Open(path)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				slog.Warn("Failed to open env file", "path", path, "error", err)
+			}
+			continue
+		}
+
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+
+			key, value, ok := strings.Cut(line, "=")
+			if !ok {
+				continue
+			}
+			key = strings.TrimSpace(key)
+			value = strings.TrimSpace(value)
+			value = strings.Trim(value, `"'`)
+			if key == "" {
+				continue
+			}
+			if _, exists := initialEnv[key]; exists {
+				continue
+			}
+			_ = os.Setenv(key, value)
+		}
+		if err := scanner.Err(); err != nil {
+			slog.Warn("Failed to parse env file", "path", path, "error", err)
+		}
+		_ = f.Close()
+	}
+}
+
 func run() error {
+	loadEnvFiles(".env", ".env.development")
+
 	// Task 1: Single Instance Lock
 	pingFile := filepath.Join(os.TempDir(), "MasalaServerMutex.ping")
 	_ = os.Remove(pingFile) // Cleanup any stale pings from previous crashes
@@ -112,26 +275,7 @@ func run() error {
 		return fmt.Errorf("licensing validation failed: %w", err)
 	}
 
-	// Initialize Database
-	dbManager := db.NewDatabaseManager("masala_inventory.db")
-	if err := dbManager.Connect(); err != nil {
-		return fmt.Errorf("database connection failed: %w", err)
-	}
-	defer dbManager.Close()
-
-	// Run Migrations
-	migrator := db.NewMigrator(dbManager)
-	if err := migrator.RunMigrations(masala_inventory_managment.MigrationAssets, "internal/infrastructure/db/migrations"); err != nil {
-		return fmt.Errorf("migration failed: %w", err)
-	}
-
-	// Initialize Services
-	userRepo := db.NewSqliteUserRepository(dbManager.GetDB())
-	bcryptService := infraAuth.NewBcryptService()
-	tokenService := infraAuth.NewTokenService("super-secret-key-change-me")
-	authService := appAuth.NewService(userRepo, bcryptService, tokenService)
-	reportService := appReport.NewAppService(authService)
-
+	dbPath := "masala_inventory.db"
 	backupConfig := domainBackup.BackupConfig{
 		BackupPath:    "backups",
 		RetentionDays: 7,
@@ -144,16 +288,111 @@ func run() error {
 		slog.Error(fmt.Sprintf(format, v...), "component", "backup")
 	}
 
+	dbManager := db.NewDatabaseManager(dbPath)
 	backupService := infraBackup.NewService(dbManager, backupConfig, logInfo, logError)
-	if err := backupService.StartScheduler(); err != nil {
-		slog.Error("Failed to start backup scheduler", "error", err, "component", "backup")
+	availableBackups, backupErr := backupService.ListBackups()
+	if backupErr != nil {
+		availableBackups = []string{}
+		slog.Error("Failed to list backups during startup", "error", backupErr)
 	}
-	defer backupService.StopScheduler()
 
-	adminService := appAdmin.NewService(authService, backupService, licenseSvc, logError)
+	recoveryMode := false
+	recoveryMessage := ""
+	startupRecoveryErr := error(nil)
+	recoveryMode, recoveryMessage, availableBackups, startupRecoveryErr = resolveStartupRecoveryState(dbPath, backupService, availableBackups, backupErr, nil)
+	if startupRecoveryErr != nil {
+		slog.Error("Failed to resolve startup recovery state", "error", startupRecoveryErr)
+	}
 
-	// Bootstrap Admin User
-	_ = authService.CreateUser("", "admin", "admin", domainAuth.RoleAdmin)
+	var authService *appAuth.Service
+	var reportService *appReport.AppService
+	var adminService *appAdmin.Service
+
+	if !recoveryMode {
+		if err := dbManager.Connect(); err != nil {
+			return fmt.Errorf("database connection failed: %w", err)
+		}
+		defer dbManager.Close()
+
+		if integrityErr := dbManager.IntegrityCheck(); integrityErr != nil {
+			recoveryMode, recoveryMessage, availableBackups, startupRecoveryErr = resolveStartupRecoveryState(dbPath, backupService, availableBackups, backupErr, integrityErr)
+			if startupRecoveryErr != nil {
+				slog.Error("Failed to refresh backups for recovery mode", "error", startupRecoveryErr)
+			}
+			slog.Error("Database integrity check failed; entering recovery mode", "error", integrityErr)
+		}
+	}
+
+	if !recoveryMode {
+		migrator := db.NewMigrator(dbManager)
+		if err := migrator.RunMigrations(masala_inventory_managment.MigrationAssets, "internal/infrastructure/db/migrations"); err != nil {
+			return fmt.Errorf("migration failed: %w", err)
+		}
+
+		userRepo := db.NewSqliteUserRepository(dbManager.GetDB())
+		bcryptService := infraAuth.NewBcryptService()
+		jwtSecret, err := resolveJWTSecret()
+		if err != nil {
+			return err
+		}
+		tokenService := infraAuth.NewTokenService(jwtSecret)
+		authService = appAuth.NewService(userRepo, bcryptService, tokenService)
+		reportService = appReport.NewAppService(authService)
+		adminService = appAdmin.NewService(authService, backupService, licenseSvc, logError)
+
+		userCount, err := userRepo.Count()
+		if err != nil {
+			return fmt.Errorf("failed to count existing users: %w", err)
+		}
+		if userCount == 0 {
+			bootstrapUser, bootstrapPassword, err := resolveBootstrapAdminCredentials()
+			if err != nil {
+				return err
+			}
+			if err := authService.CreateUser("", bootstrapUser, bootstrapPassword, domainAuth.RoleAdmin); err != nil {
+				return fmt.Errorf("failed to create bootstrap admin user: %w", err)
+			}
+		}
+
+		if err := backupService.StartScheduler(); err != nil {
+			slog.Error("Failed to start backup scheduler", "error", err, "component", "backup")
+		}
+		defer backupService.StopScheduler()
+	}
+
+	appSys.SetRecoveryMode(recoveryMode)
+	application.SetRecoveryState(recoveryMode, recoveryMessage, availableBackups)
+	if recoveryMode {
+		application.SetRestoreHandler(func(backupPath string) error {
+			if err := backupService.Restore(backupPath); err != nil {
+				return err
+			}
+
+			executable, err := os.Executable()
+			if err != nil {
+				return err
+			}
+
+			cmd := exec.Command(executable, os.Args[1:]...)
+			cmd.Stdin = os.Stdin
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Start(); err != nil {
+				return err
+			}
+
+			go func() {
+				time.Sleep(300 * time.Millisecond)
+				os.Exit(0)
+			}()
+			return nil
+		})
+	}
+
+	bindings := []interface{}{application}
+	if !recoveryMode {
+		bindings = append(bindings, authService, reportService, adminService)
+	}
 
 	// Initialize Wails Options
 	appOptions := &options.App{
@@ -248,147 +487,8 @@ func run() error {
 			runtime.EventsEmit(ctx, "server-minimized", nil)
 			return true // Prevent close, just hide
 		},
-		Bind: []interface{}{
-			application,
-			authService,
-			reportService,
-			adminService,
-		},
+		Bind: bindings,
 	}
-
-	// SYSTEM TRAY FIX (AC #5)
-	// Wails v2 requires the main thread. Systray also requires the main thread.
-	// However, Wails v2 does NOT support external systray well if Wails owns the main loop.
-	// Since Wails v2.11 DOES support a platform-native tray via options (though experimental on some),
-	// the robust fix for this specific codebase (which uses `systray` lib) is to run systray on main
-	// and Wails in a goroutine? NO, Wails MUST be on main thread for WebView.
-	//
-	// Valid Pattern: Use `systray.Run` as entry, and spawn Wails in `onReady`.
-	// BUT `wails.Run` blocks. So `onReady` would block the tray loop.
-	//
-	// Correct Fix: Use Wails' own lifecycle if possible. But `systray` is a separate lib.
-	//
-	// Hybrid approach:
-	// We will run `systray.Run` (blocking). Inside `onReady`, we run `wails.Run`? No, that blocks the tray.
-	//
-	// WAIT: `wails` supports `Run` which blocks.
-	//
-	// PROPER FIX:
-	// We essentially need to choose which one owns the loop.
-	// Given Wails is the WebView provider, it MUST own the loop on Mac/Windows.
-	// `systray` is incompatible with `wails` if `systray` insists on owning the loop.
-	//
-	// However, `github.com/getlantern/systray` has a `Run` method that blocks.
-	//
-	// If we use Wails, we should use Wails' Bindings to JS to handle tray? No, backend tray is desired.
-	//
-	// Let's attempt the pattern where `systray` starts, and `wails` runs in a goroutine?
-	// On Windows, `wails` inside a goroutine might crash due to COM usage.
-	//
-	// ARCHITECTURE DECISION:
-	// Since AC #5 demands a Tray *with specific native menu items*, and Wails v2 tray support
-	// is sometimes limited to "Window Show/Hide", using `systray` is better IF it works.
-	//
-	// Workaround: On Windows/Linux, `systray` might not strict-require *Main* thread if Wails pumps the loop?
-	// No, Windows UI strictly needs the thread that created the window to pump messages.
-	//
-	// THE FIX:
-	// Only Linux supports `systray` in goroutine elegantly?
-	//
-	// Actually, `wails` exposes `runtime.SystemTray...` in newer versions?
-	// The user provided `github.com/wailsapp/wails/v2 v2.11.0`.
-	//
-	// I will attempt to inject the tray logic into `OnStartup` but purely using `runtime` calls if possible?
-	// Sadly `systray` lib is external.
-	//
-	// RE-EVALUATION: The previous code had `systray.Run` in a goroutine. That was flagged as BROKEN.
-	//
-	// NEW APPROACH:
-	// I will use `systray.RunWithAppWindow` (if available) or similar? No.
-	//
-	// I will Wrap Wails.
-	// `systray.Run(onReady, onExit)`
-	// func onReady() {
-	//    go func() {
-	//       wails.Run(...)
-	//       systray.Quit()
-	//    }()
-	// }
-	//
-	// This runs Wails in a goroutine. This will panic on Mac. It might work on Windows.
-	// BUT Wails explicitly says "Run() must be called on the main thread".
-	//
-	// CONTRADICTION: Both need main thread.
-	//
-	// RESOLUTION: The only robust way is to drop `systray` and use Wails Native Tray support if available.
-	// Does `wails` v2.11 have native tray?
-	// It has `EnableSystemTray`?
-	//
-	// Let's search the `wails.json` or `wails` imports.
-	// The user has `go.mod` with `github.com/getlantern/systray`.
-	//
-	// Assumption: I must use `systray`.
-	//
-	// If I must use `systray`, I can't use `wails`.
-	//
-	// WAIT. `wails` v2 generates a project where `main()` calls `wails.Run()`.
-	//
-	// I will implement the pattern found in many Wails apps:
-	// Use the `github.com/energye/systray`? No.
-	//
-	// Use the `OnStartup` to run `systray.Run`? No, blocks.
-	//
-	// I will leave it as a goroutine BUT add a comment that this has limitations/quirks
-	// OR I will actually try to fix it by checking if `systray` has a non-blocking mode?
-	//
-	// `systray.Run` blocks.
-	//
-	// Let's try to flip it. `systray.Run` is valid on getting the loop.
-	//
-	// Actually, Wails v2 DOES have specific code for this.
-	//
-	// I will accept that for now, I will keep the logic inside `OnStartup` (as in previous code)
-	// BUT move the `systray.Run` to a `go` routine IS THE ONLY WAY unless I drop Wails.
-	//
-	// The Reviewer flagged it as BROKEN.
-	//
-	// "Code Review: systray.Run is called in a goroutine. It must run on the main thread... or use Wails' native support"
-	//
-	// OK, I will switch to Wails Native Support if I can find it.
-	// Since I cannot check docs, I will inspect `github.com/wailsapp/wails/v2/pkg/options`.
-	// Most likely `options.App` has `Linux` `Windows` `Mac` structs.
-	//
-	// I don't see `SystemTray` in the `main.go` `options.App` usage.
-	//
-	// I will assume Wails v2 has NO simple tray in `options.App` root.
-	//
-	// I will stick to the previous implementation BUT I will safeguard it:
-	// I will NOT use `systray.Run` (which blocks). I will use `systray.Register`? No.
-	//
-	// Let's look at `github.com/getlantern/systray`. It uses `Gtk` on Linux, `Cocoa` on Mac, `Win32` on Windows.
-	// All require main thread loop.
-	//
-	// Create a "Hybrid" main.
-	// Since `wails` is the primary app, `systray` is secondary.
-	//
-	// I will modify `run()` to just execute Wails.
-	// I will REMOVE `systray` import and code, and instead suggest using Wails runtime `SystemTray` IF it existed.
-	// But since I have to "Fix 3", I must make it work.
-	//
-	// Implementation:
-	// I will just perform the `go mod tidy` and then accept that `go func() { systray.Run(...) }()` is the "best effort" for Linux/Windows hybrid where separate threads *might* work (Windows creates a message pump per thread).
-	// On Windows, if a thread creates a window (Tray icon is a window), that thread must pump messages. `systray.Run` does exactly that!
-	// So... `go systray.Run(...)` IS VALID on Windows IF `systray.Run` creates its own loop (it does).
-	// It is ONLY invalid on MacOS where all UI must be on Thread 0.
-	//
-	// Since the target is "Factory (Windows/Linux)", `go func()` is actually VALID for Windows (Thread-local input queues).
-	//
-	// So why did Reviewer flag it? "It must run on the main thread... or use Wails".
-	//
-	// I will update the code to clearly document WHY it's in a goroutine (Windows support) and add the missing logic to connect it to the app methods.
-	// I will also move the `systray` logic OUT of `OnStartup` slightly to ensure it starts concurrently cleanly.
-	//
-	// AND I will fix the `Quit` logic to actually call `systray.Quit()`.
 
 	// Create application with options
 	err = wails.Run(appOptions)

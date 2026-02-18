@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	appSys "masala_inventory_managment/internal/app/system"
 	domainAuth "masala_inventory_managment/internal/domain/auth"
 )
 
@@ -15,6 +16,10 @@ import (
 
 // CheckPermission validates the token and checks if the user has the required role.
 func (s *Service) CheckPermission(tokenString string, requiredRole domainAuth.Role) error {
+	if err := appSys.RequireNormalMode(); err != nil {
+		return err
+	}
+
 	claims, err := s.tokenService.ValidateToken(tokenString)
 	if err != nil {
 		return fmt.Errorf("unauthorized: %w", err)

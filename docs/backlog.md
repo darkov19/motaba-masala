@@ -16,3 +16,5 @@ Routing guidance:
 | 2026-02-18 | 1.7   | 1    | Enhancement | Med | TBD | Open | Align connection indicator with explicit 🟢/🔴 requirement or update AC wording (AC 2). Ref: `frontend/src/components/layout/ConnectionStatus.tsx:11`. |
 | 2026-02-18 | 1.7   | 1    | TechDebt | Med | TBD | Open | Add automated tests for connection provider reconnect cadence/state transitions (AC 3). Ref: `frontend/src/context/ConnectionContext.tsx:85`. |
 | 2026-02-18 | 1.7   | 1    | TechDebt | Low | TBD | Open | Guard autosave localStorage writes against storage/quota exceptions (AC 1). Ref: `frontend/src/hooks/useAutoSave.ts:87`. |
+| 2026-02-18 | 1.8   | 1    | Security | Med | TBD | Open | Remove plaintext bootstrap password logging and replace with non-secret setup guidance. Ref: `cmd/server/main.go:106`. |
+| 2026-02-18 | 1.8   | 1    | TechDebt | Med | TBD | Open | Add startup integration test for integrity-check failure transitioning to recovery mode. Ref: `cmd/server/main.go:301`. |

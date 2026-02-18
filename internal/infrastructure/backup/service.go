@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -349,4 +350,104 @@ func (s *Service) StopScheduler() error {
 	}
 	s.logInfo("Backup scheduler stopped")
 	return nil
+}
+
+// ListBackups returns available backup zip files sorted newest-first.
+func (s *Service) ListBackups() ([]string, error) {
+	files, err := os.ReadDir(s.config.BackupPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, err
+	}
+
+	backups := make([]string, 0)
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		name := f.Name()
+		if strings.HasPrefix(name, "backup-") && strings.HasSuffix(name, ".zip") {
+			backups = append(backups, filepath.Join(s.config.BackupPath, name))
+		}
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(backups)))
+	return backups, nil
+}
+
+// Restore extracts a backup archive and replaces the active database file.
+func (s *Service) Restore(backupPath string) error {
+	if backupPath == "" {
+		return fmt.Errorf("backup path is required")
+	}
+
+	// Allow passing just the file name from UI.
+	candidate := backupPath
+	if !filepath.IsAbs(candidate) {
+		candidate = filepath.Join(s.config.BackupPath, filepath.Base(candidate))
+	}
+
+	absCandidate, err := filepath.Abs(candidate)
+	if err != nil {
+		return err
+	}
+	absBackupDir, err := filepath.Abs(s.config.BackupPath)
+	if err != nil {
+		return err
+	}
+	relPath, err := filepath.Rel(absBackupDir, absCandidate)
+	if err != nil {
+		return err
+	}
+	if relPath == "." || relPath == ".." || strings.HasPrefix(relPath, ".."+string(os.PathSeparator)) || filepath.IsAbs(relPath) {
+		return fmt.Errorf("backup path must be inside backup directory")
+	}
+
+	r, err := zip.OpenReader(absCandidate)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	var sourceFile *zip.File
+	for _, f := range r.File {
+		if filepath.Base(f.Name) == "masala_inventory.db" {
+			sourceFile = f
+			break
+		}
+	}
+	if sourceFile == nil {
+		return fmt.Errorf("backup does not contain masala_inventory.db")
+	}
+
+	rc, err := sourceFile.Open()
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+
+	dbPath := s.dbManager.GetDBPath()
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+		return err
+	}
+
+	tmpPath := dbPath + ".restore_tmp"
+	dst, err := os.Create(tmpPath)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(dst, rc); err != nil {
+		_ = dst.Close()
+		return err
+	}
+	if err := dst.Close(); err != nil {
+		return err
+	}
+
+	_ = s.dbManager.Close()
+	if err := os.Rename(tmpPath, dbPath); err != nil {
+		return err
+	}
+	return s.dbManager.Connect()
 }

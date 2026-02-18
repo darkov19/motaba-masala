@@ -3,6 +3,7 @@ package backup
 import (
 	"archive/zip"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -228,4 +229,145 @@ func TestConcurrency(t *testing.T) {
 	}
 
 	time.Sleep(100 * time.Millisecond) // wait for all
+}
+
+func TestListBackups_SortedNewestFirst(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewService(nil, backup.BackupConfig{BackupPath: tmpDir}, noOpLog, noOpLog)
+
+	createDummyFile(t, tmpDir, "backup-2026-02-13T020000.zip")
+	createDummyFile(t, tmpDir, "backup-2026-02-15T020000.zip")
+	createDummyFile(t, tmpDir, "backup-2026-02-14T020000.zip")
+
+	got, err := svc.ListBackups()
+	if err != nil {
+		t.Fatalf("ListBackups failed: %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("expected 3 backups, got %d", len(got))
+	}
+
+	wantFirst := filepath.Join(tmpDir, "backup-2026-02-15T020000.zip")
+	if got[0] != wantFirst {
+		t.Fatalf("expected newest backup first %s, got %s", wantFirst, got[0])
+	}
+}
+
+func TestRestore_ReplacesDatabaseFromZip(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbDir := filepath.Join(tmpDir, "db")
+	backupDir := filepath.Join(tmpDir, "backups")
+
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(backupDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	manager := createDummyDB(t, dbDir)
+	defer manager.Close()
+
+	backupDBPath := filepath.Join(tmpDir, "backup_source.db")
+	backupDBMgr := db.NewDatabaseManager(backupDBPath)
+	if err := backupDBMgr.Connect(); err != nil {
+		t.Fatalf("Failed to create backup source db: %v", err)
+	}
+	_, err := backupDBMgr.GetDB().Exec("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
+	if err != nil {
+		t.Fatalf("Failed to create backup source table: %v", err)
+	}
+	_, err = backupDBMgr.GetDB().Exec("INSERT INTO test (name) VALUES ('restored')")
+	if err != nil {
+		t.Fatalf("Failed to seed backup source table: %v", err)
+	}
+	_ = backupDBMgr.Close()
+
+	zipPath := filepath.Join(backupDir, "backup-2026-02-18T120000.zip")
+	if err := createZipWithFile(zipPath, backupDBPath, "masala_inventory.db"); err != nil {
+		t.Fatalf("Failed to build backup zip: %v", err)
+	}
+
+	svc := NewService(manager, backup.BackupConfig{BackupPath: backupDir}, noOpLog, noOpLog)
+	if err := svc.Restore(zipPath); err != nil {
+		t.Fatalf("Restore failed: %v", err)
+	}
+
+	var name string
+	if err := manager.GetDB().QueryRow("SELECT name FROM test LIMIT 1").Scan(&name); err != nil {
+		t.Fatalf("Failed to read restored row: %v", err)
+	}
+	if name != "restored" {
+		t.Fatalf("expected restored value, got %s", name)
+	}
+}
+
+func TestRestore_RejectsBackupOutsideBackupDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbDir := filepath.Join(tmpDir, "db")
+	backupDir := filepath.Join(tmpDir, "backups")
+	outsideDir := filepath.Join(tmpDir, "outside")
+
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(backupDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(outsideDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	manager := createDummyDB(t, dbDir)
+	defer manager.Close()
+
+	outsideDBPath := filepath.Join(tmpDir, "outside_source.db")
+	outsideDBMgr := db.NewDatabaseManager(outsideDBPath)
+	if err := outsideDBMgr.Connect(); err != nil {
+		t.Fatalf("Failed to create outside db: %v", err)
+	}
+	_, err := outsideDBMgr.GetDB().Exec("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
+	if err != nil {
+		t.Fatalf("Failed to create outside table: %v", err)
+	}
+	_ = outsideDBMgr.Close()
+
+	outsideZipPath := filepath.Join(outsideDir, "backup-2026-02-18T120001.zip")
+	if err := createZipWithFile(outsideZipPath, outsideDBPath, "masala_inventory.db"); err != nil {
+		t.Fatalf("Failed to build outside backup zip: %v", err)
+	}
+
+	svc := NewService(manager, backup.BackupConfig{BackupPath: backupDir}, noOpLog, noOpLog)
+	err = svc.Restore(outsideZipPath)
+	if err == nil {
+		t.Fatal("expected restore to fail for backup path outside backup directory")
+	}
+	if err.Error() != "backup path must be inside backup directory" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func createZipWithFile(zipPath, srcPath, entryName string) error {
+	dst, err := os.Create(zipPath)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	zw := zip.NewWriter(dst)
+	defer zw.Close()
+
+	entry, err := zw.Create(entryName)
+	if err != nil {
+		return err
+	}
+
+	src, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	_, err = io.Copy(entry, src)
+	return err
 }

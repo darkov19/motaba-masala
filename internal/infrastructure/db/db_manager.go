@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -93,6 +94,37 @@ func (m *DatabaseManager) GetDBPath() string {
 func (m *DatabaseManager) Close() error {
 	if m.db != nil {
 		return m.db.Close()
+	}
+	return nil
+}
+
+// IntegrityCheck runs PRAGMA integrity_check and returns an error if SQLite reports corruption.
+func (m *DatabaseManager) IntegrityCheck() error {
+	if m.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	rows, err := m.db.Query("PRAGMA integrity_check")
+	if err != nil {
+		return fmt.Errorf("integrity_check failed: %w", err)
+	}
+	defer rows.Close()
+
+	var problems []string
+	for rows.Next() {
+		var result string
+		if err := rows.Scan(&result); err != nil {
+			return fmt.Errorf("integrity_check scan failed: %w", err)
+		}
+		if result != "ok" {
+			problems = append(problems, result)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("integrity_check read failed: %w", err)
+	}
+	if len(problems) > 0 {
+		return fmt.Errorf("database integrity issue detected: %s", strings.Join(problems, "; "))
 	}
 	return nil
 }

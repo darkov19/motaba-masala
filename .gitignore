@@ -56,3 +56,8 @@ license.key
 
 masala-server
 .codex/
+
+# Environment files
+.env
+.env.*
+!.env.example
