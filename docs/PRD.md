@@ -247,6 +247,26 @@ Unlike standard inventory apps that just count stock, this system models the _tr
 
 - **Automated Local Backup:**
     - Daily automated database dump to a secondary location on the same machine (e.g., `D:\backups\` if DB is on `C:\`).
+- **Server Stability:**
+    - **System Tray:** Server minimizes to tray to prevent accidental closure.
+    - **Watchdog:** Monitor detects hanging process and auto-restarts service layer.
+    - **Disk Space Monitor:** Warning when disk space < 500MB to prevent write failures.
+    - **Single Instance Lock:** Mutex ensures only one server instance runs to prevent data corruption.
+- **Client Resilience:**
+    - **Auto-Draft:** Form data saved to LocalStorage every 5s to recover from crashes.
+    - **Connection Indicator:** Visual status (Online/Offline) with auto-reconnect overlay.
+    - **Unsaved Changes:** Blocking warning when navigating away or closing with active edits.
+- **Data Integrity:**
+    - **Optimistic Locking:** `updated_at` checks prevent concurrent overwrite of same record.
+    - **Startup Integrity Check:** `PRAGMA integrity_check` on boot; prompts restoration if corruption detected.
+    - **Missing DB Recovery:** Auto-detect missing DB file and offer restoration from backup.
+- **License Grace Period:**
+    - 30-day expiry warning banner.
+    - 7-day post-expiry **Read-Only Mode** before full lockout to allow production continuity.
+    - **Hardware Change:** Clear error screen with copyable Hardware ID for support resolution.
+- **Installer Hardening:**
+    - Installer automatically adds Firewall rules for Server port.
+    - Option for Client auto-start on Windows boot.
     - **Rolling Retention:** Keep last 7 daily backups + last 4 weekly snapshots. Older backups are automatically purged.
     - **Backup Status Indicator:** Admin dashboard displays "Last Backup: X hours ago ✅" or "⚠️ No backup in 48 hours!" so the admin is always aware.
     - **Restore Capability:** Admin can restore from any available backup via the admin panel.

@@ -1,0 +1,88 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>8</storyId>
+    <title>Data Integrity Protection</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2026-02-15</generatedAt>
+    <sourceStoryPath>docs/stories/1-8-data-integrity-protection.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Business Owner</asA>
+    <iWant>data protected from corruption and concurrent edits</iWant>
+    <soThat>inventory numbers are reliable</soThat>
+    <tasks>
+        <task id="1" acs="1">Implement Optimistic Locking
+            <subtask>Add updated_at to domain entities and DB tables</subtask>
+            <subtask>Modify Repository Update queries to use version checking</subtask>
+            <subtask>Handle ConcurrencyError in Service layer</subtask>
+        </task>
+        <task id="2" acs="2">Implement Startup Integrity Check
+            <subtask>Run PRAGMA integrity_check on startup</subtask>
+            <subtask>Implement Recovery Mode state if check fails</subtask>
+        </task>
+        <task id="3" acs="3">Implement Missing DB Recovery
+            <subtask>Detect missing DB file logic</subtask>
+            <subtask>Scan for backups and prompt restore if found</subtask>
+        </task>
+        <task id="4" acs="2,3">UI for Recovery Mode
+            <subtask>Create Wails/React View for Recovery (Restore Backup)</subtask>
+        </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="1">Optimistic Locking: Rejects save if updated_at changed.</ac>
+    <ac id="2">Startup Integrity Check: Detects corruption, prompts restore.</ac>
+    <ac id="3">Missing DB Recovery: Detects missing file, offers backup restore.</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+        <doc>
+            <path>docs/resilience-audit-report.md</path>
+            <title>Resilience Audit Report</title>
+            <section>Category 4: Data Integrity Issues</section>
+            <snippet>4.1 Concurrent Edits -> Optimistic Locking. 4.2 DB Corruption -> Integrity Check. 6.1 DB Deleted -> Restore Prompt.</snippet>
+        </doc>
+        <doc>
+            <path>docs/architecture.md</path>
+            <title>Architecture</title>
+            <section>6. Resilience & Stability Patterns</section>
+            <snippet>Data Integrity Patterns: Optimistic Locking, Startup Integrity Check.</snippet>
+        </doc>
+    </docs>
+    <dependencies>
+      <go>
+        <package name="github.com/mattn/go-sqlite3" />
+      </go>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Data Safety: Never overwrite existing DB without explicit user confirmation during recovery.</constraint>
+    <constraint>UX: Recovery Mode must be distinct from normal Admin Dashboard (simplified UI).</constraint>
+    <constraint>Performance: updated_at check adds minimal overhead.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>DatabaseManager</name>
+      <kind>Go struct</kind>
+      <signature>Method IntegrityCheck() error</signature>
+      <path>internal/infrastructure/db/db_manager.go</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Go functional tests for repository locking.</standards>
+    <locations>
+      <location>internal/infrastructure/db/sqlite_item_repository_test.go</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test concurrent updates: create item, spawn 2 routines to update same item. Expect 1 success, 1 failure.</idea>
+      <idea ac="2">Corrupt a temp DB file (write garbage bytes), init Manager, assert error/recovery mode.</idea>
+    </ideas>
+  </tests>
+</story-context>

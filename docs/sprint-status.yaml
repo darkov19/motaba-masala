@@ -43,10 +43,16 @@ development_status:
     1-3-hardware-bound-licensing-system: done
     1-4-local-authentication-rbac: done
     1-5-automated-local-backup-service: done
+    1-6-server-resilience: done
+    1-7-client-resilience-recovery: ready-for-dev
+    1-8-data-integrity-protection: ready-for-dev
+    1-9-license-ux: ready-for-dev
+    1-10-installer-hardening: ready-for-dev
+    1-11-resilience-verification: ready-for-dev
     epic-1-retrospective: optional
 
     # Epic 2: Master Data & Configuration
-    epic-2: backlog
+    epic-2: contexted
     2-1-item-master-management: backlog
     2-2-unit-conversion-engine: backlog
     2-3-recipe-bom-management: backlog

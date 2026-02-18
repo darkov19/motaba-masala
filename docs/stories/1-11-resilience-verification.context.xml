@@ -1,0 +1,73 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>11</storyId>
+    <title>Resilience Verification Suite</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2026-02-15</generatedAt>
+    <sourceStoryPath>docs/stories/1-11-resilience-verification.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>QA Tester</asA>
+    <iWant>verification tests for resilience features</iWant>
+    <soThat>we can prove the system is robust</soThat>
+    <tasks>
+        <task id="1" acs="1">WAL Recovery Integration Test
+            <subtask>Spawn/Kill/Restart server test</subtask>
+        </task>
+        <task id="2" acs="2">UDP Re-Discovery Test
+            <subtask>Mock broadcaster, verify client adaptation</subtask>
+        </task>
+        <task id="3" acs="3,4">Create Manual Test Protocols
+            <subtask>Document LAN cable and Reboot tests</subtask>
+        </task>
+        <task id="4" acs="5">Clock Tamper Test
+            <subtask>Dependency Inject fake clock to test validation logic</subtask>
+        </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="1">WAL Recovery: Data consistent after SIGKILL.</ac>
+    <ac id="2">UDP Re-Discovery: Client reconnects to new IP.</ac>
+    <ac id="3">Network Failure: Manual protocol verified.</ac>
+    <ac id="4">Client Reboot: Manual protocol verified.</ac>
+    <ac id="5">Clock Tamper: Server refuses start.</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+        <doc>
+            <path>docs/resilience-audit-report.md</path>
+            <title>Resilience Audit Report</title>
+            <section>Category 1, 2, 3, 5</section>
+            <snippet>Verification requirements for all resilience features.</snippet>
+        </doc>
+    </docs>
+  </artifacts>
+
+  <constraints>
+    <constraint>Environment: Integration tests must run in CI/CD pipeline (except manual/hardware ones).</constraint>
+    <constraint>Isolation: Tests should not affect the actual dev database.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Clock</name>
+      <kind>Go Interface</kind>
+      <signature>Now() time.Time</signature>
+      <path>internal/shared/time/clock.go (Create if missing)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Go Standard Lib testing.</standards>
+    <locations>
+      <location>test/integration/</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Use `exec.Cmd` to control server lifecycle.</idea>
+    </ideas>
+  </tests>
+</story-context>

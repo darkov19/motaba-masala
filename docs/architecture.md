@@ -146,3 +146,20 @@ export default function App() {
     - `MasalaClient.exe`: The Terminal (UI + Network Proxy).
     - `license.key`: Placed only on Server.
 - **Installer:** NSIS Script generating two installers: "Server Setup" and "Client Setup".
+
+### 6. Resilience & Stability Patterns
+
+- **Server Stability Patterns:**
+    - **System Tray:** Intercept `WM_CLOSE` to minimize instead of quit.
+    - **Watchdog Goroutine:** Monitors main service loop health; triggers self-restart ("Phoenix Pattern") on failure. Spawns new instance and exits frozen process.
+    - **Disk Space Monitor:** Periodic checks of available disk space; warns admin below 500MB threshold.
+    - **Single Instance Mutex:** Windows Named Mutex (`MasalaServerMutex`) prevents multiple server instances.
+
+- **Client Resilience Patterns:**
+    - **Auto-Draft Hook:** React custom hook `useAutoSave` writes form state to LocalStorage keyed by user+form ID.
+    - **Connection Heartbeat:** Ping server every 2s. If failed, switch UI to "Reconnecting" overlay mode.
+    - **Navigation Guard:** React Router `useBlocker` intercepts navigation/close if form is dirty.
+
+- **Data Integrity Patterns:**
+    - **Optimistic Locking:** All critical tables have `updated_at`. Updates include `WHERE id=? AND updated_at=?`.
+    - **Startup Integrity Check:** Run `PRAGMA integrity_check` before opening DB connections.

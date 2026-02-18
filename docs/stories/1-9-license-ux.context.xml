@@ -1,0 +1,76 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>9</storyId>
+    <title>License & Security UX</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2026-02-15</generatedAt>
+    <sourceStoryPath>docs/stories/1-9-license-ux.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>System Admin</asA>
+    <iWant>clear warnings about expiry and hardware issues</iWant>
+    <soThat>I can resolve them without downtime</soThat>
+    <tasks>
+        <task id="1" acs="1,2">Update License Service
+            <subtask>Implement Expiry logic (Expiring, GracePeriod, Expired)</subtask>
+            <subtask>Expose DaysRemaining</subtask>
+        </task>
+        <task id="2" acs="2">Implement Read-Only Enforcement
+            <subtask>Block write operations in backend if in GracePeriod</subtask>
+        </task>
+        <task id="3" acs="3">Implement Hardware Error Screen
+            <subtask>Detect hardware mismatch on startup</subtask>
+            <subtask>Show Lockout UI with new HW ID</subtask>
+        </task>
+        <task id="4" acs="1,2">Frontend UX
+            <subtask>Implement Warning/Error Banners</subtask>
+            <subtask>Disable write actions in UI</subtask>
+        </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="1">Expiry Warning Banner: Shown 30 days prior.</ac>
+    <ac id="2">Grace Period: 7 days read-only access post-expiry. Write actions blocked.</ac>
+    <ac id="3">Hardware Change Error: Specific screen with Copy ID button appears on HW mismatch.</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+        <doc>
+            <path>docs/resilience-audit-report.md</path>
+            <title>Resilience Audit Report</title>
+            <section>Category 5: Licensing & Security Edge Cases</section>
+            <snippet>5.1 License Expires -> Grace Period. 5.3 Hardware Changed -> Error Screen.</snippet>
+        </doc>
+    </docs>
+  </artifacts>
+
+  <constraints>
+    <constraint>Hard Block: Grace Period must enforce block at API level.</constraint>
+    <constraint>Lockout: Hardware Mismatch must prevent app entry entirely.</constraint>
+    <constraint>Clarity: Error messages must guide user to solution (e.g., "Contact Support").</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>LicenseService</name>
+      <kind>Go Interface</kind>
+      <signature>Method Validate() (LicenseStatus, error)</signature>
+      <path>internal/domain/license/service.go</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Table driven unit tests for license logic.</standards>
+    <locations>
+      <location>internal/domain/license/service_test.go</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test date math: T-31 days (Active), T-29 days (Warning), T+1 day (Grace), T+8 days (Expired).</idea>
+      <idea ac="2">Test Write Operation while status is GracePeriod -> assert 403 error.</idea>
+    </ideas>
+  </tests>
+</story-context>
