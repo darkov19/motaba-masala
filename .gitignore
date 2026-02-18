@@ -61,3 +61,6 @@ masala-server
 .env
 .env.*
 !.env.example
+
+# Demo
+demo/
