@@ -1,0 +1,235 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f5f5f5;
+    color: #1a1a1a;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ---- HEADER ---- */
+.demo-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 64px;
+    background: linear-gradient(135deg, #7D1111 0%, #a01919 50%, #5a0d0d 100%) !important;
+    box-shadow: 0 2px 8px rgba(125, 17, 17, 0.3);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.brand-logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* ---- STEPS NAV ---- */
+.steps-nav {
+    background: #fff;
+    padding: 20px 24px;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    margin-bottom: 24px;
+}
+
+.steps-nav .ant-steps-item-process .ant-steps-item-icon {
+    background: #7D1111 !important;
+    border-color: #7D1111 !important;
+}
+
+.steps-nav .ant-steps-item-finish .ant-steps-item-icon {
+    border-color: #7D1111 !important;
+}
+
+.steps-nav .ant-steps-item-finish .ant-steps-item-icon>.ant-steps-icon {
+    color: #7D1111 !important;
+}
+
+/* ---- STEP CONTENT ---- */
+.step-container {
+    min-height: 500px;
+}
+
+.step-content {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.step-header {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.step-header h3 {
+    font-weight: 700;
+    margin-bottom: 4px !important;
+}
+
+/* ---- STEP NAVIGATION ---- */
+.step-navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 0;
+    margin-top: 24px;
+    border-top: 1px solid #f0f0f0;
+}
+
+/* ---- STOCK SIDEBAR ---- */
+.stock-sider {
+    position: sticky !important;
+    top: 64px;
+    height: calc(100vh - 64px);
+}
+
+.stock-sidebar {
+    padding-bottom: 20px;
+}
+
+.stock-total-card {
+    border-radius: 12px !important;
+}
+
+.stock-total-card .ant-statistic-title {
+    font-size: 13px;
+}
+
+.stock-section-card {
+    border-radius: 10px !important;
+    transition: all 0.2s ease;
+}
+
+.stock-section-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+}
+
+/* ---- CARDS & FORMS ---- */
+.ant-card {
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.ant-card-head {
+    border-bottom: 1px solid #f5f5f5;
+}
+
+.ant-btn-primary {
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(125, 17, 17, 0.2);
+}
+
+.ant-btn-primary:hover {
+    box-shadow: 0 4px 12px rgba(125, 17, 17, 0.3);
+    transform: translateY(-1px);
+}
+
+.ant-segmented {
+    border-radius: 10px !important;
+    padding: 4px !important;
+}
+
+.ant-segmented-item-selected {
+    background: #7D1111 !important;
+    color: #fff !important;
+    border-radius: 8px !important;
+}
+
+/* ---- TABLE POLISH ---- */
+.ant-table-thead>tr>th {
+    background: #fafafa !important;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ant-table-tbody>tr:hover>td {
+    background: #fff7f7 !important;
+}
+
+/* ---- ALERTS ---- */
+.ant-alert {
+    border-radius: 10px;
+}
+
+/* ---- MODAL ---- */
+.ant-modal-content {
+    border-radius: 16px;
+}
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 1200px) {
+    .stock-sider {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .demo-header {
+        padding: 0 12px;
+    }
+
+    .steps-nav {
+        overflow-x: auto;
+    }
+
+    .step-content {
+        padding: 0 4px;
+    }
+}
+
+/* ---- SCROLLBAR ---- */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+}
