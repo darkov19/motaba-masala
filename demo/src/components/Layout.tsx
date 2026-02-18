@@ -24,7 +24,17 @@ export default function Layout() {
             <aside className="sidebar">
                 <div className="sidebar-brand">
                     <h1>Motaba Masala</h1>
-                    <span className="brand-sub">Inventory Demo</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span className="brand-sub">Inventory Demo</span>
+                        <span style={{
+                            fontSize: '0.65rem',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            color: 'var(--text-muted)'
+                        }}>demo/d4</span>
+                    </div>
                 </div>
                 <nav className="sidebar-nav">
                     {navItems.map(item => (
