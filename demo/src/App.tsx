@@ -45,8 +45,21 @@ function DemoApp() {
                             Motaba Masala
                         </Title>
                         <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
-                            Inventory & Production Management — Demo
+                            Inventory &amp; Production Management — Demo
                         </Text>
+                        <span style={{
+                            marginLeft: 10,
+                            background: 'rgba(255,255,255,0.12)',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            borderRadius: 4,
+                            padding: '1px 8px',
+                            fontSize: 11,
+                            color: 'rgba(255,255,255,0.6)',
+                            fontFamily: 'monospace',
+                            letterSpacing: '0.3px',
+                        }}>
+                            demo/D3
+                        </span>
                     </div>
                 </div>
                 <Tooltip title="Reset Demo — Clear all data">
