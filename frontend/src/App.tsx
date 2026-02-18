@@ -45,6 +45,20 @@ function App() {
                 <Title level={4} style={{ color: "#fff", margin: 0 }}>
                     Masala Inventory Management
                 </Title>
+                <span
+                    style={{
+                        marginLeft: 12,
+                        backgroundColor: "rgba(255, 255, 255, 0.15)",
+                        color: "#fff",
+                        padding: "2px 8px",
+                        borderRadius: 4,
+                        fontSize: "0.75rem",
+                        fontFamily: "monospace",
+                        border: "1px solid rgba(255, 255, 255, 0.2)",
+                    }}
+                >
+                    demo/D2
+                </span>
             </Header>
             <Content style={{ padding: "24px 50px" }}>
                 <div style={{ maxWidth: 600, margin: "0 auto" }}>
