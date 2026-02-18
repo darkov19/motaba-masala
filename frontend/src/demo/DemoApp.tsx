@@ -103,6 +103,7 @@ export default function DemoApp() {
             <Layout>
                 <Header className="demo-header">
                     <Space size="middle" wrap>
+                        <Tag color="blue">demo/d5</Tag>
                         <Tag color="purple">Guided + Free Play</Tag>
                         <Radio.Group
                             value={persona}
