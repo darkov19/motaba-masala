@@ -1,0 +1,246 @@
+import { useState } from 'react';
+import { useDemo } from '../App';
+import { addItem, deleteItem, addRecipe, deleteRecipe, addSupplier, addCustomer } from '../store/demoStore';
+import { Item, ItemType, UnitType } from '../types';
+
+const TYPE_LABELS: Record<ItemType, string> = { RAW: 'Raw Material', BULK: 'Bulk Powder', PACKING: 'Packing Material', FG: 'Finished Good' };
+const BADGE_CLASS: Record<ItemType, string> = { RAW: 'badge-raw', BULK: 'badge-bulk', PACKING: 'badge-packing', FG: 'badge-fg' };
+
+export default function MasterDataPage() {
+    const { data, setData, toast } = useDemo();
+    const [tab, setTab] = useState<'items' | 'recipes' | 'suppliers' | 'customers'>('items');
+    const [showModal, setShowModal] = useState(false);
+    const [itemForm, setItemForm] = useState({ name: '', type: 'RAW' as ItemType, baseUnit: 'KG' as UnitType, reorderLevel: 0, packWeight: 0 });
+    const [recipeForm, setRecipeForm] = useState({ name: '', outputItemId: '', outputQty: 0, wastePct: 5, ingredients: [{ itemId: '', quantity: 0 }] });
+    const [supplierForm, setSupplierForm] = useState({ name: '', contact: '', phone: '', leadTimeDays: 7 });
+    const [customerForm, setCustomerForm] = useState({ name: '', contact: '', phone: '', channel: '' });
+
+    const handleAddItem = () => {
+        if (!itemForm.name) { toast('Item name required', 'error'); return; }
+        setData(addItem(data, { ...itemForm, currentStock: 0, avgCost: 0 }));
+        setShowModal(false);
+        setItemForm({ name: '', type: 'RAW', baseUnit: 'KG', reorderLevel: 0, packWeight: 0 });
+        toast(`Item "${itemForm.name}" added`);
+    };
+
+    const handleAddRecipe = () => {
+        if (!recipeForm.name || !recipeForm.outputItemId) { toast('Fill required fields', 'error'); return; }
+        const validIngredients = recipeForm.ingredients.filter(i => i.itemId && i.quantity > 0);
+        if (validIngredients.length === 0) { toast('Add at least one ingredient', 'error'); return; }
+        setData(addRecipe(data, {
+            name: recipeForm.name, outputItemId: recipeForm.outputItemId,
+            outputQuantity: recipeForm.outputQty, outputUnit: 'KG', expectedWastePct: recipeForm.wastePct,
+            ingredients: validIngredients.map(i => ({ itemId: i.itemId, quantity: i.quantity, unit: 'KG' as UnitType })),
+        }));
+        setShowModal(false);
+        toast(`Recipe "${recipeForm.name}" added`);
+    };
+
+    const handleAddSupplier = () => {
+        if (!supplierForm.name) { toast('Name required', 'error'); return; }
+        setData(addSupplier(data, supplierForm));
+        setShowModal(false);
+        toast(`Supplier "${supplierForm.name}" added`);
+    };
+
+    const handleAddCustomer = () => {
+        if (!customerForm.name) { toast('Name required', 'error'); return; }
+        setData(addCustomer(data, customerForm));
+        setShowModal(false);
+        toast(`Customer "${customerForm.name}" added`);
+    };
+
+    const bulkItems = data.items.filter(i => i.type === 'BULK');
+    const rawItems = data.items.filter(i => i.type === 'RAW');
+
+    return (
+        <div>
+            <h1 className="page-title">⚙️ Master Data</h1>
+            <p className="page-subtitle">Configure items, recipes, suppliers, and customers. Pre-loaded with sample spice data.</p>
+
+            <div className="tabs">
+                {(['items', 'recipes', 'suppliers', 'customers'] as const).map(t => (
+                    <button key={t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => { setTab(t); setShowModal(false); }}>
+                        {t === 'items' ? '📦 Items' : t === 'recipes' ? '📝 Recipes' : t === 'suppliers' ? '🏢 Suppliers' : '👥 Customers'}
+                    </button>
+                ))}
+            </div>
+
+            {/* Items Tab */}
+            {tab === 'items' && (
+                <div className="card">
+                    <div className="card-header">
+                        <span className="card-title">Item Master ({data.items.length})</span>
+                        <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>+ Add Item</button>
+                    </div>
+                    <div className="table-container">
+                        <table>
+                            <thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Unit</th><th>Stock</th><th>Avg Cost</th><th>Value</th><th>Reorder</th><th></th></tr></thead>
+                            <tbody>
+                                {data.items.map(it => (
+                                    <tr key={it.id}>
+                                        <td className="mono">{it.id}</td>
+                                        <td><strong>{it.name}</strong></td>
+                                        <td><span className={`badge-type ${BADGE_CLASS[it.type]}`}>{TYPE_LABELS[it.type]}</span></td>
+                                        <td>{it.baseUnit}</td>
+                                        <td className={it.currentStock <= it.reorderLevel ? 'text-danger' : ''}><strong>{it.currentStock.toLocaleString()}</strong></td>
+                                        <td className="currency">₹{it.avgCost.toFixed(2)}</td>
+                                        <td className="currency">₹{(it.currentStock * it.avgCost).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
+                                        <td>{it.reorderLevel}</td>
+                                        <td><button className="btn btn-outline btn-sm" onClick={() => { setData(deleteItem(data, it.id)); toast(`Deleted "${it.name}"`); }}>✕</button></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Recipes Tab */}
+            {tab === 'recipes' && (
+                <div className="card">
+                    <div className="card-header">
+                        <span className="card-title">Recipes / BOM ({data.recipes.length})</span>
+                        <button className="btn btn-primary btn-sm" onClick={() => { setRecipeForm({ name: '', outputItemId: '', outputQty: 0, wastePct: 5, ingredients: [{ itemId: '', quantity: 0 }] }); setShowModal(true); }}>+ Add Recipe</button>
+                    </div>
+                    {data.recipes.map(r => {
+                        const outItem = data.items.find(i => i.id === r.outputItemId);
+                        return (
+                            <div key={r.id} className="card" style={{ marginBottom: 12, background: 'var(--bg-elevated)' }}>
+                                <div className="flex justify-between items-center" style={{ marginBottom: 12 }}>
+                                    <div>
+                                        <strong style={{ fontSize: '1rem' }}>{r.name}</strong>
+                                        <span className="mono" style={{ marginLeft: 8, color: 'var(--text-dim)', fontSize: '0.75rem' }}>{r.id}</span>
+                                    </div>
+                                    <button className="btn btn-outline btn-sm" onClick={() => { setData(deleteRecipe(data, r.id)); toast(`Deleted recipe "${r.name}"`); }}>✕</button>
+                                </div>
+                                <div className="flex gap-24" style={{ fontSize: '0.85rem' }}>
+                                    <div><span style={{ color: 'var(--text-dim)' }}>Output:</span> <strong className="text-bulk">{outItem?.name || r.outputItemId}</strong> ({r.outputQuantity} {r.outputUnit})</div>
+                                    <div><span style={{ color: 'var(--text-dim)' }}>Expected Waste:</span> <strong className="text-warning">{r.expectedWastePct}%</strong></div>
+                                </div>
+                                <div style={{ marginTop: 8, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                                    <strong>Ingredients:</strong> {r.ingredients.map(ing => {
+                                        const item = data.items.find(i => i.id === ing.itemId);
+                                        return `${item?.name || ing.itemId} (${ing.quantity} ${ing.unit})`;
+                                    }).join(' + ')}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* Suppliers Tab */}
+            {tab === 'suppliers' && (
+                <div className="card">
+                    <div className="card-header">
+                        <span className="card-title">Suppliers ({data.suppliers.length})</span>
+                        <button className="btn btn-primary btn-sm" onClick={() => { setSupplierForm({ name: '', contact: '', phone: '', leadTimeDays: 7 }); setShowModal(true); }}>+ Add Supplier</button>
+                    </div>
+                    <div className="table-container">
+                        <table>
+                            <thead><tr><th>ID</th><th>Name</th><th>Contact</th><th>Phone</th><th>Lead Time</th></tr></thead>
+                            <tbody>
+                                {data.suppliers.map(s => (
+                                    <tr key={s.id}><td className="mono">{s.id}</td><td><strong>{s.name}</strong></td><td>{s.contact}</td><td>{s.phone}</td><td>{s.leadTimeDays} days</td></tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Customers Tab */}
+            {tab === 'customers' && (
+                <div className="card">
+                    <div className="card-header">
+                        <span className="card-title">Customers ({data.customers.length})</span>
+                        <button className="btn btn-primary btn-sm" onClick={() => { setCustomerForm({ name: '', contact: '', phone: '', channel: '' }); setShowModal(true); }}>+ Add Customer</button>
+                    </div>
+                    <div className="table-container">
+                        <table>
+                            <thead><tr><th>ID</th><th>Name</th><th>Contact</th><th>Phone</th><th>Channel</th></tr></thead>
+                            <tbody>
+                                {data.customers.map(c => (
+                                    <tr key={c.id}><td className="mono">{c.id}</td><td><strong>{c.name}</strong></td><td>{c.contact}</td><td>{c.phone}</td><td>{c.channel}</td></tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Modals */}
+            {showModal && tab === 'items' && (
+                <div className="modal-overlay" onClick={() => setShowModal(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header"><span className="modal-title">Add New Item</span><button className="modal-close" onClick={() => setShowModal(false)}>×</button></div>
+                        <div className="form-group"><label>Name</label><input value={itemForm.name} onChange={e => setItemForm({ ...itemForm, name: e.target.value })} placeholder="e.g. Fennel Seeds" /></div>
+                        <div className="form-row">
+                            <div className="form-group"><label>Type</label><select value={itemForm.type} onChange={e => setItemForm({ ...itemForm, type: e.target.value as ItemType })}><option value="RAW">Raw Material</option><option value="BULK">Bulk Powder</option><option value="PACKING">Packing Material</option><option value="FG">Finished Good</option></select></div>
+                            <div className="form-group"><label>Base Unit</label><select value={itemForm.baseUnit} onChange={e => setItemForm({ ...itemForm, baseUnit: e.target.value as UnitType })}><option value="KG">KG</option><option value="GRAM">Gram</option><option value="PCS">Pieces</option><option value="BOX">Box</option></select></div>
+                        </div>
+                        <div className="form-row">
+                            <div className="form-group"><label>Reorder Level</label><input type="number" value={itemForm.reorderLevel} onChange={e => setItemForm({ ...itemForm, reorderLevel: +e.target.value })} /></div>
+                            {itemForm.type === 'FG' && <div className="form-group"><label>Pack Weight (grams)</label><input type="number" value={itemForm.packWeight} onChange={e => setItemForm({ ...itemForm, packWeight: +e.target.value })} /></div>}
+                        </div>
+                        <div className="modal-actions"><button className="btn btn-outline" onClick={() => setShowModal(false)}>Cancel</button><button className="btn btn-primary" onClick={handleAddItem}>Add Item</button></div>
+                    </div>
+                </div>
+            )}
+
+            {showModal && tab === 'recipes' && (
+                <div className="modal-overlay" onClick={() => setShowModal(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header"><span className="modal-title">Add New Recipe</span><button className="modal-close" onClick={() => setShowModal(false)}>×</button></div>
+                        <div className="form-group"><label>Recipe Name</label><input value={recipeForm.name} onChange={e => setRecipeForm({ ...recipeForm, name: e.target.value })} placeholder="e.g. Turmeric Powder" /></div>
+                        <div className="form-row">
+                            <div className="form-group"><label>Output Item</label><select value={recipeForm.outputItemId} onChange={e => setRecipeForm({ ...recipeForm, outputItemId: e.target.value })}><option value="">Select...</option>{bulkItems.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}</select></div>
+                            <div className="form-group"><label>Expected Output (KG)</label><input type="number" value={recipeForm.outputQty || ''} onChange={e => setRecipeForm({ ...recipeForm, outputQty: +e.target.value })} /></div>
+                        </div>
+                        <div className="form-group"><label>Expected Waste %</label><input type="number" value={recipeForm.wastePct} onChange={e => setRecipeForm({ ...recipeForm, wastePct: +e.target.value })} /></div>
+                        <label>Ingredients</label>
+                        {recipeForm.ingredients.map((ing, idx) => (
+                            <div key={idx} className="flex gap-8 mb-16">
+                                <select value={ing.itemId} onChange={e => { const ings = [...recipeForm.ingredients]; ings[idx] = { ...ings[idx], itemId: e.target.value }; setRecipeForm({ ...recipeForm, ingredients: ings }); }} style={{ flex: 2 }}><option value="">Select item...</option>{rawItems.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}</select>
+                                <input type="number" placeholder="Qty KG" value={ing.quantity || ''} onChange={e => { const ings = [...recipeForm.ingredients]; ings[idx] = { ...ings[idx], quantity: +e.target.value }; setRecipeForm({ ...recipeForm, ingredients: ings }); }} style={{ flex: 1 }} />
+                            </div>
+                        ))}
+                        <button className="add-line-btn" onClick={() => setRecipeForm({ ...recipeForm, ingredients: [...recipeForm.ingredients, { itemId: '', quantity: 0 }] })}>+ Add Ingredient</button>
+                        <div className="modal-actions"><button className="btn btn-outline" onClick={() => setShowModal(false)}>Cancel</button><button className="btn btn-primary" onClick={handleAddRecipe}>Add Recipe</button></div>
+                    </div>
+                </div>
+            )}
+
+            {showModal && tab === 'suppliers' && (
+                <div className="modal-overlay" onClick={() => setShowModal(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header"><span className="modal-title">Add Supplier</span><button className="modal-close" onClick={() => setShowModal(false)}>×</button></div>
+                        <div className="form-group"><label>Company Name</label><input value={supplierForm.name} onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })} /></div>
+                        <div className="form-row">
+                            <div className="form-group"><label>Contact Person</label><input value={supplierForm.contact} onChange={e => setSupplierForm({ ...supplierForm, contact: e.target.value })} /></div>
+                            <div className="form-group"><label>Phone</label><input value={supplierForm.phone} onChange={e => setSupplierForm({ ...supplierForm, phone: e.target.value })} /></div>
+                        </div>
+                        <div className="form-group"><label>Lead Time (Days)</label><input type="number" value={supplierForm.leadTimeDays} onChange={e => setSupplierForm({ ...supplierForm, leadTimeDays: +e.target.value })} /></div>
+                        <div className="modal-actions"><button className="btn btn-outline" onClick={() => setShowModal(false)}>Cancel</button><button className="btn btn-primary" onClick={handleAddSupplier}>Add Supplier</button></div>
+                    </div>
+                </div>
+            )}
+
+            {showModal && tab === 'customers' && (
+                <div className="modal-overlay" onClick={() => setShowModal(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header"><span className="modal-title">Add Customer</span><button className="modal-close" onClick={() => setShowModal(false)}>×</button></div>
+                        <div className="form-group"><label>Name</label><input value={customerForm.name} onChange={e => setCustomerForm({ ...customerForm, name: e.target.value })} /></div>
+                        <div className="form-row">
+                            <div className="form-group"><label>Contact Person</label><input value={customerForm.contact} onChange={e => setCustomerForm({ ...customerForm, contact: e.target.value })} /></div>
+                            <div className="form-group"><label>Phone</label><input value={customerForm.phone} onChange={e => setCustomerForm({ ...customerForm, phone: e.target.value })} /></div>
+                        </div>
+                        <div className="form-group"><label>Channel</label><input value={customerForm.channel} onChange={e => setCustomerForm({ ...customerForm, channel: e.target.value })} placeholder="e.g. Distributor, E-Commerce, Retail" /></div>
+                        <div className="modal-actions"><button className="btn btn-outline" onClick={() => setShowModal(false)}>Cancel</button><button className="btn btn-primary" onClick={handleAddCustomer}>Add Customer</button></div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
