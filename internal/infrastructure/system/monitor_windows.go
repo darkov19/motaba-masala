@@ -19,7 +19,9 @@ var (
 	procSetForeground = moduser32.NewProc("SetForegroundWindow")
 )
 
-type WindowsMonitor struct{}
+type WindowsMonitor struct {
+	mutexHandle windows.Handle
+}
 
 func NewMonitor() domainSys.SysMonitor {
 	return &WindowsMonitor{}
@@ -36,14 +38,16 @@ func (m *WindowsMonitor) CheckMutex(name string) (bool, error) {
 	handle, err := windows.CreateMutex(nil, false, utf16Name)
 	if err != nil {
 		if err == windows.ERROR_ALREADY_EXISTS {
+			if handle != 0 {
+				_ = windows.CloseHandle(handle)
+			}
 			return true, nil
 		}
 		return false, fmt.Errorf("failed to create mutex: %w", err)
 	}
 
-	// If we successfully created it and it didn't exist, we hold the handle.
-	// In a real app, we should keep this handle open for the duration of the app.
-	_ = handle // Keep handle alive via some global or service state if needed.
+	// Keep mutex handle open for process lifetime so single-instance lock remains active.
+	m.mutexHandle = handle
 
 	return false, nil
 }

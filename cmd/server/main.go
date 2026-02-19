@@ -42,7 +42,10 @@ import (
 var LicensePublicKey string
 
 //go:embed assets/icon.png
-var iconData []byte
+var iconPNGData []byte
+
+//go:embed assets/icon.ico
+var iconICOData []byte
 
 const (
 	envAppEnvironment            = "MASALA_APP_ENV"
@@ -53,6 +56,8 @@ const (
 	integrityRecoveryPrompt      = "⚠️ Database integrity issue detected. Restore from backup?"
 	missingDBRecoveryPrompt      = "No database found. Restore from latest backup?"
 	backupDiscoveryFailurePrompt = "⚠️ Recovery required, but backups could not be listed. Check backup directory permissions and retry restore."
+	relaunchHelperArg            = "--relaunch-helper"
+	relaunchAttempts             = 5
 )
 
 type startupBackupLister interface {
@@ -154,6 +159,33 @@ func resolveStartupRecoveryState(dbPath string, backupService startupBackupListe
 	return recoveryMode, recoveryMessage, refreshedBackups, nil
 }
 
+func shouldEnterRecoveryOnConnectError(dbPath string, connectErr error) bool {
+	if connectErr == nil {
+		return false
+	}
+	if _, err := os.Stat(dbPath); err != nil {
+		return false
+	}
+
+	msg := strings.ToLower(connectErr.Error())
+	indicators := []string{
+		"failed to apply pragma",
+		"malformed database schema",
+		"database schema is corrupt",
+		"database disk image is malformed",
+		"file is not a database",
+		"database corrupt",
+		"not a database",
+	}
+	for _, indicator := range indicators {
+		if strings.Contains(msg, indicator) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func main() {
 	if err := run(); err != nil {
 		log.Printf("Application failed to start: %v", err)
@@ -211,6 +243,10 @@ func loadEnvFiles(paths ...string) {
 func run() error {
 	loadEnvFiles(".env", ".env.development")
 
+	if len(os.Args) > 1 && os.Args[1] == relaunchHelperArg {
+		return runRelaunchHelper(os.Args[2:])
+	}
+
 	// Task 1: Single Instance Lock
 	pingFile := filepath.Join(os.TempDir(), "MasalaServerMutex.ping")
 	_ = os.Remove(pingFile) // Cleanup any stale pings from previous crashes
@@ -242,26 +278,12 @@ func run() error {
 		monitorSvc.HandleWatchdogFailure()
 		slog.Info("Attempting self-restart...")
 
-		executable, err := os.Executable()
-		if err != nil {
-			slog.Error("Failed to determine executable path for restart", "error", err)
-			os.Exit(1) // Fallback to crash
-		}
-
-		// Spawn new instance
-		cmd := exec.Command(executable, os.Args[1:]...)
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		// Detach process attributes if needed, but standard spawn is usually enough
-		// as long as parent exits quickly.
-		if err := cmd.Start(); err != nil {
+		if err := startRelaunchHelper(); err != nil {
 			slog.Error("Failed to trigger self-restart", "error", err)
 			os.Exit(1)
 		}
 
-		slog.Info("New instance spawned. Exiting current instance.")
+		slog.Info("Relaunch helper started. Exiting current instance.")
 		os.Exit(0)
 	})
 
@@ -309,17 +331,30 @@ func run() error {
 	var adminService *appAdmin.Service
 
 	if !recoveryMode {
-		if err := dbManager.Connect(); err != nil {
-			return fmt.Errorf("database connection failed: %w", err)
-		}
-		defer dbManager.Close()
-
-		if integrityErr := dbManager.IntegrityCheck(); integrityErr != nil {
-			recoveryMode, recoveryMessage, availableBackups, startupRecoveryErr = resolveStartupRecoveryState(dbPath, backupService, availableBackups, backupErr, integrityErr)
-			if startupRecoveryErr != nil {
-				slog.Error("Failed to refresh backups for recovery mode", "error", startupRecoveryErr)
+		connectErr := dbManager.Connect()
+		if connectErr != nil {
+			if shouldEnterRecoveryOnConnectError(dbPath, connectErr) {
+				recoveryMode, recoveryMessage, availableBackups, startupRecoveryErr = resolveStartupRecoveryState(dbPath, backupService, availableBackups, backupErr, connectErr)
+				if startupRecoveryErr != nil {
+					slog.Error("Failed to resolve recovery state after DB connect failure", "error", startupRecoveryErr)
+				}
+				if !recoveryMode {
+					return fmt.Errorf("database connection failed: %w", connectErr)
+				}
+				slog.Error("Database connection failed due to corruption-like error; entering recovery mode", "error", connectErr)
+			} else {
+				return fmt.Errorf("database connection failed: %w", connectErr)
 			}
-			slog.Error("Database integrity check failed; entering recovery mode", "error", integrityErr)
+		} else {
+			defer dbManager.Close()
+
+			if integrityErr := dbManager.IntegrityCheck(); integrityErr != nil {
+				recoveryMode, recoveryMessage, availableBackups, startupRecoveryErr = resolveStartupRecoveryState(dbPath, backupService, availableBackups, backupErr, integrityErr)
+				if startupRecoveryErr != nil {
+					slog.Error("Failed to refresh backups for recovery mode", "error", startupRecoveryErr)
+				}
+				slog.Error("Database integrity check failed; entering recovery mode", "error", integrityErr)
+			}
 		}
 	}
 
@@ -368,21 +403,12 @@ func run() error {
 				return err
 			}
 
-			executable, err := os.Executable()
-			if err != nil {
-				return err
-			}
-
-			cmd := exec.Command(executable, os.Args[1:]...)
-			cmd.Stdin = os.Stdin
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Start(); err != nil {
+			if err := startRelaunchHelper(); err != nil {
 				return err
 			}
 
 			go func() {
-				time.Sleep(300 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 				os.Exit(0)
 			}()
 			return nil
@@ -416,8 +442,10 @@ func run() error {
 					systray.Run(func() {
 						systray.SetTitle("Masala Server")
 						systray.SetTooltip("Masala Inventory Server")
-						if len(iconData) > 0 {
-							systray.SetIcon(iconData)
+						if stdruntime.GOOS == "windows" && len(iconICOData) > 0 {
+							systray.SetIcon(iconICOData)
+						} else if len(iconPNGData) > 0 {
+							systray.SetIcon(iconPNGData)
 						}
 
 						mOpen := systray.AddMenuItem("Open Dashboard", "Restore the server window")
@@ -498,4 +526,67 @@ func run() error {
 	}
 
 	return nil
+}
+
+func startRelaunchHelper() error {
+	executable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to determine executable path for relaunch: %w", err)
+	}
+
+	helperArgs := append([]string{relaunchHelperArg}, os.Args[1:]...)
+	cmd := exec.Command(executable, helperArgs...)
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start relaunch helper: %w", err)
+	}
+
+	return nil
+}
+
+func runRelaunchHelper(forwardedArgs []string) error {
+	executable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to determine executable path in relaunch helper: %w", err)
+	}
+
+	baseDelay := 500 * time.Millisecond
+	quickExitWindow := 700 * time.Millisecond
+	var lastErr error
+	for attempt := 1; attempt <= relaunchAttempts; attempt++ {
+		if attempt > 1 {
+			time.Sleep(time.Duration(attempt) * baseDelay)
+		}
+
+		cmd := exec.Command(executable, forwardedArgs...)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Start(); err != nil {
+			lastErr = fmt.Errorf("start attempt %d failed: %w", attempt, err)
+			continue
+		}
+
+		done := make(chan error, 1)
+		go func(c *exec.Cmd) {
+			done <- c.Wait()
+		}(cmd)
+
+		select {
+		case exitErr := <-done:
+			if exitErr != nil {
+				lastErr = fmt.Errorf("relaunch attempt %d exited early: %w", attempt, exitErr)
+			} else {
+				lastErr = fmt.Errorf("relaunch attempt %d exited early", attempt)
+			}
+			continue
+		case <-time.After(quickExitWindow):
+			return nil
+		}
+	}
+
+	if lastErr != nil {
+		return fmt.Errorf("failed to relaunch application after %d attempts: %w", relaunchAttempts, lastErr)
+	}
+
+	return fmt.Errorf("failed to relaunch application after %d attempts", relaunchAttempts)
 }

@@ -18,10 +18,65 @@ function Write-Step([string]$Message) {
     Write-Host "==> $Message" -ForegroundColor Cyan
 }
 
+function Get-HeaderHex([string]$Path) {
+    if (-not (Test-Path $Path)) {
+        return ""
+    }
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -lt 2) {
+        return ""
+    }
+    return ("{0:X2}{1:X2}" -f $bytes[0], $bytes[1])
+}
+
+function Assert-PeExecutable([string]$Path) {
+    if (-not (Test-Path $Path)) {
+        throw "Expected executable not found: $Path"
+    }
+    $header = Get-HeaderHex $Path
+    if ($header -ne "4D5A") {
+        throw "Build output is not a Windows PE executable (MZ). Header=$header Path=$Path"
+    }
+}
+
+function Ensure-BuildExecutable {
+    $header = Get-HeaderHex $BuildExe
+    if ((-not (Test-Path $BuildExe)) -or ($header -ne "4D5A")) {
+        Build-WindowsApp
+    }
+}
+
 function Ensure-DbExists {
     if (-not (Test-Path $DbPath)) {
-        throw "Database file not found: $DbPath"
+        Ensure-BaselineDb
     }
+}
+
+function Ensure-BaselineDb {
+    if (Test-Path $DbPath) {
+        return
+    }
+
+    Write-Step "Bootstrapping baseline DB"
+    Stop-AppIfRunning
+    Ensure-BuildExecutable
+    Launch-App
+
+    $deadline = (Get-Date).AddSeconds(25)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-Path $DbPath) {
+            break
+        }
+        Start-Sleep -Milliseconds 500
+    }
+
+    Stop-AppIfRunning
+
+    if (-not (Test-Path $DbPath)) {
+        throw "Failed to bootstrap baseline DB at: $DbPath"
+    }
+
+    Write-Host "Baseline DB ready: $DbPath" -ForegroundColor Green
 }
 
 function Ensure-PretestBackup {
@@ -62,6 +117,26 @@ function Build-WindowsApp {
     if (-not (Test-Path $BuildExe)) {
         throw "Expected built executable not found: $BuildExe"
     }
+
+    $header = Get-HeaderHex $BuildExe
+    if ($header -ne "4D5A") {
+        Write-Warning "Wails output is not a PE executable (header=$header). Falling back to tagged go build."
+
+        if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {
+            throw "gcc not found in PATH. Install MSYS2 UCRT64 GCC and add C:\msys64\ucrt64\bin to PATH."
+        }
+
+        $env:CGO_ENABLED = "1"
+        Push-Location $RepoRoot
+        try {
+            & go build -tags "desktop,production" -o $BuildExe .\cmd\server
+        }
+        finally {
+            Pop-Location
+        }
+    }
+
+    Assert-PeExecutable $BuildExe
 }
 
 function Stop-AppIfRunning {
@@ -73,9 +148,8 @@ function Stop-AppIfRunning {
 }
 
 function Launch-App {
-    if (-not (Test-Path $BuildExe)) {
-        throw "Executable missing. Run mode 'build' first. Expected: $BuildExe"
-    }
+    Ensure-BuildExecutable
+    Assert-PeExecutable $BuildExe
     Start-Process -FilePath $BuildExe -WorkingDirectory $RepoRoot | Out-Null
 }
 
