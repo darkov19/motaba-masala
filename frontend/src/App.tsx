@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Layout, Typography, Card, Segmented, Space, Alert, Button, List, message } from "antd";
 import { useBlocker, useLocation, useNavigate } from "react-router-dom";
-import logo from "./assets/images/logo-universal.png";
+import logo from "./assets/images/app-icon.ico";
 import { ConnectionProvider } from "./context/ConnectionContext";
 import { ConnectionStatus } from "./components/layout/ConnectionStatus";
 import { ReconnectionOverlay } from "./components/layout/ReconnectionOverlay";

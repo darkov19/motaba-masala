@@ -508,6 +508,33 @@ func run() error {
 				}
 			}()
 
+			go func() {
+				ticker := time.NewTicker(1 * time.Second)
+				defer ticker.Stop()
+
+				initialized := false
+				lastMinimized := false
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+						minimized := runtime.WindowIsMinimised(ctx)
+						if !initialized {
+							lastMinimized = minimized
+							initialized = true
+							continue
+						}
+						if minimized && !lastMinimized {
+							if err := infraSys.ShowNotification("Server Backgrounded", "Server is running in background. Use the system tray to open or exit."); err != nil {
+								slog.Error("Failed to show minimize notification", "error", err)
+							}
+						}
+						lastMinimized = minimized
+					}
+				}
+			}()
+
 		},
 		OnShutdown: func(ctx context.Context) {
 			systray.Quit()

@@ -5,7 +5,7 @@ const { Text } = Typography;
 
 export function ConnectionStatus() {
     const { isConnected, isChecking, lastCheckedAt } = useConnection();
-    const statusLabel = isConnected ? "🟢 Connected" : "🔴 Disconnected";
+    const statusLabel = isConnected ? "Connected" : "Disconnected";
 
     return (
         <Space size={8}>
