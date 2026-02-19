@@ -254,7 +254,7 @@ func loadEnvFiles(paths ...string) {
 }
 
 func run() error {
-	loadEnvFiles(".env", ".env.development", ".env.local")
+	loadEnvFiles(".env", ".env.development")
 
 	if len(os.Args) > 1 && os.Args[1] == relaunchHelperArg {
 		return runRelaunchHelper(os.Args[2:])

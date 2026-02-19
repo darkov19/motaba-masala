@@ -15,12 +15,40 @@ $BuildExe = Join-Path $RepoRoot "build\bin\masala_inventory_server.exe"
 $MissingDbPath = Join-Path $RepoRoot "masala_inventory.db.missing_test"
 $PretestDbBackup = Join-Path $RepoRoot "masala_inventory.db.pretest_backup"
 $LicensePath = Join-Path $RepoRoot "license.key"
+$EnvDevelopmentPath = Join-Path $RepoRoot ".env.development"
+
+function Get-EnvValueFromFile([string]$Path, [string]$Key) {
+    if (-not (Test-Path $Path)) {
+        return ""
+    }
+
+    $line = Get-Content $Path | Where-Object {
+        ($_ -match "^\s*$Key\s*=") -and (-not ($_ -match "^\s*#"))
+    } | Select-Object -First 1
+
+    if ([string]::IsNullOrWhiteSpace($line)) {
+        return ""
+    }
+
+    $parts = $line -split "=", 2
+    if ($parts.Count -lt 2) {
+        return ""
+    }
+
+    return $parts[1].Trim().Trim("'`"")
+}
 
 if ([string]::IsNullOrWhiteSpace($LicenseKey)) {
     $LicenseKey = $env:MASALA_LICENSE_KEY
 }
 if ([string]::IsNullOrWhiteSpace($LicensePublicKey)) {
     $LicensePublicKey = $env:MASALA_LICENSE_PUBLIC_KEY
+}
+if ([string]::IsNullOrWhiteSpace($LicenseKey)) {
+    $LicenseKey = Get-EnvValueFromFile $EnvDevelopmentPath "MASALA_LICENSE_KEY"
+}
+if ([string]::IsNullOrWhiteSpace($LicensePublicKey)) {
+    $LicensePublicKey = Get-EnvValueFromFile $EnvDevelopmentPath "MASALA_LICENSE_PUBLIC_KEY"
 }
 
 function Write-Step([string]$Message) {
