@@ -120,19 +120,29 @@ function Build-WindowsApp {
 
     $header = Get-HeaderHex $BuildExe
     if ($header -ne "4D5A") {
-        Write-Warning "Wails output is not a PE executable (header=$header). Falling back to tagged go build."
-
-        if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {
-            throw "gcc not found in PATH. Install MSYS2 UCRT64 GCC and add C:\msys64\ucrt64\bin to PATH."
-        }
-
-        $env:CGO_ENABLED = "1"
+        Write-Warning "Wails output is not a PE executable (header=$header). Retrying Wails build with native_webview2loader tag."
         Push-Location $RepoRoot
         try {
-            & go build -tags "desktop,production" -o $BuildExe .\cmd\server
+            & wails build -clean -platform windows/amd64 -tags "native_webview2loader"
         }
         finally {
             Pop-Location
+        }
+
+        $header = Get-HeaderHex $BuildExe
+        if ($header -ne "4D5A") {
+            Write-Warning "Tagged Wails output is still not a PE executable (header=$header). Falling back to go build."
+            $env:CGO_ENABLED = "1"
+            Push-Location $RepoRoot
+            try {
+                & go build -tags "desktop,production,native_webview2loader" -o $BuildExe .\cmd\server
+                if ($LASTEXITCODE -ne 0) {
+                    throw "go build failed (exit code $LASTEXITCODE). Install MSYS2 UCRT64 GCC and add C:\msys64\ucrt64\bin to PATH."
+                }
+            }
+            finally {
+                Pop-Location
+            }
         }
     }
 
