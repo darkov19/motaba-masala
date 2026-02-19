@@ -18,8 +18,8 @@ bin/
 *.test
 *.out
 vendor/
-server
-client
+/server
+/client
 
 # Node/Frontend
 node_modules/
