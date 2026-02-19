@@ -564,6 +564,7 @@ func run() error {
 				slog.Info("OnBeforeClose: Force quit detected, allowing close")
 				return false // Allow close
 			}
+			slog.Info("OnBeforeClose: Window close request received (likely title bar X)")
 			slog.Info("OnBeforeClose: Hiding window and backgrounding server")
 			runtime.WindowHide(ctx)
 			// AC #1: Notification bubble on minimize
