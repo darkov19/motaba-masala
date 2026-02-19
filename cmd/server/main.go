@@ -57,7 +57,7 @@ const (
 	missingDBRecoveryPrompt      = "No database found. Restore from latest backup?"
 	backupDiscoveryFailurePrompt = "⚠️ Recovery required, but backups could not be listed. Check backup directory permissions and retry restore."
 	relaunchHelperArg            = "--relaunch-helper"
-	relaunchAttempts             = 5
+	relaunchAttempts             = 12
 )
 
 type startupBackupLister interface {
@@ -550,8 +550,10 @@ func runRelaunchHelper(forwardedArgs []string) error {
 	}
 
 	baseDelay := 500 * time.Millisecond
-	quickExitWindow := 700 * time.Millisecond
+	quickExitWindow := 3 * time.Second
 	var lastErr error
+	logPath := filepath.Join(os.TempDir(), "masala-relaunch-helper.log")
+	writeRelaunchLog(logPath, "helper start executable=%s args=%v", executable, forwardedArgs)
 	for attempt := 1; attempt <= relaunchAttempts; attempt++ {
 		if attempt > 1 {
 			time.Sleep(time.Duration(attempt) * baseDelay)
@@ -563,8 +565,10 @@ func runRelaunchHelper(forwardedArgs []string) error {
 		cmd.Stderr = os.Stderr
 		if err := cmd.Start(); err != nil {
 			lastErr = fmt.Errorf("start attempt %d failed: %w", attempt, err)
+			writeRelaunchLog(logPath, "attempt=%d start failed: %v", attempt, err)
 			continue
 		}
+		writeRelaunchLog(logPath, "attempt=%d started pid=%d", attempt, cmd.Process.Pid)
 
 		done := make(chan error, 1)
 		go func(c *exec.Cmd) {
@@ -575,18 +579,33 @@ func runRelaunchHelper(forwardedArgs []string) error {
 		case exitErr := <-done:
 			if exitErr != nil {
 				lastErr = fmt.Errorf("relaunch attempt %d exited early: %w", attempt, exitErr)
+				writeRelaunchLog(logPath, "attempt=%d exited early with error: %v", attempt, exitErr)
 			} else {
 				lastErr = fmt.Errorf("relaunch attempt %d exited early", attempt)
+				writeRelaunchLog(logPath, "attempt=%d exited early without error", attempt)
 			}
 			continue
 		case <-time.After(quickExitWindow):
+			writeRelaunchLog(logPath, "attempt=%d success (alive for %s)", attempt, quickExitWindow)
 			return nil
 		}
 	}
 
 	if lastErr != nil {
+		writeRelaunchLog(logPath, "helper failed after %d attempts: %v", relaunchAttempts, lastErr)
 		return fmt.Errorf("failed to relaunch application after %d attempts: %w", relaunchAttempts, lastErr)
 	}
 
+	writeRelaunchLog(logPath, "helper failed after %d attempts: unknown error", relaunchAttempts)
 	return fmt.Errorf("failed to relaunch application after %d attempts", relaunchAttempts)
+}
+
+func writeRelaunchLog(path string, format string, args ...interface{}) {
+	line := fmt.Sprintf("%s %s\n", time.Now().Format(time.RFC3339Nano), fmt.Sprintf(format, args...))
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, _ = f.WriteString(line)
 }
