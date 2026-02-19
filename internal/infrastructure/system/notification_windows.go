@@ -22,6 +22,9 @@ func ShowNotification(title, message string) error {
 			slog.Error("ShowNotification: toast failed", "error", err, "title", title)
 			if fallbackErr := showBalloonTipFallback(title, message); fallbackErr != nil {
 				slog.Error("ShowNotification: fallback balloon failed", "error", fallbackErr, "title", title)
+				if messageBoxErr := showMessageBoxFallback(title, message); messageBoxErr != nil {
+					slog.Error("ShowNotification: fallback message box failed", "error", messageBoxErr, "title", title)
+				}
 			}
 		} else {
 			slog.Info("ShowNotification: toast sent", "title", title)
@@ -47,5 +50,16 @@ func showBalloonTipFallback(title, message string) error {
 		"$n.Dispose();"
 
 	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps)
+	return cmd.Run()
+}
+
+func showMessageBoxFallback(title, message string) error {
+	escape := func(s string) string {
+		return strings.ReplaceAll(s, "'", "''")
+	}
+	ps := "$ErrorActionPreference='Stop';" +
+		"Add-Type -AssemblyName PresentationFramework;" +
+		"[System.Windows.MessageBox]::Show('" + escape(message) + "','" + escape(title) + "','OK','Information') | Out-Null"
+	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", ps)
 	return cmd.Run()
 }

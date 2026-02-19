@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { Badge, Space, Typography } from "antd";
 import { useConnection } from "../../context/ConnectionContext";
 
@@ -6,6 +7,27 @@ const { Text } = Typography;
 export function ConnectionStatus() {
     const { isConnected, isChecking, lastCheckedAt } = useConnection();
     const statusLabel = isConnected ? "Connected" : "Disconnected";
+    const [now, setNow] = useState(() => Date.now());
+
+    useEffect(() => {
+        const timer = window.setInterval(() => {
+            setNow(Date.now());
+        }, 1000);
+        return () => {
+            window.clearInterval(timer);
+        };
+    }, []);
+
+    const lastCheckedLabel = useMemo(() => {
+        if (!lastCheckedAt) {
+            return null;
+        }
+        const elapsedSeconds = Math.max(
+            0,
+            Math.floor((now - lastCheckedAt) / 1000),
+        );
+        return `${elapsedSeconds}s ago`;
+    }, [lastCheckedAt, now]);
 
     return (
         <Space size={8}>
@@ -14,10 +36,8 @@ export function ConnectionStatus() {
             {isChecking ? (
                 <Text style={{ color: "#f5f5f5" }}>Checking...</Text>
             ) : null}
-            {lastCheckedAt ? (
-                <Text style={{ color: "#f5f5f5" }}>
-                    {new Date(lastCheckedAt).toLocaleTimeString()}
-                </Text>
+            {lastCheckedLabel ? (
+                <Text style={{ color: "#f5f5f5" }}>{lastCheckedLabel}</Text>
             ) : null}
         </Space>
     );

@@ -535,6 +535,11 @@ func run() error {
 						return
 					case <-ticker.C:
 						minimized := runtime.WindowIsMinimised(ctx)
+						if stdruntime.GOOS == "windows" {
+							if winMinimized, err := infraSys.WindowIsMinimizedByTitle("Masala Inventory Server"); err == nil {
+								minimized = winMinimized
+							}
+						}
 						if !initialized {
 							lastMinimized = minimized
 							initialized = true
