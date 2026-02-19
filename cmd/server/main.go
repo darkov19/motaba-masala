@@ -536,6 +536,7 @@ func startRelaunchHelper() error {
 
 	helperArgs := append([]string{relaunchHelperArg}, os.Args[1:]...)
 	cmd := exec.Command(executable, helperArgs...)
+	detachProcess(cmd)
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start relaunch helper: %w", err)
 	}
@@ -563,6 +564,7 @@ func runRelaunchHelper(forwardedArgs []string) error {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
+		detachProcess(cmd)
 		if err := cmd.Start(); err != nil {
 			lastErr = fmt.Errorf("start attempt %d failed: %w", attempt, err)
 			writeRelaunchLog(logPath, "attempt=%d start failed: %v", attempt, err)
