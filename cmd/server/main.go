@@ -50,6 +50,7 @@ var iconICOData []byte
 const (
 	envAppEnvironment            = "MASALA_APP_ENV"
 	envJWTSecret                 = "MASALA_JWT_SECRET"
+	envLicensePublicKey          = "MASALA_LICENSE_PUBLIC_KEY"
 	envBootstrapAdminUsername    = "MASALA_BOOTSTRAP_ADMIN_USERNAME"
 	envBootstrapAdminPassword    = "MASALA_BOOTSTRAP_ADMIN_PASSWORD"
 	defaultBootstrapAdminUser    = "admin"
@@ -59,6 +60,8 @@ const (
 	relaunchHelperArg            = "--relaunch-helper"
 	relaunchAttempts             = 12
 )
+
+const defaultLicensePublicKey = "ebe55ca92c5a7161a80ce7718c7567e2566a6f51fb564f191bee61cb7b29d776"
 
 type startupBackupLister interface {
 	ListBackups() ([]string, error)
@@ -85,6 +88,16 @@ func resolveJWTSecret() (string, error) {
 	}
 
 	return "", fmt.Errorf("%s must be set in non-development environments", envJWTSecret)
+}
+
+func resolveLicensePublicKey() string {
+	if envKey := strings.TrimSpace(os.Getenv(envLicensePublicKey)); envKey != "" {
+		return envKey
+	}
+	if strings.TrimSpace(LicensePublicKey) != "" {
+		return strings.TrimSpace(LicensePublicKey)
+	}
+	return defaultLicensePublicKey
 }
 
 func generateSecurePassword(byteLen int) (string, error) {
@@ -241,7 +254,7 @@ func loadEnvFiles(paths ...string) {
 }
 
 func run() error {
-	loadEnvFiles(".env", ".env.development")
+	loadEnvFiles(".env", ".env.development", ".env.local")
 
 	if len(os.Args) > 1 && os.Args[1] == relaunchHelperArg {
 		return runRelaunchHelper(os.Args[2:])
@@ -288,9 +301,7 @@ func run() error {
 	})
 
 	// Licensing Check
-	if LicensePublicKey == "" {
-		LicensePublicKey = "ebe55ca92c5a7161a80ce7718c7567e2566a6f51fb564f191bee61cb7b29d776"
-	}
+	LicensePublicKey = resolveLicensePublicKey()
 
 	licenseSvc := license.NewLicensingService(LicensePublicKey, "license.key", ".hw_hb")
 	if err := licenseSvc.ValidateLicense(); err != nil {
