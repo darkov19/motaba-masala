@@ -1,6 +1,8 @@
 param(
     [ValidateSet("build", "prepare", "missing-db", "corrupt-db", "all", "reset")]
-    [string]$Mode = "all"
+    [string]$Mode = "all",
+    [string]$LicenseKey = "",
+    [string]$LicensePublicKey = ""
 )
 
 Set-StrictMode -Version Latest
@@ -12,6 +14,14 @@ $BackupsDir = Join-Path $RepoRoot "backups"
 $BuildExe = Join-Path $RepoRoot "build\bin\masala_inventory_server.exe"
 $MissingDbPath = Join-Path $RepoRoot "masala_inventory.db.missing_test"
 $PretestDbBackup = Join-Path $RepoRoot "masala_inventory.db.pretest_backup"
+$LicensePath = Join-Path $RepoRoot "license.key"
+
+if ([string]::IsNullOrWhiteSpace($LicenseKey)) {
+    $LicenseKey = $env:MASALA_LICENSE_KEY
+}
+if ([string]::IsNullOrWhiteSpace($LicensePublicKey)) {
+    $LicensePublicKey = $env:MASALA_LICENSE_PUBLIC_KEY
+}
 
 function Write-Step([string]$Message) {
     Write-Host ""
@@ -37,6 +47,30 @@ function Assert-PeExecutable([string]$Path) {
     if ($header -ne "4D5A") {
         throw "Build output is not a Windows PE executable (MZ). Header=$header Path=$Path"
     }
+}
+
+function Ensure-LicenseFile {
+    if ([string]::IsNullOrWhiteSpace($LicenseKey)) {
+        return
+    }
+
+    $normalized = $LicenseKey.Trim()
+    if ((Test-Path $LicensePath)) {
+        $existing = (Get-Content $LicensePath -Raw).Trim()
+        if ($existing -eq $normalized) {
+            return
+        }
+    }
+
+    Set-Content -Path $LicensePath -Value $normalized -NoNewline
+    Write-Host "Updated license.key from script/env configuration." -ForegroundColor Green
+}
+
+function Get-BuildLdflags {
+    if ([string]::IsNullOrWhiteSpace($LicensePublicKey)) {
+        return ""
+    }
+    return "-X main.LicensePublicKey=$LicensePublicKey"
 }
 
 function Ensure-BuildExecutable {
@@ -105,10 +139,18 @@ function Ensure-BackupZip {
 }
 
 function Build-WindowsApp {
+    Ensure-LicenseFile
+    $ldflags = Get-BuildLdflags
+
     Write-Step "Building Windows package with Wails"
     Push-Location $RepoRoot
     try {
-        & wails build -clean -platform windows/amd64
+        if ([string]::IsNullOrWhiteSpace($ldflags)) {
+            & wails build -clean -platform windows/amd64
+        }
+        else {
+            & wails build -clean -platform windows/amd64 -ldflags $ldflags
+        }
     }
     finally {
         Pop-Location
@@ -123,7 +165,12 @@ function Build-WindowsApp {
         Write-Warning "Wails output is not a PE executable (header=$header). Retrying Wails build with native_webview2loader tag."
         Push-Location $RepoRoot
         try {
-            & wails build -clean -platform windows/amd64 -tags "native_webview2loader"
+            if ([string]::IsNullOrWhiteSpace($ldflags)) {
+                & wails build -clean -platform windows/amd64 -tags "native_webview2loader"
+            }
+            else {
+                & wails build -clean -platform windows/amd64 -tags "native_webview2loader" -ldflags $ldflags
+            }
         }
         finally {
             Pop-Location
@@ -135,7 +182,12 @@ function Build-WindowsApp {
             $env:CGO_ENABLED = "1"
             Push-Location $RepoRoot
             try {
-                & go build -tags "desktop,production,native_webview2loader" -o $BuildExe .\cmd\server
+                if ([string]::IsNullOrWhiteSpace($ldflags)) {
+                    & go build -tags "desktop,production,native_webview2loader" -o $BuildExe .\cmd\server
+                }
+                else {
+                    & go build -tags "desktop,production,native_webview2loader" -ldflags $ldflags -o $BuildExe .\cmd\server
+                }
                 if ($LASTEXITCODE -ne 0) {
                     throw "go build failed (exit code $LASTEXITCODE). Install MSYS2 UCRT64 GCC and add C:\msys64\ucrt64\bin to PATH."
                 }
@@ -158,6 +210,7 @@ function Stop-AppIfRunning {
 }
 
 function Launch-App {
+    Ensure-LicenseFile
     Ensure-BuildExecutable
     Assert-PeExecutable $BuildExe
     Start-Process -FilePath $BuildExe -WorkingDirectory $RepoRoot | Out-Null
