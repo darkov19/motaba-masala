@@ -446,8 +446,23 @@ func (s *Service) Restore(backupPath string) error {
 	}
 
 	_ = s.dbManager.Close()
+
+	// Remove sidecar files from previous DB state so stale WAL/SHM cannot
+	// override restored content on next connection.
+	_ = os.Remove(dbPath + "-wal")
+	_ = os.Remove(dbPath + "-shm")
+
+	// On Windows, renaming over an existing file may fail; remove target first.
+	if err := os.Remove(dbPath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
 	if err := os.Rename(tmpPath, dbPath); err != nil {
 		return err
 	}
+
+	// Ensure no stale sidecars remain after DB swap.
+	_ = os.Remove(dbPath + "-wal")
+	_ = os.Remove(dbPath + "-shm")
+
 	return s.dbManager.Connect()
 }

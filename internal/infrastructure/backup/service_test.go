@@ -302,6 +302,81 @@ func TestRestore_ReplacesDatabaseFromZip(t *testing.T) {
 	}
 }
 
+func TestRestore_RemovesWalAndShmSidecars(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbDir := filepath.Join(tmpDir, "db")
+	backupDir := filepath.Join(tmpDir, "backups")
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(backupDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	dbPath := filepath.Join(dbDir, "masala_inventory.db")
+	activeMgr := db.NewDatabaseManager(dbPath)
+	if err := activeMgr.Connect(); err != nil {
+		t.Fatalf("active connect failed: %v", err)
+	}
+	defer activeMgr.Close()
+	if _, err := activeMgr.GetDB().Exec("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)"); err != nil {
+		t.Fatalf("active schema init failed: %v", err)
+	}
+	if _, err := activeMgr.GetDB().Exec("INSERT INTO t (name) VALUES ('old')"); err != nil {
+		t.Fatalf("active seed failed: %v", err)
+	}
+
+	// Simulate stale sidecars from previous state.
+	if err := os.WriteFile(dbPath+"-wal", []byte("stale wal"), 0644); err != nil {
+		t.Fatalf("failed to write wal sidecar: %v", err)
+	}
+	if err := os.WriteFile(dbPath+"-shm", []byte("stale shm"), 0644); err != nil {
+		t.Fatalf("failed to write shm sidecar: %v", err)
+	}
+
+	restoreDbPath := filepath.Join(tmpDir, "restore_source.db")
+	restoreMgr := db.NewDatabaseManager(restoreDbPath)
+	if err := restoreMgr.Connect(); err != nil {
+		t.Fatalf("restore source connect failed: %v", err)
+	}
+	if _, err := restoreMgr.GetDB().Exec("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)"); err != nil {
+		t.Fatalf("restore source schema init failed: %v", err)
+	}
+	if _, err := restoreMgr.GetDB().Exec("INSERT INTO t (name) VALUES ('restored')"); err != nil {
+		t.Fatalf("restore source seed failed: %v", err)
+	}
+	_ = restoreMgr.Close()
+
+	zipPath := filepath.Join(backupDir, "backup-2026-02-19T190000.zip")
+	if err := createZipWithFile(zipPath, restoreDbPath, "masala_inventory.db"); err != nil {
+		t.Fatalf("failed to create restore zip: %v", err)
+	}
+
+	svc := NewService(activeMgr, backup.BackupConfig{BackupPath: backupDir}, noOpLog, noOpLog)
+	if err := svc.Restore(zipPath); err != nil {
+		t.Fatalf("restore failed: %v", err)
+	}
+
+	if walBytes, err := os.ReadFile(dbPath + "-wal"); err == nil {
+		if string(walBytes) == "stale wal" {
+			t.Fatal("expected stale wal sidecar content to be cleared during restore")
+		}
+	}
+	if shmBytes, err := os.ReadFile(dbPath + "-shm"); err == nil {
+		if string(shmBytes) == "stale shm" {
+			t.Fatal("expected stale shm sidecar content to be cleared during restore")
+		}
+	}
+
+	var name string
+	if err := activeMgr.GetDB().QueryRow("SELECT name FROM t LIMIT 1").Scan(&name); err != nil {
+		t.Fatalf("failed to read restored row: %v", err)
+	}
+	if name != "restored" {
+		t.Fatalf("expected restored value, got %s", name)
+	}
+}
+
 func TestRestore_RejectsBackupOutsideBackupDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbDir := filepath.Join(tmpDir, "db")
