@@ -13,21 +13,28 @@ import (
 // ShowNotification sends a desktop notification on Windows using native toasts.
 func ShowNotification(title, message string) error {
 	go func() {
+		toastErr := error(nil)
 		notification := toast.Notification{
 			AppID:   "Masala Inventory Server",
 			Title:   title,
 			Message: message,
 		}
 		if err := notification.Push(); err != nil {
+			toastErr = err
 			slog.Error("ShowNotification: toast failed", "error", err, "title", title)
-			if fallbackErr := showBalloonTipFallback(title, message); fallbackErr != nil {
-				slog.Error("ShowNotification: fallback balloon failed", "error", fallbackErr, "title", title)
+		} else {
+			slog.Info("ShowNotification: toast sent", "title", title)
+		}
+
+		// Always attempt balloon tip so users still see a visible signal even when
+		// Windows toast is suppressed by system settings/focus mode.
+		if fallbackErr := showBalloonTipFallback(title, message); fallbackErr != nil {
+			slog.Error("ShowNotification: fallback balloon failed", "error", fallbackErr, "title", title)
+			if toastErr != nil {
 				if messageBoxErr := showMessageBoxFallback(title, message); messageBoxErr != nil {
 					slog.Error("ShowNotification: fallback message box failed", "error", messageBoxErr, "title", title)
 				}
 			}
-		} else {
-			slog.Info("ShowNotification: toast sent", "title", title)
 		}
 	}()
 	return nil
