@@ -59,6 +59,7 @@ const (
 	backupDiscoveryFailurePrompt = "⚠️ Recovery required, but backups could not be listed. Check backup directory permissions and retry restore."
 	relaunchHelperArg            = "--relaunch-helper"
 	relaunchAttempts             = 12
+	envRelaunchWorkingDir        = "MASALA_RELAUNCH_WORKDIR"
 )
 
 const defaultLicensePublicKey = "ebe55ca92c5a7161a80ce7718c7567e2566a6f51fb564f191bee61cb7b29d776"
@@ -572,8 +573,15 @@ func startRelaunchHelper() error {
 		return fmt.Errorf("failed to determine executable path for relaunch: %w", err)
 	}
 
+	workDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to determine current working directory for relaunch: %w", err)
+	}
+
 	helperArgs := append([]string{relaunchHelperArg}, os.Args[1:]...)
 	cmd := exec.Command(executable, helperArgs...)
+	cmd.Dir = workDir
+	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=%s", envRelaunchWorkingDir, workDir))
 	detachProcess(cmd)
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start relaunch helper: %w", err)
@@ -587,18 +595,27 @@ func runRelaunchHelper(forwardedArgs []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to determine executable path in relaunch helper: %w", err)
 	}
+	launchDir := strings.TrimSpace(os.Getenv(envRelaunchWorkingDir))
+	if launchDir == "" {
+		if cwd, cwdErr := os.Getwd(); cwdErr == nil {
+			launchDir = cwd
+		}
+	}
 
 	baseDelay := 500 * time.Millisecond
 	quickExitWindow := 3 * time.Second
 	var lastErr error
 	logPath := filepath.Join(os.TempDir(), "masala-relaunch-helper.log")
-	writeRelaunchLog(logPath, "helper start executable=%s args=%v", executable, forwardedArgs)
+	writeRelaunchLog(logPath, "helper start executable=%s workdir=%s args=%v", executable, launchDir, forwardedArgs)
 	for attempt := 1; attempt <= relaunchAttempts; attempt++ {
 		if attempt > 1 {
 			time.Sleep(time.Duration(attempt) * baseDelay)
 		}
 
 		cmd := exec.Command(executable, forwardedArgs...)
+		if launchDir != "" {
+			cmd.Dir = launchDir
+		}
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
