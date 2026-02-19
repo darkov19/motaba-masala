@@ -17,11 +17,22 @@ var (
 	procFindWindowW   = moduser32.NewProc("FindWindowW")
 	procShowWindow    = moduser32.NewProc("ShowWindow")
 	procSetForeground = moduser32.NewProc("SetForegroundWindow")
+	procLoadImageW    = moduser32.NewProc("LoadImageW")
+	procSendMessageW  = moduser32.NewProc("SendMessageW")
 )
 
 type WindowsMonitor struct {
 	mutexHandle windows.Handle
 }
+
+const (
+	imageIcon      = 1
+	lrLoadFromFile = 0x0010
+	lrDefaultSize  = 0x0040
+	wmSetIcon      = 0x0080
+	iconSmall      = 0
+	iconBig        = 1
+)
 
 func NewMonitor() domainSys.SysMonitor {
 	return &WindowsMonitor{}
@@ -86,4 +97,36 @@ func (m *WindowsMonitor) GetDiskSpace(path string) (uint64, error) {
 
 func (m *WindowsMonitor) ShowNotification(title, message string) error {
 	return ShowNotification(title, message)
+}
+
+func SetWindowIconFromFile(title, iconPath string) error {
+	titlePtr, err := windows.UTF16PtrFromString(title)
+	if err != nil {
+		return err
+	}
+	hwnd, _, _ := procFindWindowW.Call(0, uintptr(unsafe.Pointer(titlePtr)))
+	if hwnd == 0 {
+		return fmt.Errorf("window not found for title %q", title)
+	}
+
+	iconPathPtr, err := windows.UTF16PtrFromString(iconPath)
+	if err != nil {
+		return err
+	}
+
+	hIcon, _, _ := procLoadImageW.Call(
+		0,
+		uintptr(unsafe.Pointer(iconPathPtr)),
+		imageIcon,
+		0,
+		0,
+		lrLoadFromFile|lrDefaultSize,
+	)
+	if hIcon == 0 {
+		return fmt.Errorf("failed to load icon from %s", iconPath)
+	}
+
+	procSendMessageW.Call(hwnd, wmSetIcon, iconSmall, hIcon)
+	procSendMessageW.Call(hwnd, wmSetIcon, iconBig, hIcon)
+	return nil
 }

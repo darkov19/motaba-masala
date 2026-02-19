@@ -491,6 +491,20 @@ func run() error {
 				slog.Warn("System Tray is disabled on Linux to prevent GTK main loop conflicts with Wails.")
 			}
 
+			if stdruntime.GOOS == "windows" {
+				go func() {
+					iconPath := filepath.Join("cmd", "server", "assets", "icon.ico")
+					for attempt := 1; attempt <= 40; attempt++ {
+						if err := infraSys.SetWindowIconFromFile("Masala Inventory Server", iconPath); err == nil {
+							slog.Info("Applied Windows window icon", "path", iconPath, "attempt", attempt)
+							return
+						}
+						time.Sleep(250 * time.Millisecond)
+					}
+					slog.Warn("Failed to apply Windows window icon", "path", iconPath)
+				}()
+			}
+
 			// Background watcher for cross-process focus pings (Linux/Unix support)
 			go func() {
 				pingFile := filepath.Join(os.TempDir(), "MasalaServerMutex.ping")
