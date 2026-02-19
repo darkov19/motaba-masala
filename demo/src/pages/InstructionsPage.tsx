@@ -1,8 +1,8 @@
 export default function InstructionsPage({ onStart }: { onStart: () => void }) {
     return (
         <div className="instructions-page">
-            <div className="instructions-hero">
-                <h1>Motaba Masala Demo</h1>
+            <div className="instructions-hero" style={{ textAlign: 'center' }}>
+                <img src="/logo.png" alt="Motaba Masala" style={{ height: '120px', width: 'auto', marginBottom: '16px' }} />
                 <p>Walk through the complete spice manufacturing workflow — from raw material procurement to finished goods dispatch. Every action is real and fully operational.</p>
             </div>
 

@@ -107,12 +107,7 @@ function App() {
                 {/* Header */}
                 <header className="app-header">
                     <div className="app-logo">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect width="24" height="24" rx="6" fill="var(--color-primary)" />
-                            <path d="M7 8h10M7 12h10M7 16h6" stroke="white" strokeWidth="2" strokeLinecap="round" />
-                        </svg>
-                        <h1>Motaba Masala</h1>
-                        <span className="badge">DEMO</span>
+                        <img src="/logo.png" alt="Motaba Masala" style={{ height: '42px', width: 'auto' }} />
                     </div>
                     <div className="btn-group">
                         <button className="btn btn-outline btn-sm" onClick={handleReset}>Reset Demo</button>
