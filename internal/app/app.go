@@ -20,6 +20,7 @@ type LicenseStatus struct {
 
 type LicenseLockoutState struct {
 	Enabled    bool   `json:"enabled"`
+	Reason     string `json:"reason,omitempty"`
 	Message    string `json:"message"`
 	HardwareID string `json:"hardware_id,omitempty"`
 }
@@ -115,9 +116,10 @@ func (a *App) GetLicenseStatus() (LicenseStatus, error) {
 	return a.licenseStatusProvider()
 }
 
-func (a *App) SetLicenseLockoutState(enabled bool, message, hardwareID string) {
+func (a *App) SetLicenseLockoutState(enabled bool, reason, message, hardwareID string) {
 	a.lockoutState = LicenseLockoutState{
 		Enabled:    enabled,
+		Reason:     reason,
 		Message:    message,
 		HardwareID: hardwareID,
 	}

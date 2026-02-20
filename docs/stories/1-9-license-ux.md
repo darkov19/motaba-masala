@@ -75,15 +75,17 @@ so that I can resolve issues without sudden production downtime or confusion.
 ### Debug Log References
 
 - 2026-02-20: Planned implementation by AC order: (1) extend licensing package with explicit status model and expiry parsing while preserving legacy `license.key` signatures, (2) add backend write guard for grace-period read-only enforcement in inventory service, (3) add startup lockout-mode branch for hardware mismatch with frontend-facing lockout payload, (4) add frontend polling/banners/button disable behavior, (5) run full Go + frontend regression tests before marking complete.
+- 2026-02-20: Applied follow-up in same story scope to replace full-expiry fast-exit with explicit lockout UI, adding lockout reason metadata and a copyable support message for renewal requests.
 
 ### Completion Notes List
 
 - Implemented new license lifecycle model (`active`, `expiring`, `grace-period`, `expired`) with deterministic day-window calculation and backward-compatible parsing for legacy signature-only license files.
 - Added app-level license status API and lockout-state API so frontend can poll status and render explicit lockout UX with Hardware ID copy support.
-- Updated server startup flow to enter lockout mode for hardware mismatch instead of hard exit, and to keep full lockout after grace-period expiry.
+- Updated server startup flow to enter lockout mode for both hardware mismatch and full-expiry (post-grace), instead of fast process exit.
 - Added backend write-access enforcement hook and wired inventory write operations (`UpdateItem`, `UpdateBatch`, `UpdateGRN`) to block during grace period with `403`-style error.
 - Added frontend persistent license banners, periodic status polling, read-only disablement for transaction actions (`New GRN`, `New Batch`), and disabled submit/reset actions in forms.
-- Added/updated automated tests for licensing status logic, app lockout/status APIs, write-guard enforcement, and frontend lockout/banner behavior.
+- Added `Copy Support Message` action on lockout screens so users can send Hardware ID and issue context directly to support.
+- Added/updated automated tests for licensing status logic, app lockout/status APIs, write-guard enforcement, and frontend lockout/banner behavior (including full-expiry lockout rendering).
 
 ### File List
 
@@ -102,11 +104,13 @@ so that I can resolve issues without sudden production downtime or confusion.
 - `frontend/src/components/forms/BatchForm.tsx`
 - `frontend/src/__tests__/AppRecoveryMode.test.tsx`
 - `frontend/src/__tests__/AppLicenseStatus.test.tsx`
+- `scripts/story-1-9-windows-license-ux-test.ps1`
 
 ## Change Log
 
 - 2026-02-15: Story drafted.
 - 2026-02-20: Implemented license status lifecycle, grace-period read-only enforcement, hardware mismatch lockout mode UI, and frontend license banners/polling; added backend/frontend automated tests.
+- 2026-02-20: Updated full-expiry handling to lockout UI with Hardware ID and support-message copy flow; updated Windows manual test script expectations.
 
 ---
 

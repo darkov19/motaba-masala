@@ -28,6 +28,7 @@ type LicenseStatus = {
 
 type LicenseLockoutState = {
     enabled: boolean;
+    reason?: "hardware-mismatch" | "license-expired";
     message: string;
     hardware_id?: string;
 };
@@ -337,31 +338,63 @@ function App() {
     };
 
     const onCopyHardwareID = async () => {
-        const hardwareID = lockoutState?.hardware_id;
-        if (!hardwareID) {
+        const hardwareID = lockoutState?.hardware_id || "";
+        if (!hardwareID) return;
+        const copied = await copyToClipboard(hardwareID);
+        if (copied) {
+            message.success("Hardware ID copied");
             return;
         }
+        message.error("Unable to copy Hardware ID. Please copy it manually.");
+    };
 
+    const copyToClipboard = async (text: string): Promise<boolean> => {
         try {
             if (navigator.clipboard?.writeText) {
-                await navigator.clipboard.writeText(hardwareID);
-                message.success("Hardware ID copied");
-                return;
+                await navigator.clipboard.writeText(text);
+                return true;
             }
 
             const input = document.createElement("textarea");
-            input.value = hardwareID;
+            input.value = text;
             document.body.appendChild(input);
             input.select();
             document.execCommand("copy");
             document.body.removeChild(input);
-            message.success("Hardware ID copied");
+            return true;
         } catch {
-            message.error("Unable to copy Hardware ID. Please copy it manually.");
+            return false;
         }
     };
 
+    const onCopySupportMessage = async () => {
+        const hardwareID = lockoutState?.hardware_id || "Unavailable";
+        const issue = lockoutState?.reason === "license-expired"
+            ? "License expired (grace period ended)"
+            : "Hardware ID mismatch";
+        const supportMessage = [
+            "License Renewal Request",
+            `Issue: ${issue}`,
+            `Hardware ID: ${hardwareID}`,
+            `Date: ${new Date().toISOString()}`,
+        ].join("\n");
+
+        const copied = await copyToClipboard(supportMessage);
+        if (copied) {
+            message.success("Support message copied");
+            return;
+        }
+        message.error("Unable to copy support message.");
+    };
+
     if (!isLoadingRecovery && lockoutState?.enabled) {
+        const heading = lockoutState.reason === "license-expired"
+            ? "License Expired. Application is locked."
+            : "Hardware ID Mismatch. Application is locked.";
+        const guidance = lockoutState.reason === "license-expired"
+            ? "Your grace period has ended. Contact support with this Hardware ID to renew your license."
+            : "Contact support with this Hardware ID to request a new license.";
+
         return (
             <Layout style={{ minHeight: "100vh" }}>
                 <Header className="app-header">
@@ -376,21 +409,24 @@ function App() {
                     <Card className="app-card" variant="borderless">
                         <Space orientation="vertical" size={16} style={{ width: "100%" }}>
                             <Title level={3} style={{ marginBottom: 0 }}>
-                                Hardware ID Mismatch. Application is locked.
+                                {heading}
                             </Title>
                             <Alert
                                 type="error"
                                 showIcon
-                                title={lockoutState.message || "Hardware ID Mismatch. Application is locked."}
+                                title={lockoutState.message || heading}
                             />
                             <Text type="secondary">
-                                Contact support with this Hardware ID to request a new license.
+                                {guidance}
                             </Text>
                             <Card size="small">
-                                <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                                <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
                                     <Text code>{lockoutState.hardware_id || "Unavailable"}</Text>
                                     <Button type="primary" onClick={() => void onCopyHardwareID()}>
                                         Copy ID
+                                    </Button>
+                                    <Button onClick={() => void onCopySupportMessage()}>
+                                        Copy Support Message
                                     </Button>
                                 </Space>
                             </Card>

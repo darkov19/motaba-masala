@@ -194,10 +194,10 @@ function Run-ScenarioExpired([string]$BaseSignature) {
         -Name "AC2 - Full Expiry Lockout (expired 8 days ago)" `
         -Prepare { Set-LicenseJson -Signature $BaseSignature -ExpiresAt $expires } `
         -ExpectedChecks @(
-            "Application should fail startup quickly (grace period ended).",
-            "Process exits without entering normal workspace."
-        ) `
-        -ExpectExitFast $true
+            "Lockout screen shows: License Expired. Application is locked.",
+            "Screen shows grace period ended guidance and hardware ID.",
+            "Copy ID and Copy Support Message actions are available."
+        )
 }
 
 function Run-ScenarioMismatch([string]$BaseSignature) {
@@ -253,4 +253,4 @@ finally {
 Write-Step "Done"
 Write-Host "Manual license UX run complete."
 Write-Host "If needed, restore manually with:"
-Write-Host "  .\scripts\windows-license-ux-test.ps1 -Mode reset"
+Write-Host "  .\scripts\story-1-9-windows-license-ux-test.ps1 -Mode reset"

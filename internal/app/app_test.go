@@ -46,11 +46,14 @@ func TestGetLicenseStatus_UsesConfiguredProvider(t *testing.T) {
 
 func TestGetLicenseLockoutState_ReturnsConfiguredState(t *testing.T) {
 	a := NewApp(true)
-	a.SetLicenseLockoutState(true, "Hardware ID Mismatch. Application is locked.", "machine-123")
+	a.SetLicenseLockoutState(true, "hardware-mismatch", "Hardware ID Mismatch. Application is locked.", "machine-123")
 
 	lockout := a.GetLicenseLockoutState()
 	if !lockout.Enabled {
 		t.Fatal("expected lockout to be enabled")
+	}
+	if lockout.Reason != "hardware-mismatch" {
+		t.Fatalf("expected lockout reason to match, got %q", lockout.Reason)
 	}
 	if lockout.HardwareID != "machine-123" {
 		t.Fatalf("expected hardware id to match, got %q", lockout.HardwareID)

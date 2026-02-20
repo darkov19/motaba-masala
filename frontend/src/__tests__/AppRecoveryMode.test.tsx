@@ -36,6 +36,7 @@ describe("App recovery and license states", () => {
         });
         getLicenseLockoutState.mockResolvedValue({
             enabled: false,
+            reason: "hardware-mismatch",
             message: "",
             hardware_id: "",
         });
@@ -102,6 +103,7 @@ describe("App recovery and license states", () => {
         getRecoveryState.mockResolvedValue({ enabled: false, message: "", backups: [] });
         getLicenseLockoutState.mockResolvedValue({
             enabled: true,
+            reason: "hardware-mismatch",
             message: "Hardware ID Mismatch. Application is locked.",
             hardware_id: "new-hw-123",
         });
@@ -132,6 +134,39 @@ describe("App recovery and license states", () => {
         await waitFor(() => {
             expect(navigator.clipboard.writeText).toHaveBeenCalledWith("new-hw-123");
         });
+        fireEvent.click(screen.getByRole("button", { name: "Copy Support Message" }));
+        await waitFor(() => {
+            expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(2);
+        });
+
+        router.dispose();
+    });
+
+    it("renders full-expiry lockout mode with renewal guidance", async () => {
+        getRecoveryState.mockResolvedValue({ enabled: false, message: "", backups: [] });
+        getLicenseLockoutState.mockResolvedValue({
+            enabled: true,
+            reason: "license-expired",
+            message: "License expired. Grace period ended. Application is locked.",
+            hardware_id: "expired-hw-999",
+        });
+
+        const router = createMemoryRouter(
+            [
+                {
+                    path: "*",
+                    element: <App />,
+                },
+            ],
+            { initialEntries: ["/grn"] },
+        );
+
+        render(<RouterProvider router={router} />);
+
+        expect(await screen.findByRole("heading", { name: "License Expired. Application is locked." })).toBeInTheDocument();
+        expect(screen.getByText("expired-hw-999")).toBeInTheDocument();
+        expect(screen.getByText(/grace period has ended/i)).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Copy Support Message" })).toBeInTheDocument();
 
         router.dispose();
     });

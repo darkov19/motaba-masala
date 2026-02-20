@@ -310,22 +310,42 @@ func run() error {
 
 	licenseSvc := license.NewLicensingService(LicensePublicKey, "license.key", ".hw_hb")
 	lockoutMode := false
+	lockoutReason := ""
 	lockoutMessage := ""
 	lockoutHardwareID := ""
-	if _, err := licenseSvc.GetCurrentStatus(); err != nil {
+	initialSnapshot, err := licenseSvc.GetCurrentStatus()
+	if err != nil {
 		if errors.Is(err, license.ErrHardwareIDMismatch) {
 			lockoutMode = true
+			lockoutReason = "hardware-mismatch"
 			lockoutHardwareID = license.ExtractHardwareID(err)
 			lockoutMessage = "Hardware ID Mismatch. Application is locked."
 			slog.Error("Starting in license lockout mode", "error", err, "hardware_id", lockoutHardwareID)
 		} else {
 			return fmt.Errorf("licensing validation failed: %w", err)
 		}
+	} else if initialSnapshot.Status == license.StatusExpired {
+		lockoutMode = true
+		lockoutReason = "license-expired"
+		lockoutHardwareID = initialSnapshot.HardwareID
+		lockoutMessage = "License expired. Grace period ended. Application is locked."
+		slog.Warn("Starting in license-expired lockout mode", "hardware_id", lockoutHardwareID, "expires_at", initialSnapshot.ExpiresAt)
 	}
 
 	if !lockoutMode {
 		if err := licenseSvc.ValidateLicense(); err != nil {
-			return fmt.Errorf("licensing validation failed: %w", err)
+			if errors.Is(err, license.ErrLicenseExpired) {
+				latestSnapshot, statusErr := licenseSvc.GetCurrentStatus()
+				if statusErr != nil {
+					return fmt.Errorf("licensing validation failed: %w", err)
+				}
+				lockoutMode = true
+				lockoutReason = "license-expired"
+				lockoutHardwareID = latestSnapshot.HardwareID
+				lockoutMessage = "License expired. Grace period ended. Application is locked."
+			} else {
+				return fmt.Errorf("licensing validation failed: %w", err)
+			}
 		}
 	}
 
@@ -480,7 +500,7 @@ func run() error {
 
 	appSys.SetRecoveryMode(recoveryMode)
 	application.SetRecoveryState(recoveryMode, recoveryMessage, availableBackups)
-	application.SetLicenseLockoutState(lockoutMode, lockoutMessage, lockoutHardwareID)
+	application.SetLicenseLockoutState(lockoutMode, lockoutReason, lockoutMessage, lockoutHardwareID)
 	if recoveryMode {
 		application.SetRestoreHandler(func(backupPath string) error {
 			if err := backupService.Restore(backupPath); err != nil {
