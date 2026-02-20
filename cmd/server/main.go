@@ -518,11 +518,14 @@ func run() error {
 			}()
 
 			go func() {
-				ticker := time.NewTicker(1 * time.Second)
+				// Poll window state at a lower cadence; this is enough for UX notifications
+				// and reduces repeated syscall work on long-running sessions.
+				ticker := time.NewTicker(3 * time.Second)
 				defer ticker.Stop()
 
 				initialized := false
 				lastMinimized := false
+				notifiedWhileMinimized := false
 				for {
 					select {
 					case <-ctx.Done():
@@ -530,8 +533,14 @@ func run() error {
 					case <-ticker.C:
 						minimized := runtime.WindowIsMinimised(ctx)
 						if stdruntime.GOOS == "windows" {
-							if winMinimized, err := infraSys.WindowIsCurrentProcessMinimized(); err == nil {
-								minimized = winMinimized
+							// In steady minimized state we've already notified; skip extra window
+							// enumeration until a potential restore transition is observed.
+							if !lastMinimized || !notifiedWhileMinimized || !minimized {
+								if winMinimized, err := infraSys.WindowIsCurrentProcessMinimized(); err == nil {
+									minimized = winMinimized
+								}
+							} else {
+								minimized = true
 							}
 						}
 						if !initialized {
@@ -543,6 +552,10 @@ func run() error {
 							if err := infraSys.ShowNotification(backgroundNotificationTitle, backgroundNotificationBody); err != nil {
 								slog.Error("Failed to show minimize notification", "error", err)
 							}
+							notifiedWhileMinimized = true
+						}
+						if !minimized {
+							notifiedWhileMinimized = false
 						}
 						lastMinimized = minimized
 					}
