@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("all", "expiring", "grace", "expired", "mismatch", "reset")]
+    [ValidateSet("all", "expiring", "grace", "expired", "mismatch", "transition", "reset")]
     [string]$Mode = "all",
     [string]$AppPath = "",
     [switch]$SkipRestore
@@ -209,8 +209,46 @@ function Run-ScenarioMismatch([string]$BaseSignature) {
         -ExpectedChecks @(
             "Lockout screen shows: Hardware ID Mismatch. Application is locked.",
             "A newly computed Hardware ID is displayed.",
-            "Clicking Copy ID copies the displayed hardware ID."
+            "Clicking Copy ID copies the displayed hardware ID.",
+            "Copy Support Message action is available and copies a support-ready message."
         )
+}
+
+function Run-ScenarioGraceToExpiredTransition([string]$BaseSignature) {
+    Write-Step "AC2 - Runtime Transition: Grace Period -> Full Lockout (no restart)"
+
+    $graceExpires = (Get-Date).AddDays(-1).ToString("yyyy-MM-dd")
+    $expiredDate = (Get-Date).AddDays(-8).ToString("yyyy-MM-dd")
+
+    Set-LicenseJson -Signature $BaseSignature -ExpiresAt $graceExpires
+    $proc = Start-App "AC2 runtime transition"
+    Start-Sleep -Seconds 6
+
+    if ($proc.HasExited) {
+        Write-Warning "App exited unexpectedly before transition checks."
+        return
+    }
+
+    Write-Host ""
+    Write-Host "Phase 1 checks (grace-period):" -ForegroundColor Magenta
+    Write-Host " - Red read-only banner is visible."
+    Write-Host " - New GRN and New Batch are disabled."
+    Write-Host " - GRN/Batch submit actions are disabled."
+    Read-Host "After Phase 1 checks, press Enter to switch license to full-expired and continue"
+
+    Set-LicenseJson -Signature $BaseSignature -ExpiresAt $expiredDate
+    Write-Host "License updated to expired (>7 days). Waiting for polling window (35s)..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 35
+
+    Write-Host ""
+    Write-Host "Phase 2 checks (post-poll lockout):" -ForegroundColor Magenta
+    Write-Host " - Without restarting the app, lockout screen appears automatically."
+    Write-Host " - Heading: License Expired. Application is locked."
+    Write-Host " - Hardware ID is shown."
+    Write-Host " - Copy ID and Copy Support Message are available."
+    Read-Host "After Phase 2 checks, press Enter to continue"
+
+    Stop-App $proc
 }
 
 Assert-AppPath
@@ -232,11 +270,13 @@ try {
         "grace" { Run-ScenarioGrace $baseSignature }
         "expired" { Run-ScenarioExpired $baseSignature }
         "mismatch" { Run-ScenarioMismatch $baseSignature }
+        "transition" { Run-ScenarioGraceToExpiredTransition $baseSignature }
         "all" {
             Run-ScenarioExpiring $baseSignature
             Run-ScenarioGrace $baseSignature
             Run-ScenarioExpired $baseSignature
             Run-ScenarioMismatch $baseSignature
+            Run-ScenarioGraceToExpiredTransition $baseSignature
         }
     }
 }

@@ -170,4 +170,47 @@ describe("App recovery and license states", () => {
 
         router.dispose();
     });
+
+    it("transitions from grace-period to lockout during runtime polling", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        getRecoveryState.mockResolvedValue({ enabled: false, message: "", backups: [] });
+        getLicenseLockoutState.mockResolvedValue({
+            enabled: false,
+            reason: "",
+            message: "",
+            hardware_id: "runtime-hw-321",
+        });
+        getLicenseStatus
+            .mockResolvedValueOnce({
+                status: "grace-period",
+                days_remaining: -1,
+                message: "License Expired. Read-only mode active for 6 more days.",
+            })
+            .mockResolvedValue({
+                status: "expired",
+                days_remaining: -7,
+                message: "License expired. Application is locked.",
+            });
+
+        const router = createMemoryRouter(
+            [
+                {
+                    path: "*",
+                    element: <App />,
+                },
+            ],
+            { initialEntries: ["/grn"] },
+        );
+
+        render(<RouterProvider router={router} />);
+
+        expect(await screen.findByText("License Expired. Read-only mode active for 6 more days.")).toBeInTheDocument();
+
+        await vi.advanceTimersByTimeAsync(30000);
+
+        expect(await screen.findByRole("heading", { name: "License Expired. Application is locked." })).toBeInTheDocument();
+
+        router.dispose();
+        vi.useRealTimers();
+    });
 });

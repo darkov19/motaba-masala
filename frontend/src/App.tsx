@@ -227,6 +227,12 @@ const defaultLicenseStatus: LicenseStatus = {
     days_remaining: 0,
 };
 
+const degradedLicenseStatus: LicenseStatus = {
+    status: "grace-period",
+    days_remaining: 0,
+    message: "Unable to verify license status. Read-only mode is active until verification succeeds.",
+};
+
 function App() {
     const [recoveryState, setRecoveryState] = useState<RecoveryState | null>(null);
     const [licenseStatus, setLicenseStatus] = useState<LicenseStatus>(defaultLicenseStatus);
@@ -295,7 +301,7 @@ function App() {
                 }
             } catch {
                 if (mounted) {
-                    setLicenseStatus(defaultLicenseStatus);
+                    setLicenseStatus(degradedLicenseStatus);
                 }
             }
         };
@@ -309,7 +315,7 @@ function App() {
 
         void initialize();
         const poller = window.setInterval(() => {
-            void loadLicenseStatus();
+            void Promise.all([loadLicenseStatus(), loadLockoutState()]);
         }, 30000);
 
         return () => {
@@ -317,6 +323,21 @@ function App() {
             window.clearInterval(poller);
         };
     }, []);
+
+    const effectiveLockoutState = useMemo<LicenseLockoutState | null>(() => {
+        if (lockoutState?.enabled) {
+            return lockoutState;
+        }
+        if (licenseStatus.status === "expired") {
+            return {
+                enabled: true,
+                reason: "license-expired",
+                message: licenseStatus.message || "License expired. Application is locked.",
+                hardware_id: lockoutState?.hardware_id || "",
+            };
+        }
+        return null;
+    }, [licenseStatus.message, licenseStatus.status, lockoutState]);
 
     const onRestoreBackup = async (backupPath: string) => {
         const restoreBinding = (window as WindowWithAppBindings).go?.app?.App?.RestoreBackup;
@@ -338,7 +359,7 @@ function App() {
     };
 
     const onCopyHardwareID = async () => {
-        const hardwareID = lockoutState?.hardware_id || "";
+        const hardwareID = effectiveLockoutState?.hardware_id || "";
         if (!hardwareID) return;
         const copied = await copyToClipboard(hardwareID);
         if (copied) {
@@ -368,8 +389,8 @@ function App() {
     };
 
     const onCopySupportMessage = async () => {
-        const hardwareID = lockoutState?.hardware_id || "Unavailable";
-        const issue = lockoutState?.reason === "license-expired"
+        const hardwareID = effectiveLockoutState?.hardware_id || "Unavailable";
+        const issue = effectiveLockoutState?.reason === "license-expired"
             ? "License expired (grace period ended)"
             : "Hardware ID mismatch";
         const supportMessage = [
@@ -387,11 +408,11 @@ function App() {
         message.error("Unable to copy support message.");
     };
 
-    if (!isLoadingRecovery && lockoutState?.enabled) {
-        const heading = lockoutState.reason === "license-expired"
+    if (!isLoadingRecovery && effectiveLockoutState?.enabled) {
+        const heading = effectiveLockoutState.reason === "license-expired"
             ? "License Expired. Application is locked."
             : "Hardware ID Mismatch. Application is locked.";
-        const guidance = lockoutState.reason === "license-expired"
+        const guidance = effectiveLockoutState.reason === "license-expired"
             ? "Your grace period has ended. Contact support with this Hardware ID to renew your license."
             : "Contact support with this Hardware ID to request a new license.";
 
@@ -414,14 +435,14 @@ function App() {
                             <Alert
                                 type="error"
                                 showIcon
-                                title={lockoutState.message || heading}
+                                title={effectiveLockoutState.message || heading}
                             />
                             <Text type="secondary">
                                 {guidance}
                             </Text>
                             <Card size="small">
                                 <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
-                                    <Text code>{lockoutState.hardware_id || "Unavailable"}</Text>
+                                    <Text code>{effectiveLockoutState.hardware_id || "Unavailable"}</Text>
                                     <Button type="primary" onClick={() => void onCopyHardwareID()}>
                                         Copy ID
                                     </Button>

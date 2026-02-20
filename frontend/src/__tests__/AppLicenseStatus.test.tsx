@@ -56,4 +56,45 @@ describe("App license status banners", () => {
         router.dispose();
         delete (window as unknown as { go?: unknown }).go;
     });
+
+    it("falls back to safe read-only state when license status fetch fails", async () => {
+        (window as unknown as {
+            go?: {
+                app?: {
+                    App?: {
+                        GetRecoveryState?: () => Promise<unknown>;
+                        GetLicenseLockoutState?: () => Promise<unknown>;
+                        GetLicenseStatus?: () => Promise<unknown>;
+                    };
+                };
+            };
+        }).go = {
+            app: {
+                App: {
+                    GetRecoveryState: vi.fn().mockResolvedValue({ enabled: false, message: "", backups: [] }),
+                    GetLicenseLockoutState: vi.fn().mockResolvedValue({ enabled: false, message: "", hardware_id: "" }),
+                    GetLicenseStatus: vi.fn().mockRejectedValue(new Error("timeout")),
+                },
+            },
+        };
+
+        const router = createMemoryRouter(
+            [
+                {
+                    path: "*",
+                    element: <App />,
+                },
+            ],
+            { initialEntries: ["/grn"] },
+        );
+
+        render(<RouterProvider router={router} />);
+
+        expect(await screen.findByText("Unable to verify license status. Read-only mode is active until verification succeeds.")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "New GRN" })).toBeDisabled();
+        expect(screen.getByRole("button", { name: "New Batch" })).toBeDisabled();
+
+        router.dispose();
+        delete (window as unknown as { go?: unknown }).go;
+    });
 });

@@ -18,6 +18,16 @@ func NewService(repo domainInventory.Repository) *Service {
 	return &Service{repo: repo}
 }
 
+func (s *Service) CreateItem(item *domainInventory.Item) error {
+	if err := appLicenseMode.RequireWriteAccess(); err != nil {
+		return err
+	}
+	if err := s.repo.CreateItem(item); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Service) UpdateItem(item *domainInventory.Item) error {
 	if err := appLicenseMode.RequireWriteAccess(); err != nil {
 		return err
@@ -31,6 +41,16 @@ func (s *Service) UpdateItem(item *domainInventory.Item) error {
 	return nil
 }
 
+func (s *Service) CreateBatch(batch *domainInventory.Batch) error {
+	if err := appLicenseMode.RequireWriteAccess(); err != nil {
+		return err
+	}
+	if err := s.repo.CreateBatch(batch); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Service) UpdateBatch(batch *domainInventory.Batch) error {
 	if err := appLicenseMode.RequireWriteAccess(); err != nil {
 		return err
@@ -39,6 +59,16 @@ func (s *Service) UpdateBatch(batch *domainInventory.Batch) error {
 		if errors.Is(err, domainErrors.ErrConcurrencyConflict) {
 			return errors.New(ErrRecordModified)
 		}
+		return err
+	}
+	return nil
+}
+
+func (s *Service) CreateGRN(grn *domainInventory.GRN) error {
+	if err := appLicenseMode.RequireWriteAccess(); err != nil {
+		return err
+	}
+	if err := s.repo.CreateGRN(grn); err != nil {
 		return err
 	}
 	return nil
