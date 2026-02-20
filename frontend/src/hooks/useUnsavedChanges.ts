@@ -29,7 +29,9 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
     } = options;
 
     useEffect(() => {
-        setForceQuit(!isDirty);
+        // Keep close interception enabled by default. Force quit should only be
+        // enabled for explicit user-confirmed exit paths.
+        setForceQuit(false);
 
         const onBeforeUnload = (event: BeforeUnloadEvent) => {
             if (!isDirty) {
