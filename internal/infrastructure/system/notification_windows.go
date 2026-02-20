@@ -20,36 +20,32 @@ func ShowNotification(title, message string) error {
 		logPath := filepath.Join(os.TempDir(), "masala-notification.log")
 		writeNotificationLog(logPath, "notification requested title=%q message=%q", title, message)
 
-		toastErr := error(nil)
+		iconPath := resolveNotificationIconPath()
 		notification := toast.Notification{
 			AppID:   "Masala Inventory Server",
 			Title:   title,
 			Message: message,
+			Icon:    iconPath,
 		}
 		if err := notification.Push(); err != nil {
-			toastErr = err
 			slog.Error("ShowNotification: toast failed", "error", err, "title", title)
 			writeNotificationLog(logPath, "toast failed: %v", err)
-		} else {
-			slog.Info("ShowNotification: toast sent", "title", title)
-			writeNotificationLog(logPath, "toast sent successfully")
-		}
-
-		// Always attempt balloon tip so users still see a visible signal even when
-		// Windows toast is suppressed by system settings/focus mode.
-		if fallbackErr := showBalloonTipFallback(title, message); fallbackErr != nil {
-			slog.Error("ShowNotification: fallback balloon failed", "error", fallbackErr, "title", title)
-			writeNotificationLog(logPath, "balloon fallback failed: %v", fallbackErr)
-			if toastErr != nil {
+			if fallbackErr := showBalloonTipFallback(title, message); fallbackErr != nil {
+				slog.Error("ShowNotification: fallback balloon failed", "error", fallbackErr, "title", title)
+				writeNotificationLog(logPath, "balloon fallback failed: %v", fallbackErr)
 				if messageBoxErr := showMessageBoxFallback(title, message); messageBoxErr != nil {
 					slog.Error("ShowNotification: fallback message box failed", "error", messageBoxErr, "title", title)
 					writeNotificationLog(logPath, "message box fallback failed: %v", messageBoxErr)
 				} else {
 					writeNotificationLog(logPath, "message box fallback succeeded")
 				}
+			} else {
+				writeNotificationLog(logPath, "balloon fallback succeeded")
 			}
+			return
 		} else {
-			writeNotificationLog(logPath, "balloon fallback succeeded")
+			slog.Info("ShowNotification: toast sent", "title", title)
+			writeNotificationLog(logPath, "toast sent successfully (icon=%q)", iconPath)
 		}
 	}()
 	return nil
@@ -102,4 +98,30 @@ func writeNotificationLog(path string, format string, args ...interface{}) {
 	}
 	defer f.Close()
 	_, _ = f.WriteString(line)
+}
+
+func resolveNotificationIconPath() string {
+	candidates := []string{
+		filepath.Join("cmd", "server", "assets", "icon.ico"),
+		filepath.Join("assets", "icon.ico"),
+	}
+
+	if exePath, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exePath)
+		candidates = append(candidates,
+			filepath.Join(exeDir, "cmd", "server", "assets", "icon.ico"),
+			filepath.Join(exeDir, "assets", "icon.ico"),
+		)
+	}
+
+	for _, candidate := range candidates {
+		absPath, err := filepath.Abs(candidate)
+		if err != nil {
+			continue
+		}
+		if _, err := os.Stat(absPath); err == nil {
+			return absPath
+		}
+	}
+	return ""
 }

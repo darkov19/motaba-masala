@@ -60,6 +60,8 @@ const (
 	relaunchHelperArg            = "--relaunch-helper"
 	relaunchAttempts             = 12
 	envRelaunchWorkingDir        = "MASALA_RELAUNCH_WORKDIR"
+	backgroundNotificationTitle  = "Masala Inventory is still running"
+	backgroundNotificationBody   = "The server is now in the background. Use the tray icon to reopen or exit."
 )
 
 const defaultLicensePublicKey = "ebe55ca92c5a7161a80ce7718c7567e2566a6f51fb564f191bee61cb7b29d776"
@@ -546,7 +548,7 @@ func run() error {
 							continue
 						}
 						if minimized && !lastMinimized {
-							if err := infraSys.ShowNotification("Server Backgrounded", "Server is running in background. Use the system tray to open or exit."); err != nil {
+							if err := infraSys.ShowNotification(backgroundNotificationTitle, backgroundNotificationBody); err != nil {
 								slog.Error("Failed to show minimize notification", "error", err)
 							}
 						}
@@ -568,7 +570,7 @@ func run() error {
 			slog.Info("OnBeforeClose: Hiding window and backgrounding server")
 			runtime.WindowHide(ctx)
 			// AC #1: Notification bubble on minimize
-			if err := infraSys.ShowNotification("Server Backgrounded", "Server is running in background. Use the system tray to open or exit."); err != nil {
+			if err := infraSys.ShowNotification(backgroundNotificationTitle, backgroundNotificationBody); err != nil {
 				slog.Error("Failed to show notification", "error", err)
 			}
 			runtime.EventsEmit(ctx, "server-minimized", nil)
