@@ -3,6 +3,7 @@ package inventory
 import (
 	"errors"
 
+	appLicenseMode "masala_inventory_managment/internal/app/licensemode"
 	domainErrors "masala_inventory_managment/internal/domain/errors"
 	domainInventory "masala_inventory_managment/internal/domain/inventory"
 )
@@ -18,6 +19,9 @@ func NewService(repo domainInventory.Repository) *Service {
 }
 
 func (s *Service) UpdateItem(item *domainInventory.Item) error {
+	if err := appLicenseMode.RequireWriteAccess(); err != nil {
+		return err
+	}
 	if err := s.repo.UpdateItem(item); err != nil {
 		if errors.Is(err, domainErrors.ErrConcurrencyConflict) {
 			return errors.New(ErrRecordModified)
@@ -28,6 +32,9 @@ func (s *Service) UpdateItem(item *domainInventory.Item) error {
 }
 
 func (s *Service) UpdateBatch(batch *domainInventory.Batch) error {
+	if err := appLicenseMode.RequireWriteAccess(); err != nil {
+		return err
+	}
 	if err := s.repo.UpdateBatch(batch); err != nil {
 		if errors.Is(err, domainErrors.ErrConcurrencyConflict) {
 			return errors.New(ErrRecordModified)
@@ -38,6 +45,9 @@ func (s *Service) UpdateBatch(batch *domainInventory.Batch) error {
 }
 
 func (s *Service) UpdateGRN(grn *domainInventory.GRN) error {
+	if err := appLicenseMode.RequireWriteAccess(); err != nil {
+		return err
+	}
 	if err := s.repo.UpdateGRN(grn); err != nil {
 		if errors.Is(err, domainErrors.ErrConcurrencyConflict) {
 			return errors.New(ErrRecordModified)

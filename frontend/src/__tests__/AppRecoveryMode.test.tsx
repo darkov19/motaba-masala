@@ -12,13 +12,17 @@ vi.mock("../components/forms/BatchForm", () => ({
     BatchForm: () => <div>Mock Batch Form</div>,
 }));
 
-describe("App recovery mode", () => {
+describe("App recovery and license states", () => {
     const getRecoveryState = vi.fn();
     const restoreBackup = vi.fn();
+    const getLicenseStatus = vi.fn();
+    const getLicenseLockoutState = vi.fn();
 
     beforeEach(() => {
         getRecoveryState.mockReset();
         restoreBackup.mockReset();
+        getLicenseStatus.mockReset();
+        getLicenseLockoutState.mockReset();
 
         getRecoveryState.mockResolvedValue({
             enabled: true,
@@ -26,6 +30,15 @@ describe("App recovery mode", () => {
             backups: ["backups/backup-2026-02-18T120000.zip"],
         });
         restoreBackup.mockResolvedValue(undefined);
+        getLicenseStatus.mockResolvedValue({
+            status: "active",
+            days_remaining: 0,
+        });
+        getLicenseLockoutState.mockResolvedValue({
+            enabled: false,
+            message: "",
+            hardware_id: "",
+        });
 
         (window as unknown as {
             go?: {
@@ -33,6 +46,8 @@ describe("App recovery mode", () => {
                     App?: {
                         GetRecoveryState?: typeof getRecoveryState;
                         RestoreBackup?: typeof restoreBackup;
+                        GetLicenseStatus?: typeof getLicenseStatus;
+                        GetLicenseLockoutState?: typeof getLicenseLockoutState;
                     };
                 };
             };
@@ -41,6 +56,8 @@ describe("App recovery mode", () => {
                 App: {
                     GetRecoveryState: getRecoveryState,
                     RestoreBackup: restoreBackup,
+                    GetLicenseStatus: getLicenseStatus,
+                    GetLicenseLockoutState: getLicenseLockoutState,
                 },
             },
         };
@@ -77,6 +94,44 @@ describe("App recovery mode", () => {
             expect(restoreBackup).toHaveBeenCalledWith("backups/backup-2026-02-18T120000.zip");
         });
         expect(message.success).toHaveBeenCalledWith("Backup restore started. Server will restart.");
+
+        router.dispose();
+    });
+
+    it("renders hardware lockout mode with copy action", async () => {
+        getRecoveryState.mockResolvedValue({ enabled: false, message: "", backups: [] });
+        getLicenseLockoutState.mockResolvedValue({
+            enabled: true,
+            message: "Hardware ID Mismatch. Application is locked.",
+            hardware_id: "new-hw-123",
+        });
+
+        Object.defineProperty(navigator, "clipboard", {
+            value: {
+                writeText: vi.fn().mockResolvedValue(undefined),
+            },
+            configurable: true,
+        });
+
+        const router = createMemoryRouter(
+            [
+                {
+                    path: "*",
+                    element: <App />,
+                },
+            ],
+            { initialEntries: ["/grn"] },
+        );
+
+        render(<RouterProvider router={router} />);
+
+        expect(await screen.findByRole("heading", { name: "Hardware ID Mismatch. Application is locked." })).toBeInTheDocument();
+        expect(screen.getByText("new-hw-123")).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "Copy ID" }));
+        await waitFor(() => {
+            expect(navigator.clipboard.writeText).toHaveBeenCalledWith("new-hw-123");
+        });
 
         router.dispose();
     });

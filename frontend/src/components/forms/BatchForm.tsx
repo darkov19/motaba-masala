@@ -11,11 +11,12 @@ type BatchValues = {
 type BatchFormProps = {
     userKey: string;
     onDirtyChange: (isDirty: boolean) => void;
+    writeDisabled?: boolean;
 };
 
 const EMPTY_BATCH_VALUES: BatchValues = {};
 
-export function BatchForm({ userKey, onDirtyChange }: BatchFormProps) {
+export function BatchForm({ userKey, onDirtyChange, writeDisabled = false }: BatchFormProps) {
     const [form] = Form.useForm<BatchValues>();
     const watchedValues = Form.useWatch([], form) ?? EMPTY_BATCH_VALUES;
 
@@ -84,10 +85,11 @@ export function BatchForm({ userKey, onDirtyChange }: BatchFormProps) {
                 <InputNumber min={0} style={{ width: "100%" }} />
             </Form.Item>
             <Space>
-                <Button type="primary" htmlType="submit">
+                <Button type="primary" htmlType="submit" disabled={writeDisabled}>
                     Submit Batch
                 </Button>
                 <Button
+                    disabled={writeDisabled}
                     onClick={() => {
                         form.resetFields();
                         clearDraft();

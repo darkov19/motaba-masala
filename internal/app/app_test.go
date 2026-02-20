@@ -28,3 +28,31 @@ func TestRestoreBackup_CallsHandlerInRecoveryMode(t *testing.T) {
 		t.Fatal("expected restore handler to be called")
 	}
 }
+
+func TestGetLicenseStatus_UsesConfiguredProvider(t *testing.T) {
+	a := NewApp(true)
+	a.SetLicenseStatusProvider(func() (LicenseStatus, error) {
+		return LicenseStatus{Status: "grace-period", DaysRemaining: -2}, nil
+	})
+
+	status, err := a.GetLicenseStatus()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if status.Status != "grace-period" || status.DaysRemaining != -2 {
+		t.Fatalf("unexpected status: %+v", status)
+	}
+}
+
+func TestGetLicenseLockoutState_ReturnsConfiguredState(t *testing.T) {
+	a := NewApp(true)
+	a.SetLicenseLockoutState(true, "Hardware ID Mismatch. Application is locked.", "machine-123")
+
+	lockout := a.GetLicenseLockoutState()
+	if !lockout.Enabled {
+		t.Fatal("expected lockout to be enabled")
+	}
+	if lockout.HardwareID != "machine-123" {
+		t.Fatalf("expected hardware id to match, got %q", lockout.HardwareID)
+	}
+}

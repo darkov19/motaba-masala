@@ -11,11 +11,12 @@ type GRNValues = {
 type GRNFormProps = {
     userKey: string;
     onDirtyChange: (isDirty: boolean) => void;
+    writeDisabled?: boolean;
 };
 
 const EMPTY_GRN_VALUES: GRNValues = {};
 
-export function GRNForm({ userKey, onDirtyChange }: GRNFormProps) {
+export function GRNForm({ userKey, onDirtyChange, writeDisabled = false }: GRNFormProps) {
     const [form] = Form.useForm<GRNValues>();
     const watchedValues = Form.useWatch([], form) ?? EMPTY_GRN_VALUES;
 
@@ -74,10 +75,11 @@ export function GRNForm({ userKey, onDirtyChange }: GRNFormProps) {
                 <Input.TextArea rows={4} placeholder="Optional notes" />
             </Form.Item>
             <Space>
-                <Button type="primary" htmlType="submit">
+                <Button type="primary" htmlType="submit" disabled={writeDisabled}>
                     Submit GRN
                 </Button>
                 <Button
+                    disabled={writeDisabled}
                     onClick={() => {
                         form.resetFields();
                         clearDraft();

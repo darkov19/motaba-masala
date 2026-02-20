@@ -19,12 +19,27 @@ type RecoveryState = {
     backups: string[];
 };
 
+type LicenseStatus = {
+    status: "active" | "expiring" | "grace-period" | "expired";
+    days_remaining: number;
+    expires_at?: string;
+    message?: string;
+};
+
+type LicenseLockoutState = {
+    enabled: boolean;
+    message: string;
+    hardware_id?: string;
+};
+
 type WindowWithAppBindings = Window & {
     go?: {
         app?: {
             App?: {
                 GetRecoveryState?: () => Promise<RecoveryState>;
                 RestoreBackup?: (backupPath: string) => Promise<void>;
+                GetLicenseStatus?: () => Promise<LicenseStatus>;
+                GetLicenseLockoutState?: () => Promise<LicenseLockoutState>;
             };
         };
     };
@@ -40,7 +55,11 @@ const VIEW_TO_PATH: Record<ViewKey, string> = {
     batch: "/batch",
 };
 
-function ResilienceWorkspace() {
+type ResilienceWorkspaceProps = {
+    licenseStatus: LicenseStatus;
+};
+
+function ResilienceWorkspace({ licenseStatus }: ResilienceWorkspaceProps) {
     const navigate = useNavigate();
     const location = useLocation();
     const [dirtyByView, setDirtyByView] = useState<Record<ViewKey, boolean>>({
@@ -48,6 +67,7 @@ function ResilienceWorkspace() {
         batch: false,
     });
     const activeView = PATH_TO_VIEW[location.pathname] ?? "grn";
+    const writeDisabled = licenseStatus.status === "grace-period" || licenseStatus.status === "expired";
 
     useEffect(() => {
         if (!PATH_TO_VIEW[location.pathname]) {
@@ -87,6 +107,44 @@ function ResilienceWorkspace() {
         navigate(VIEW_TO_PATH[nextView]);
     };
 
+    const renderLicenseBanner = () => {
+        if (licenseStatus.status === "expiring") {
+            return (
+                <Alert
+                    banner
+                    showIcon
+                    type="warning"
+                    title={licenseStatus.message || `License expires in ${licenseStatus.days_remaining} days. Contact support to renew.`}
+                />
+            );
+        }
+
+        if (licenseStatus.status === "grace-period") {
+            const daysLeft = Math.max(0, 7 + licenseStatus.days_remaining);
+            return (
+                <Alert
+                    banner
+                    showIcon
+                    type="error"
+                    title={licenseStatus.message || `License Expired. Read-only mode active for ${daysLeft} more days.`}
+                />
+            );
+        }
+
+        if (licenseStatus.status === "expired") {
+            return (
+                <Alert
+                    banner
+                    showIcon
+                    type="error"
+                    title={licenseStatus.message || "License expired. Application is locked. Contact support to renew."}
+                />
+            );
+        }
+
+        return null;
+    };
+
     return (
         <Layout style={{ minHeight: "100vh" }}>
             <Header className="app-header">
@@ -99,6 +157,8 @@ function ResilienceWorkspace() {
                 <ConnectionStatus />
             </Header>
 
+            {renderLicenseBanner()}
+
             <Content className="app-content">
                 <Card className="app-card" variant="borderless">
                     <Space orientation="vertical" size={20} style={{ width: "100%" }}>
@@ -109,6 +169,21 @@ function ResilienceWorkspace() {
                             Auto-save drafts every 5 seconds, recover on restart, and
                             guard against data loss.
                         </Text>
+
+                        <Space>
+                            <Button
+                                onClick={() => navigate("/grn")}
+                                disabled={writeDisabled}
+                            >
+                                New GRN
+                            </Button>
+                            <Button
+                                onClick={() => navigate("/batch")}
+                                disabled={writeDisabled}
+                            >
+                                New Batch
+                            </Button>
+                        </Space>
 
                         <Segmented
                             block
@@ -123,12 +198,14 @@ function ResilienceWorkspace() {
                         <div style={{ display: activeView === "grn" ? "block" : "none" }}>
                             <GRNForm
                                 userKey="operator"
+                                writeDisabled={writeDisabled}
                                 onDirtyChange={isDirty => setDirtyFor("grn", isDirty)}
                             />
                         </div>
                         <div style={{ display: activeView === "batch" ? "block" : "none" }}>
                             <BatchForm
                                 userKey="operator"
+                                writeDisabled={writeDisabled}
                                 onDirtyChange={isDirty => setDirtyFor("batch", isDirty)}
                             />
                         </div>
@@ -144,19 +221,26 @@ function ResilienceWorkspace() {
     );
 }
 
+const defaultLicenseStatus: LicenseStatus = {
+    status: "active",
+    days_remaining: 0,
+};
+
 function App() {
     const [recoveryState, setRecoveryState] = useState<RecoveryState | null>(null);
+    const [licenseStatus, setLicenseStatus] = useState<LicenseStatus>(defaultLicenseStatus);
+    const [lockoutState, setLockoutState] = useState<LicenseLockoutState | null>(null);
     const [isLoadingRecovery, setIsLoadingRecovery] = useState(true);
     const [restoringBackup, setRestoringBackup] = useState<string | null>(null);
 
     useEffect(() => {
         let mounted = true;
+
         const loadRecoveryState = async () => {
             const binding = (window as WindowWithAppBindings).go?.app?.App?.GetRecoveryState;
             if (typeof binding !== "function") {
                 if (mounted) {
                     setRecoveryState(null);
-                    setIsLoadingRecovery(false);
                 }
                 return;
             }
@@ -170,16 +254,66 @@ function App() {
                 if (mounted) {
                     setRecoveryState(null);
                 }
-            } finally {
+            }
+        };
+
+        const loadLockoutState = async () => {
+            const binding = (window as WindowWithAppBindings).go?.app?.App?.GetLicenseLockoutState;
+            if (typeof binding !== "function") {
                 if (mounted) {
-                    setIsLoadingRecovery(false);
+                    setLockoutState(null);
+                }
+                return;
+            }
+
+            try {
+                const state = await binding();
+                if (mounted) {
+                    setLockoutState(state);
+                }
+            } catch {
+                if (mounted) {
+                    setLockoutState(null);
                 }
             }
         };
 
-        void loadRecoveryState();
+        const loadLicenseStatus = async () => {
+            const binding = (window as WindowWithAppBindings).go?.app?.App?.GetLicenseStatus;
+            if (typeof binding !== "function") {
+                if (mounted) {
+                    setLicenseStatus(defaultLicenseStatus);
+                }
+                return;
+            }
+
+            try {
+                const state = await binding();
+                if (mounted) {
+                    setLicenseStatus(state);
+                }
+            } catch {
+                if (mounted) {
+                    setLicenseStatus(defaultLicenseStatus);
+                }
+            }
+        };
+
+        const initialize = async () => {
+            await Promise.all([loadRecoveryState(), loadLockoutState(), loadLicenseStatus()]);
+            if (mounted) {
+                setIsLoadingRecovery(false);
+            }
+        };
+
+        void initialize();
+        const poller = window.setInterval(() => {
+            void loadLicenseStatus();
+        }, 30000);
+
         return () => {
             mounted = false;
+            window.clearInterval(poller);
         };
     }, []);
 
@@ -201,6 +335,71 @@ function App() {
             setRestoringBackup(null);
         }
     };
+
+    const onCopyHardwareID = async () => {
+        const hardwareID = lockoutState?.hardware_id;
+        if (!hardwareID) {
+            return;
+        }
+
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(hardwareID);
+                message.success("Hardware ID copied");
+                return;
+            }
+
+            const input = document.createElement("textarea");
+            input.value = hardwareID;
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand("copy");
+            document.body.removeChild(input);
+            message.success("Hardware ID copied");
+        } catch {
+            message.error("Unable to copy Hardware ID. Please copy it manually.");
+        }
+    };
+
+    if (!isLoadingRecovery && lockoutState?.enabled) {
+        return (
+            <Layout style={{ minHeight: "100vh" }}>
+                <Header className="app-header">
+                    <Space align="center" size={16}>
+                        <img src={logo} className="app-header__logo" alt="logo" />
+                        <Title level={4} className="app-header__title">
+                            Masala Inventory Management
+                        </Title>
+                    </Space>
+                </Header>
+                <Content className="app-content">
+                    <Card className="app-card" variant="borderless">
+                        <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+                            <Title level={3} style={{ marginBottom: 0 }}>
+                                Hardware ID Mismatch. Application is locked.
+                            </Title>
+                            <Alert
+                                type="error"
+                                showIcon
+                                title={lockoutState.message || "Hardware ID Mismatch. Application is locked."}
+                            />
+                            <Text type="secondary">
+                                Contact support with this Hardware ID to request a new license.
+                            </Text>
+                            <Card size="small">
+                                <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                                    <Text code>{lockoutState.hardware_id || "Unavailable"}</Text>
+                                    <Button type="primary" onClick={() => void onCopyHardwareID()}>
+                                        Copy ID
+                                    </Button>
+                                </Space>
+                            </Card>
+                        </Space>
+                    </Card>
+                </Content>
+            </Layout>
+        );
+    }
 
     if (!isLoadingRecovery && recoveryState?.enabled) {
         return (
@@ -256,7 +455,7 @@ function App() {
 
     return (
         <ConnectionProvider>
-            <ResilienceWorkspace />
+            <ResilienceWorkspace licenseStatus={licenseStatus} />
         </ConnectionProvider>
     );
 }

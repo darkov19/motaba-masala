@@ -11,19 +11,37 @@ type RecoveryState struct {
 	Backups []string `json:"backups"`
 }
 
+type LicenseStatus struct {
+	Status        string `json:"status"`
+	DaysRemaining int    `json:"days_remaining"`
+	ExpiresAt     string `json:"expires_at,omitempty"`
+	Message       string `json:"message,omitempty"`
+}
+
+type LicenseLockoutState struct {
+	Enabled    bool   `json:"enabled"`
+	Message    string `json:"message"`
+	HardwareID string `json:"hardware_id,omitempty"`
+}
+
 // App struct
 type App struct {
-	ctx            context.Context
-	isServer       bool
-	forceQuit      bool
-	recoveryState  RecoveryState
-	restoreHandler func(string) error
+	ctx                   context.Context
+	isServer              bool
+	forceQuit             bool
+	recoveryState         RecoveryState
+	restoreHandler        func(string) error
+	licenseStatusProvider func() (LicenseStatus, error)
+	lockoutState          LicenseLockoutState
 }
 
 // NewApp creates a new App application struct
 func NewApp(isServer bool) *App {
 	return &App{
 		isServer: isServer,
+		licenseStatusProvider: func() (LicenseStatus, error) {
+			return LicenseStatus{Status: "active", DaysRemaining: 0}, nil
+		},
 	}
 }
 
@@ -81,4 +99,30 @@ func (a *App) RestoreBackup(backupPath string) error {
 		return fmt.Errorf("restore handler is not configured")
 	}
 	return a.restoreHandler(backupPath)
+}
+
+func (a *App) SetLicenseStatusProvider(provider func() (LicenseStatus, error)) {
+	if provider == nil {
+		a.licenseStatusProvider = func() (LicenseStatus, error) {
+			return LicenseStatus{Status: "active", DaysRemaining: 0}, nil
+		}
+		return
+	}
+	a.licenseStatusProvider = provider
+}
+
+func (a *App) GetLicenseStatus() (LicenseStatus, error) {
+	return a.licenseStatusProvider()
+}
+
+func (a *App) SetLicenseLockoutState(enabled bool, message, hardwareID string) {
+	a.lockoutState = LicenseLockoutState{
+		Enabled:    enabled,
+		Message:    message,
+		HardwareID: hardwareID,
+	}
+}
+
+func (a *App) GetLicenseLockoutState() LicenseLockoutState {
+	return a.lockoutState
 }

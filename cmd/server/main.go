@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	_ "embed"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -13,6 +14,7 @@ import (
 	"masala_inventory_managment/internal/app"
 	appAdmin "masala_inventory_managment/internal/app/admin"
 	appAuth "masala_inventory_managment/internal/app/auth"
+	appLicenseMode "masala_inventory_managment/internal/app/licensemode"
 	appReport "masala_inventory_managment/internal/app/report"
 	appSys "masala_inventory_managment/internal/app/system"
 	domainAuth "masala_inventory_managment/internal/domain/auth"
@@ -307,9 +309,72 @@ func run() error {
 	LicensePublicKey = resolveLicensePublicKey()
 
 	licenseSvc := license.NewLicensingService(LicensePublicKey, "license.key", ".hw_hb")
-	if err := licenseSvc.ValidateLicense(); err != nil {
-		return fmt.Errorf("licensing validation failed: %w", err)
+	lockoutMode := false
+	lockoutMessage := ""
+	lockoutHardwareID := ""
+	if _, err := licenseSvc.GetCurrentStatus(); err != nil {
+		if errors.Is(err, license.ErrHardwareIDMismatch) {
+			lockoutMode = true
+			lockoutHardwareID = license.ExtractHardwareID(err)
+			lockoutMessage = "Hardware ID Mismatch. Application is locked."
+			slog.Error("Starting in license lockout mode", "error", err, "hardware_id", lockoutHardwareID)
+		} else {
+			return fmt.Errorf("licensing validation failed: %w", err)
+		}
 	}
+
+	if !lockoutMode {
+		if err := licenseSvc.ValidateLicense(); err != nil {
+			return fmt.Errorf("licensing validation failed: %w", err)
+		}
+	}
+
+	application.SetLicenseStatusProvider(func() (app.LicenseStatus, error) {
+		snapshot, err := licenseSvc.GetCurrentStatus()
+		if err != nil {
+			if errors.Is(err, license.ErrHardwareIDMismatch) {
+				return app.LicenseStatus{
+					Status:        string(license.StatusExpired),
+					DaysRemaining: -7,
+					Message:       "Hardware ID Mismatch. Application is locked.",
+				}, nil
+			}
+			return app.LicenseStatus{}, err
+		}
+
+		status := app.LicenseStatus{
+			Status:        string(snapshot.Status),
+			DaysRemaining: snapshot.DaysRemaining,
+			ExpiresAt:     snapshot.ExpiresAt,
+		}
+		switch snapshot.Status {
+		case license.StatusExpiring:
+			status.Message = fmt.Sprintf("License expires in %d days. Contact support to renew.", snapshot.DaysRemaining)
+		case license.StatusGracePeriod:
+			status.Message = fmt.Sprintf("License Expired. Read-only mode active for %d more days.", 7+snapshot.DaysRemaining)
+		case license.StatusExpired:
+			status.Message = "License expired. Contact support to renew."
+		}
+		return status, nil
+	})
+
+	appLicenseMode.SetWriteEnforcer(func() error {
+		snapshot, err := licenseSvc.GetCurrentStatus()
+		if err != nil {
+			if errors.Is(err, license.ErrHardwareIDMismatch) {
+				return appLicenseMode.ErrReadOnlyMode
+			}
+			return err
+		}
+		if snapshot.Status == license.StatusGracePeriod {
+			return appLicenseMode.ErrReadOnlyMode
+		}
+		if snapshot.Status == license.StatusExpired {
+			return fmt.Errorf("%w: grace period ended", license.ErrLicenseExpired)
+		}
+		return nil
+	})
+	defer appLicenseMode.SetWriteEnforcer(nil)
 
 	dbPath := "masala_inventory.db"
 	backupConfig := domainBackup.BackupConfig{
@@ -324,93 +389,98 @@ func run() error {
 		slog.Error(fmt.Sprintf(format, v...), "component", "backup")
 	}
 
-	dbManager := db.NewDatabaseManager(dbPath)
-	backupService := infraBackup.NewService(dbManager, backupConfig, logInfo, logError)
-	availableBackups, backupErr := backupService.ListBackups()
-	if backupErr != nil {
-		availableBackups = []string{}
-		slog.Error("Failed to list backups during startup", "error", backupErr)
-	}
-
-	recoveryMode := false
-	recoveryMessage := ""
-	startupRecoveryErr := error(nil)
-	recoveryMode, recoveryMessage, availableBackups, startupRecoveryErr = resolveStartupRecoveryState(dbPath, backupService, availableBackups, backupErr, nil)
-	if startupRecoveryErr != nil {
-		slog.Error("Failed to resolve startup recovery state", "error", startupRecoveryErr)
-	}
-
 	var authService *appAuth.Service
 	var reportService *appReport.AppService
 	var adminService *appAdmin.Service
+	recoveryMode := false
+	recoveryMessage := ""
+	availableBackups := []string{}
 
-	if !recoveryMode {
-		connectErr := dbManager.Connect()
-		if connectErr != nil {
-			if shouldEnterRecoveryOnConnectError(dbPath, connectErr) {
-				recoveryMode, recoveryMessage, availableBackups, startupRecoveryErr = resolveStartupRecoveryState(dbPath, backupService, availableBackups, backupErr, connectErr)
-				if startupRecoveryErr != nil {
-					slog.Error("Failed to resolve recovery state after DB connect failure", "error", startupRecoveryErr)
-				}
-				if !recoveryMode {
+	dbManager := db.NewDatabaseManager(dbPath)
+	backupService := infraBackup.NewService(dbManager, backupConfig, logInfo, logError)
+	if !lockoutMode {
+		backupErr := error(nil)
+		availableBackups, backupErr = backupService.ListBackups()
+		if backupErr != nil {
+			availableBackups = []string{}
+			slog.Error("Failed to list backups during startup", "error", backupErr)
+		}
+
+		startupRecoveryErr := error(nil)
+		recoveryMode, recoveryMessage, availableBackups, startupRecoveryErr = resolveStartupRecoveryState(dbPath, backupService, availableBackups, backupErr, nil)
+		if startupRecoveryErr != nil {
+			slog.Error("Failed to resolve startup recovery state", "error", startupRecoveryErr)
+		}
+
+		if !recoveryMode {
+			connectErr := dbManager.Connect()
+			if connectErr != nil {
+				if shouldEnterRecoveryOnConnectError(dbPath, connectErr) {
+					recoveryMode, recoveryMessage, availableBackups, startupRecoveryErr = resolveStartupRecoveryState(dbPath, backupService, availableBackups, backupErr, connectErr)
+					if startupRecoveryErr != nil {
+						slog.Error("Failed to resolve recovery state after DB connect failure", "error", startupRecoveryErr)
+					}
+					if !recoveryMode {
+						return fmt.Errorf("database connection failed: %w", connectErr)
+					}
+					slog.Error("Database connection failed due to corruption-like error; entering recovery mode", "error", connectErr)
+				} else {
 					return fmt.Errorf("database connection failed: %w", connectErr)
 				}
-				slog.Error("Database connection failed due to corruption-like error; entering recovery mode", "error", connectErr)
 			} else {
-				return fmt.Errorf("database connection failed: %w", connectErr)
-			}
-		} else {
-			defer dbManager.Close()
+				defer dbManager.Close()
 
-			if integrityErr := dbManager.IntegrityCheck(); integrityErr != nil {
-				recoveryMode, recoveryMessage, availableBackups, startupRecoveryErr = resolveStartupRecoveryState(dbPath, backupService, availableBackups, backupErr, integrityErr)
-				if startupRecoveryErr != nil {
-					slog.Error("Failed to refresh backups for recovery mode", "error", startupRecoveryErr)
+				if integrityErr := dbManager.IntegrityCheck(); integrityErr != nil {
+					recoveryMode, recoveryMessage, availableBackups, startupRecoveryErr = resolveStartupRecoveryState(dbPath, backupService, availableBackups, backupErr, integrityErr)
+					if startupRecoveryErr != nil {
+						slog.Error("Failed to refresh backups for recovery mode", "error", startupRecoveryErr)
+					}
+					slog.Error("Database integrity check failed; entering recovery mode", "error", integrityErr)
 				}
-				slog.Error("Database integrity check failed; entering recovery mode", "error", integrityErr)
 			}
 		}
-	}
 
-	if !recoveryMode {
-		migrator := db.NewMigrator(dbManager)
-		if err := migrator.RunMigrations(masala_inventory_managment.MigrationAssets, "internal/infrastructure/db/migrations"); err != nil {
-			return fmt.Errorf("migration failed: %w", err)
-		}
+		if !recoveryMode {
+			migrator := db.NewMigrator(dbManager)
+			if err := migrator.RunMigrations(masala_inventory_managment.MigrationAssets, "internal/infrastructure/db/migrations"); err != nil {
+				return fmt.Errorf("migration failed: %w", err)
+			}
 
-		userRepo := db.NewSqliteUserRepository(dbManager.GetDB())
-		bcryptService := infraAuth.NewBcryptService()
-		jwtSecret, err := resolveJWTSecret()
-		if err != nil {
-			return err
-		}
-		tokenService := infraAuth.NewTokenService(jwtSecret)
-		authService = appAuth.NewService(userRepo, bcryptService, tokenService)
-		reportService = appReport.NewAppService(authService)
-		adminService = appAdmin.NewService(authService, backupService, licenseSvc, logError)
-
-		userCount, err := userRepo.Count()
-		if err != nil {
-			return fmt.Errorf("failed to count existing users: %w", err)
-		}
-		if userCount == 0 {
-			bootstrapUser, bootstrapPassword, err := resolveBootstrapAdminCredentials()
+			userRepo := db.NewSqliteUserRepository(dbManager.GetDB())
+			bcryptService := infraAuth.NewBcryptService()
+			jwtSecret, err := resolveJWTSecret()
 			if err != nil {
 				return err
 			}
-			if err := authService.CreateUser("", bootstrapUser, bootstrapPassword, domainAuth.RoleAdmin); err != nil {
-				return fmt.Errorf("failed to create bootstrap admin user: %w", err)
-			}
-		}
+			tokenService := infraAuth.NewTokenService(jwtSecret)
+			authService = appAuth.NewService(userRepo, bcryptService, tokenService)
+			reportService = appReport.NewAppService(authService)
+			adminService = appAdmin.NewService(authService, backupService, licenseSvc, logError)
 
-		if err := backupService.StartScheduler(); err != nil {
-			slog.Error("Failed to start backup scheduler", "error", err, "component", "backup")
+			userCount, err := userRepo.Count()
+			if err != nil {
+				return fmt.Errorf("failed to count existing users: %w", err)
+			}
+			if userCount == 0 {
+				bootstrapUser, bootstrapPassword, err := resolveBootstrapAdminCredentials()
+				if err != nil {
+					return err
+				}
+				if err := authService.CreateUser("", bootstrapUser, bootstrapPassword, domainAuth.RoleAdmin); err != nil {
+					return fmt.Errorf("failed to create bootstrap admin user: %w", err)
+				}
+			}
+
+			if err := backupService.StartScheduler(); err != nil {
+				slog.Error("Failed to start backup scheduler", "error", err, "component", "backup")
+			}
+			defer backupService.StopScheduler()
 		}
-		defer backupService.StopScheduler()
 	}
 
 	appSys.SetRecoveryMode(recoveryMode)
 	application.SetRecoveryState(recoveryMode, recoveryMessage, availableBackups)
+	application.SetLicenseLockoutState(lockoutMode, lockoutMessage, lockoutHardwareID)
 	if recoveryMode {
 		application.SetRestoreHandler(func(backupPath string) error {
 			if err := backupService.Restore(backupPath); err != nil {
@@ -430,7 +500,7 @@ func run() error {
 	}
 
 	bindings := []interface{}{application}
-	if !recoveryMode {
+	if !recoveryMode && !lockoutMode {
 		bindings = append(bindings, authService, reportService, adminService)
 	}
 
@@ -451,46 +521,46 @@ func run() error {
 			// Initialize System Tray
 			// Note: We run this in a goroutine because Wails requires the main thread.
 			// This works on Windows but causes SIGABRT on Linux due to GTK loop conflict.
-				if stdruntime.GOOS != "linux" {
-					go func() {
-						systray.Run(func() {
-							systray.SetTitle("Masala Server")
-							systray.SetTooltip("Masala Inventory Server")
+			if stdruntime.GOOS != "linux" {
+				go func() {
+					systray.Run(func() {
+						systray.SetTitle("Masala Server")
+						systray.SetTooltip("Masala Inventory Server")
 						if stdruntime.GOOS == "windows" && len(iconICOData) > 0 {
 							systray.SetIcon(iconICOData)
 						} else if len(iconPNGData) > 0 {
 							systray.SetIcon(iconPNGData)
 						}
 
-							mOpen := systray.AddMenuItem("Open Dashboard", "Restore the server window")
-							systray.AddSeparator()
-							mQuit := systray.AddMenuItem("Exit Server", "Shutdown the server")
+						mOpen := systray.AddMenuItem("Open Dashboard", "Restore the server window")
+						systray.AddSeparator()
+						mQuit := systray.AddMenuItem("Exit Server", "Shutdown the server")
 
-							// Keep onReady non-blocking; process menu events in a dedicated goroutine.
-							go func() {
-								for {
-									select {
-									case <-ctx.Done():
-										return
-									case <-mOpen.ClickedCh:
-										slog.Info("Tray action", "action", "open-dashboard")
-										runtime.WindowShow(ctx)
-										runtime.WindowUnminimise(ctx)
-									case <-mQuit.ClickedCh:
-										slog.Info("Tray action", "action", "exit-server")
-										runtime.WindowShow(ctx)
-										runtime.WindowUnminimise(ctx)
-										application.SetForceQuit(true)
-										runtime.Quit(ctx)
-										return
-									}
+						// Keep onReady non-blocking; process menu events in a dedicated goroutine.
+						go func() {
+							for {
+								select {
+								case <-ctx.Done():
+									return
+								case <-mOpen.ClickedCh:
+									slog.Info("Tray action", "action", "open-dashboard")
+									runtime.WindowShow(ctx)
+									runtime.WindowUnminimise(ctx)
+								case <-mQuit.ClickedCh:
+									slog.Info("Tray action", "action", "exit-server")
+									runtime.WindowShow(ctx)
+									runtime.WindowUnminimise(ctx)
+									application.SetForceQuit(true)
+									runtime.Quit(ctx)
+									return
 								}
-							}()
-						}, func() {
-							// Systray cleanup
-						})
-					}()
-				} else {
+							}
+						}()
+					}, func() {
+						// Systray cleanup
+					})
+				}()
+			} else {
 				slog.Warn("System Tray is disabled on Linux to prevent GTK main loop conflicts with Wails.")
 			}
 

@@ -27,7 +27,7 @@ func VerifyLicense(publicKeyHex, licenseKeyHex, hwID string) error {
 	}
 
 	if !ed25519.Verify(pubKey, []byte(hwID), sig) {
-		return fmt.Errorf("license key verification failed: signature mismatch for this hardware")
+		return fmt.Errorf("license key verification failed: %w", ErrHardwareIDMismatch)
 	}
 
 	return nil

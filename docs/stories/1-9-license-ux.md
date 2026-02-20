@@ -1,6 +1,6 @@
 # Story 1.9: License & Security UX
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -16,30 +16,30 @@ so that I can resolve issues without sudden production downtime or confusion.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Update License Service (AC: 1, 2)
-    - [ ] Update `LicenseStatus` enum to include `Expiring`, `GracePeriod`, `Expired`.
-    - [ ] Implement expiry check logic:
+- [x] Task 1: Update License Service (AC: 1, 2)
+    - [x] Update `LicenseStatus` enum to include `Expiring`, `GracePeriod`, `Expired`.
+    - [x] Implement expiry check logic:
         - If `Days <= 30` -> `Expiring`.
         - If `Days <= 0` AND `Days > -7` -> `GracePeriod`.
         - If `Days <= -7` -> `Expired`.
-    - [ ] Expose `DaysRemaining` in license status API.
+    - [x] Expose `DaysRemaining` in license status API.
 
-- [ ] Task 2: Implement Read-Only Enforcement (AC: 2)
-    - [ ] Create middleware/interceptor in domain services.
-    - [ ] If `LicenseStatus == GracePeriod`, block all Write/Update/Delete operations with `403 License Expired`.
-    - [ ] Allow Read operations.
+- [x] Task 2: Implement Read-Only Enforcement (AC: 2)
+    - [x] Create middleware/interceptor in domain services.
+    - [x] If `LicenseStatus == GracePeriod`, block all Write/Update/Delete operations with `403 License Expired`.
+    - [x] Allow Read operations.
 
-- [ ] Task 3: Implement Hardware Error Screen (AC: 3)
-    - [ ] Update startup license check (`cmd/server/main.go`).
-    - [ ] If `HardwareMismatch` error occurs, launch Wails in "Lockout Mode".
-    - [ ] Pass the _new_ computed Hardware ID to the frontend.
-    - [ ] Create simple HTML/React view for "Hardware Mismatch" with Copy button.
+- [x] Task 3: Implement Hardware Error Screen (AC: 3)
+    - [x] Update startup license check (`cmd/server/main.go`).
+    - [x] If `HardwareMismatch` error occurs, launch Wails in "Lockout Mode".
+    - [x] Pass the _new_ computed Hardware ID to the frontend.
+    - [x] Create simple HTML/React view for "Hardware Mismatch" with Copy button.
 
-- [ ] Task 4: Frontend Banners (AC: 1, 2)
-    - [ ] Update Main Layout to poll/check License Status.
-    - [ ] Render Yellow Warning Banner if `Expiring`.
-    - [ ] Render Red Error Banner if `GracePeriod` or `Expired`.
-    - [ ] Disable "New GRN", "New Batch" buttons in UI if `GracePeriod`.
+- [x] Task 4: Frontend Banners (AC: 1, 2)
+    - [x] Update Main Layout to poll/check License Status.
+    - [x] Render Yellow Warning Banner if `Expiring`.
+    - [x] Render Red Error Banner if `GracePeriod` or `Expired`.
+    - [x] Disable "New GRN", "New Batch" buttons in UI if `GracePeriod`.
 
 ## Dev Notes
 
@@ -74,13 +74,39 @@ so that I can resolve issues without sudden production downtime or confusion.
 
 ### Debug Log References
 
+- 2026-02-20: Planned implementation by AC order: (1) extend licensing package with explicit status model and expiry parsing while preserving legacy `license.key` signatures, (2) add backend write guard for grace-period read-only enforcement in inventory service, (3) add startup lockout-mode branch for hardware mismatch with frontend-facing lockout payload, (4) add frontend polling/banners/button disable behavior, (5) run full Go + frontend regression tests before marking complete.
+
 ### Completion Notes List
 
+- Implemented new license lifecycle model (`active`, `expiring`, `grace-period`, `expired`) with deterministic day-window calculation and backward-compatible parsing for legacy signature-only license files.
+- Added app-level license status API and lockout-state API so frontend can poll status and render explicit lockout UX with Hardware ID copy support.
+- Updated server startup flow to enter lockout mode for hardware mismatch instead of hard exit, and to keep full lockout after grace-period expiry.
+- Added backend write-access enforcement hook and wired inventory write operations (`UpdateItem`, `UpdateBatch`, `UpdateGRN`) to block during grace period with `403`-style error.
+- Added frontend persistent license banners, periodic status polling, read-only disablement for transaction actions (`New GRN`, `New Batch`), and disabled submit/reset actions in forms.
+- Added/updated automated tests for licensing status logic, app lockout/status APIs, write-guard enforcement, and frontend lockout/banner behavior.
+
 ### File List
+
+- `internal/infrastructure/license/status.go`
+- `internal/infrastructure/license/license_service.go`
+- `internal/infrastructure/license/crypto.go`
+- `internal/infrastructure/license/status_test.go`
+- `internal/app/licensemode/licensemode.go`
+- `internal/app/inventory/service.go`
+- `internal/app/inventory/service_test.go`
+- `internal/app/app.go`
+- `internal/app/app_test.go`
+- `cmd/server/main.go`
+- `frontend/src/App.tsx`
+- `frontend/src/components/forms/GRNForm.tsx`
+- `frontend/src/components/forms/BatchForm.tsx`
+- `frontend/src/__tests__/AppRecoveryMode.test.tsx`
+- `frontend/src/__tests__/AppLicenseStatus.test.tsx`
 
 ## Change Log
 
 - 2026-02-15: Story drafted.
+- 2026-02-20: Implemented license status lifecycle, grace-period read-only enforcement, hardware mismatch lockout mode UI, and frontend license banners/polling; added backend/frontend automated tests.
 
 ---
 
