@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Layout, Typography, Card, Segmented, Space, Alert, Button, List, message } from "antd";
+import { Layout, Typography, Card, Segmented, Space, Alert, Button, message } from "antd";
 import { useBlocker, useLocation, useNavigate } from "react-router-dom";
 import logo from "./assets/images/icon.png";
 import { ConnectionProvider } from "./context/ConnectionContext";
@@ -100,8 +100,8 @@ function ResilienceWorkspace() {
             </Header>
 
             <Content className="app-content">
-                <Card className="app-card" bordered={false}>
-                    <Space direction="vertical" size={20} style={{ width: "100%" }}>
+                <Card className="app-card" variant="borderless">
+                    <Space orientation="vertical" size={20} style={{ width: "100%" }}>
                         <Title level={2} style={{ marginBottom: 0 }}>
                             Client Resilience & Recovery
                         </Title>
@@ -214,39 +214,39 @@ function App() {
                     </Space>
                 </Header>
                 <Content className="app-content">
-                    <Card className="app-card" bordered={false}>
-                        <Space direction="vertical" size={16} style={{ width: "100%" }}>
+                    <Card className="app-card" variant="borderless">
+                        <Space orientation="vertical" size={16} style={{ width: "100%" }}>
                             <Title level={3} style={{ marginBottom: 0 }}>
                                 Database Recovery Mode
                             </Title>
                             <Alert
                                 type="warning"
                                 showIcon
-                                message={recoveryState.message || "Database recovery is required before normal startup."}
+                                title={recoveryState.message || "Database recovery is required before normal startup."}
                             />
                             <Text type="secondary">
                                 Select a backup archive to restore. The server will restart automatically after restore.
                             </Text>
-                            <List
-                                locale={{ emptyText: "No backups found in backups/ directory." }}
-                                dataSource={recoveryState.backups}
-                                renderItem={backupPath => (
-                                    <List.Item
-                                        actions={[
-                                            <Button
-                                                key={backupPath}
-                                                type="primary"
-                                                loading={restoringBackup === backupPath}
-                                                onClick={() => void onRestoreBackup(backupPath)}
-                                            >
-                                                Restore
-                                            </Button>,
-                                        ]}
-                                    >
-                                        <Text code>{backupPath}</Text>
-                                    </List.Item>
-                                )}
-                            />
+                            {recoveryState.backups.length === 0 ? (
+                                <Text type="secondary">No backups found in backups/ directory.</Text>
+                            ) : (
+                                <Space orientation="vertical" size={12} style={{ width: "100%" }}>
+                                    {recoveryState.backups.map(backupPath => (
+                                        <Card key={backupPath} size="small">
+                                            <Space align="center" style={{ width: "100%", justifyContent: "space-between" }}>
+                                                <Text code>{backupPath}</Text>
+                                                <Button
+                                                    type="primary"
+                                                    loading={restoringBackup === backupPath}
+                                                    onClick={() => void onRestoreBackup(backupPath)}
+                                                >
+                                                    Restore
+                                                </Button>
+                                            </Space>
+                                        </Card>
+                                    ))}
+                                </Space>
+                            )}
                         </Space>
                     </Card>
                 </Content>

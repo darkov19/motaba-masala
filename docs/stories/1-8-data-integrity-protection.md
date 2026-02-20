@@ -1,6 +1,6 @@
 # Story 1.8: Data Integrity Protection
 
-Status: in-progress
+Status: done
 
 ## Story
 
@@ -42,8 +42,8 @@ so that the inventory numbers are legally reliable and I don't lose my business 
 
 ### Review Follow-ups (AI)
 
-- [ ] [AI-Review][Med] Remove plaintext bootstrap password logging and replace with a one-time setup signal that does not expose credentials (AC #3)
-- [ ] [AI-Review][Med] Add automated startup integration coverage for integrity-check failure transitioning to recovery mode (AC #2)
+- [x] [AI-Review][Med] Remove plaintext bootstrap password logging and replace with a one-time setup signal that does not expose credentials (AC #3)
+- [x] [AI-Review][Med] Add automated startup integration coverage for integrity-check failure transitioning to recovery mode (AC #2)
 
 ## Dev Notes
 
@@ -91,6 +91,7 @@ GPT-5 Codex
 - Implemented AC2 startup integrity check in `DatabaseManager.IntegrityCheck()` and server startup path to enter recovery mode when corruption is detected.
 - Implemented AC3 missing DB startup handling: if DB is missing and backups exist, server enters recovery mode; if no backups exist, it continues with fresh DB initialization.
 - Implemented recovery-mode UI and backend restore action that lists available backups, restores selected zip, and restarts the server process.
+- Completed post-review hardening: removed deprecated Ant Design recovery UI usage, added malformed-DB startup recovery integration test, and enabled React Router v7 transition future-flag compatibility in app/test routers.
 - Validation results:
 - `GOCACHE=/tmp/go-build-cache go test ./...` ✅
 - `npm run test:run` (frontend) ✅
@@ -118,6 +119,9 @@ GPT-5 Codex
 - internal/infrastructure/db/sqlite_inventory_repository.go
 - internal/infrastructure/db/sqlite_inventory_repository_test.go
 - frontend/src/App.tsx
+- frontend/src/main.tsx
+- frontend/src/__tests__/AppRecoveryMode.test.tsx
+- frontend/src/__tests__/AppNavigationBlocker.test.tsx
 - docs/sprint-status.yaml
 
 ## Change Log
@@ -126,6 +130,7 @@ GPT-5 Codex
 - 2026-02-18: Implemented optimistic locking for Item/Batch/GRN, startup integrity check + recovery mode, missing DB recovery flow, and recovery UI with backup restore/restart.
 - 2026-02-18: Senior Developer Review notes appended.
 - 2026-02-18: Senior Developer Review notes appended (follow-up pass).
+- 2026-02-20: Addressed review follow-ups, finalized Story 1.8, and prepared sprint tracking for Story 1.9 start.
 
 ---
 

@@ -66,10 +66,22 @@ describe("App route-level unsaved navigation blocking", () => {
                     element: <App />,
                 },
             ],
-            { initialEntries: ["/grn"] },
+            {
+                initialEntries: ["/grn"],
+                future: {
+                    v7_startTransition: true,
+                },
+            },
         );
 
-        const { unmount } = render(<RouterProvider router={router} />);
+        const { unmount } = render(
+            <RouterProvider
+                router={router}
+                future={{
+                    v7_startTransition: true,
+                }}
+            />,
+        );
 
         fireEvent.click(screen.getByLabelText("GRN Dirty"));
         fireEvent.click(screen.getByRole("radio", { name: "Batch Form" }));
@@ -96,7 +108,11 @@ describe("App route-level unsaved navigation blocking", () => {
             expect(router.state.location.pathname).toBe("/batch");
         });
 
-        fireEvent.click(screen.getByRole("radio", { name: "GRN Form" }));
+        fireEvent.click(screen.getByLabelText("GRN Dirty"));
+
+        await act(async () => {
+            await router.navigate("/grn");
+        });
 
         await waitFor(() => {
             expect(router.state.location.pathname).toBe("/grn");

@@ -7,12 +7,19 @@ import "./style.css";
 import App from "./App";
 
 const queryClient = new QueryClient();
-const router = createBrowserRouter([
+const router = createBrowserRouter(
+    [
+        {
+            path: "*",
+            element: <App />,
+        },
+    ],
     {
-        path: "*",
-        element: <App />,
+        future: {
+            v7_startTransition: true,
+        },
     },
-]);
+);
 
 const container = document.getElementById("root");
 const root = createRoot(container!);
@@ -29,7 +36,12 @@ root.render(
                     },
                 }}
             >
-                <RouterProvider router={router} />
+                <RouterProvider
+                    router={router}
+                    future={{
+                        v7_startTransition: true,
+                    }}
+                />
             </ConfigProvider>
         </QueryClientProvider>
     </React.StrictMode>,

@@ -141,6 +141,67 @@ func TestStartupIntegrityFailurePath_EntersRecoveryMode(t *testing.T) {
 	}
 }
 
+func TestStartupMalformedDatabasePath_EntersRecoveryMode(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "masala_inventory.db")
+	backupDir := filepath.Join(tempDir, "backups")
+	if err := os.MkdirAll(backupDir, 0755); err != nil {
+		t.Fatalf("failed to create backup dir: %v", err)
+	}
+
+	// Corruption fixture: write non-SQLite bytes so startup connect path fails.
+	if err := os.WriteFile(dbPath, []byte("not-a-sqlite-database"), 0644); err != nil {
+		t.Fatalf("failed to write malformed db fixture: %v", err)
+	}
+
+	backupFile := filepath.Join(backupDir, "backup-2026-02-20T110000.zip")
+	if err := os.WriteFile(backupFile, []byte("dummy"), 0644); err != nil {
+		t.Fatalf("failed to create backup file: %v", err)
+	}
+
+	dbManager := db.NewDatabaseManager(dbPath)
+	backupService := infraBackup.NewService(
+		dbManager,
+		domainBackup.BackupConfig{BackupPath: backupDir},
+		func(string, ...interface{}) {},
+		func(string, ...interface{}) {},
+	)
+
+	availableBackups, backupErr := backupService.ListBackups()
+	if backupErr != nil {
+		t.Fatalf("unexpected backup listing error: %v", backupErr)
+	}
+
+	connectErr := dbManager.Connect()
+	if connectErr == nil {
+		_ = dbManager.Close()
+		t.Fatal("expected malformed sqlite fixture to fail database connect")
+	}
+	if !shouldEnterRecoveryOnConnectError(dbPath, connectErr) {
+		t.Fatalf("expected connect error to trigger recovery path, got: %v", connectErr)
+	}
+
+	recoveryMode, recoveryMessage, resolvedBackups, resolveErr := resolveStartupRecoveryState(
+		dbPath,
+		backupService,
+		availableBackups,
+		backupErr,
+		connectErr,
+	)
+	if resolveErr != nil {
+		t.Fatalf("unexpected recovery state resolution error: %v", resolveErr)
+	}
+	if !recoveryMode {
+		t.Fatal("expected recovery mode to be enabled")
+	}
+	if recoveryMessage != integrityRecoveryPrompt {
+		t.Fatalf("unexpected recovery prompt: %q", recoveryMessage)
+	}
+	if len(resolvedBackups) != 1 || resolvedBackups[0] != backupFile {
+		t.Fatalf("unexpected resolved backups list: %#v", resolvedBackups)
+	}
+}
+
 type failingBackupLister struct{}
 
 func (f *failingBackupLister) ListBackups() ([]string, error) {

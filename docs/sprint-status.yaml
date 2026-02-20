@@ -45,7 +45,7 @@ development_status:
     1-5-automated-local-backup-service: done
     1-6-server-resilience: done
     1-7-client-resilience-recovery: done
-    1-8-data-integrity-protection: in-progress
+    1-8-data-integrity-protection: done
     1-9-license-ux: ready-for-dev
     1-10-installer-hardening: ready-for-dev
     1-11-resilience-verification: ready-for-dev
