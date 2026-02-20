@@ -437,7 +437,7 @@ func run() error {
 		Title:             "Masala Inventory Server",
 		Width:             1024,
 		Height:            768,
-		HideWindowOnClose: true, // Native Wails support for minimize on close
+		HideWindowOnClose: false, // Route close via OnBeforeClose for explicit logging + notifications
 		AssetServer: &assetserver.Options{
 			Assets: masala_inventory_managment.Assets,
 		},
