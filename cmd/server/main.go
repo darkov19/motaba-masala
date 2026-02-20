@@ -451,37 +451,46 @@ func run() error {
 			// Initialize System Tray
 			// Note: We run this in a goroutine because Wails requires the main thread.
 			// This works on Windows but causes SIGABRT on Linux due to GTK loop conflict.
-			if stdruntime.GOOS != "linux" {
-				go func() {
-					systray.Run(func() {
-						systray.SetTitle("Masala Server")
-						systray.SetTooltip("Masala Inventory Server")
+				if stdruntime.GOOS != "linux" {
+					go func() {
+						systray.Run(func() {
+							systray.SetTitle("Masala Server")
+							systray.SetTooltip("Masala Inventory Server")
 						if stdruntime.GOOS == "windows" && len(iconICOData) > 0 {
 							systray.SetIcon(iconICOData)
 						} else if len(iconPNGData) > 0 {
 							systray.SetIcon(iconPNGData)
 						}
 
-						mOpen := systray.AddMenuItem("Open Dashboard", "Restore the server window")
-						systray.AddSeparator()
-						mQuit := systray.AddMenuItem("Exit Server", "Shutdown the server")
+							mOpen := systray.AddMenuItem("Open Dashboard", "Restore the server window")
+							systray.AddSeparator()
+							mQuit := systray.AddMenuItem("Exit Server", "Shutdown the server")
 
-						for {
-							select {
-							case <-mOpen.ClickedCh:
-								runtime.WindowShow(ctx)
-								runtime.WindowUnminimise(ctx)
-							case <-mQuit.ClickedCh:
-								runtime.WindowShow(ctx)
-								runtime.WindowUnminimise(ctx)
-								runtime.EventsEmit(ctx, "app:request-quit-confirm", nil)
-							}
-						}
-					}, func() {
-						// Systray cleanup
-					})
-				}()
-			} else {
+							// Keep onReady non-blocking; process menu events in a dedicated goroutine.
+							go func() {
+								for {
+									select {
+									case <-ctx.Done():
+										return
+									case <-mOpen.ClickedCh:
+										slog.Info("Tray action", "action", "open-dashboard")
+										runtime.WindowShow(ctx)
+										runtime.WindowUnminimise(ctx)
+									case <-mQuit.ClickedCh:
+										slog.Info("Tray action", "action", "exit-server")
+										runtime.WindowShow(ctx)
+										runtime.WindowUnminimise(ctx)
+										application.SetForceQuit(true)
+										runtime.Quit(ctx)
+										return
+									}
+								}
+							}()
+						}, func() {
+							// Systray cleanup
+						})
+					}()
+				} else {
 				slog.Warn("System Tray is disabled on Linux to prevent GTK main loop conflicts with Wails.")
 			}
 
