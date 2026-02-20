@@ -62,22 +62,10 @@ describe("App recovery mode", () => {
                     element: <App />,
                 },
             ],
-            {
-                initialEntries: ["/grn"],
-                future: {
-                    v7_startTransition: true,
-                },
-            },
+            { initialEntries: ["/grn"] },
         );
 
-        render(
-            <RouterProvider
-                router={router}
-                future={{
-                    v7_startTransition: true,
-                }}
-            />,
-        );
+        render(<RouterProvider router={router} />);
 
         expect(await screen.findByText("Database Recovery Mode")).toBeInTheDocument();
         expect(screen.getByText("Recovery required.")).toBeInTheDocument();

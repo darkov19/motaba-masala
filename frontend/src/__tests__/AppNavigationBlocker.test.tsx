@@ -66,22 +66,10 @@ describe("App route-level unsaved navigation blocking", () => {
                     element: <App />,
                 },
             ],
-            {
-                initialEntries: ["/grn"],
-                future: {
-                    v7_startTransition: true,
-                },
-            },
+            { initialEntries: ["/grn"] },
         );
 
-        const { unmount } = render(
-            <RouterProvider
-                router={router}
-                future={{
-                    v7_startTransition: true,
-                }}
-            />,
-        );
+        const { unmount } = render(<RouterProvider router={router} />);
 
         fireEvent.click(screen.getByLabelText("GRN Dirty"));
         fireEvent.click(screen.getByRole("radio", { name: "Batch Form" }));
