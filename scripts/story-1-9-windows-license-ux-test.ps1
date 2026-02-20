@@ -2,11 +2,7 @@ param(
     [ValidateSet("all", "expiring", "grace", "expired", "mismatch", "reset")]
     [string]$Mode = "all",
     [string]$AppPath = "",
-    [switch]$SkipRestore,
-    [switch]$FetchLatest,
-    [switch]$BuildApp,
-    [string]$Remote = "origin",
-    [string]$Branch = ""
+    [switch]$SkipRestore
 )
 
 Set-StrictMode -Version Latest
@@ -15,7 +11,6 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $LicensePath = Join-Path $RepoRoot "license.key"
 $LicenseBackupPath = Join-Path $RepoRoot "license.key.story1_9_backup"
-$RecoveryScript = Join-Path $RepoRoot "scripts\windows-recovery-test.ps1"
 
 if ([string]::IsNullOrWhiteSpace($AppPath)) {
     $DefaultBuildExe = Join-Path $RepoRoot "build\bin\masala_inventory_server.exe"
@@ -40,25 +35,6 @@ function Assert-AppPath {
     if (-not (Test-Path $AppPath)) {
         throw "App executable not found: $AppPath"
     }
-}
-
-function Sync-Latest {
-    if ([string]::IsNullOrWhiteSpace($Branch)) {
-        $Branch = (& git -C $RepoRoot rev-parse --abbrev-ref HEAD).Trim()
-    }
-
-    Write-Step "Fetching latest from $Remote/$Branch"
-    & git -C $RepoRoot fetch $Remote $Branch
-    & git -C $RepoRoot pull --ff-only $Remote $Branch
-}
-
-function Build-App {
-    if (-not (Test-Path $RecoveryScript)) {
-        throw "Build helper script missing: $RecoveryScript"
-    }
-
-    Write-Step "Building app"
-    & powershell -ExecutionPolicy Bypass -File $RecoveryScript -Mode build
 }
 
 function Backup-LicenseFile {
@@ -235,17 +211,6 @@ function Run-ScenarioMismatch([string]$BaseSignature) {
             "A newly computed Hardware ID is displayed.",
             "Clicking Copy ID copies the displayed hardware ID."
         )
-}
-
-if ($FetchLatest) {
-    Sync-Latest
-}
-
-if ($BuildApp) {
-    Build-App
-    if ([string]::IsNullOrWhiteSpace($AppPath)) {
-        $AppPath = Join-Path $RepoRoot "build\bin\masala_inventory_server.exe"
-    }
 }
 
 Assert-AppPath
