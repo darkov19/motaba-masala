@@ -472,17 +472,9 @@ func run() error {
 								runtime.WindowShow(ctx)
 								runtime.WindowUnminimise(ctx)
 							case <-mQuit.ClickedCh:
-								selection, err := runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
-									Type:          runtime.QuestionDialog,
-									Title:         "Confirm Exit",
-									Message:       "Clients may be connected. Are you sure you want to exit?",
-									DefaultButton: "No",
-									Buttons:       []string{"Yes", "No"},
-								})
-								if err == nil && selection == "Yes" {
-									application.SetForceQuit(true)
-									runtime.Quit(ctx)
-								}
+								runtime.WindowShow(ctx)
+								runtime.WindowUnminimise(ctx)
+								runtime.EventsEmit(ctx, "app:request-quit-confirm", nil)
 							}
 						}
 					}, func() {

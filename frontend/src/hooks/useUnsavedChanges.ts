@@ -1,5 +1,6 @@
+import { ExclamationCircleFilled } from "@ant-design/icons";
 import { Modal } from "antd";
-import { useEffect } from "react";
+import { createElement, useEffect } from "react";
 import type { Blocker } from "react-router-dom";
 import { SetForceQuit } from "../../wailsjs/go/app/App";
 import { EventsOn, Quit } from "../../wailsjs/runtime/runtime";
@@ -71,6 +72,7 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
 
     useEffect(() => {
         let unsubscribe: (() => void) | undefined;
+        let unsubscribeQuitConfirm: (() => void) | undefined;
 
         try {
             unsubscribe = EventsOn("app:before-close", () => {
@@ -93,12 +95,34 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
                     },
                 });
             });
+
+            unsubscribeQuitConfirm = EventsOn("app:request-quit-confirm", () => {
+                Modal.confirm({
+                    title: "Exit Masala Inventory Server?",
+                    content: isDirty
+                        ? "You have unsaved changes. Exiting now may lose recent edits. Do you want to exit anyway?"
+                        : "The server will stop and connected clients may be disconnected. Do you want to exit now?",
+                    icon: createElement(ExclamationCircleFilled, {
+                        style: { color: "#7D1111" },
+                    }),
+                    centered: true,
+                    okText: "Exit Server",
+                    cancelText: "Keep Running",
+                    okButtonProps: { danger: true },
+                    onOk: () => {
+                        return setForceQuit(true).finally(() => {
+                            Quit();
+                        });
+                    },
+                });
+            });
         } catch {
             // Ignore when runtime event bus is unavailable (non-Wails test/browser mode).
         }
 
         return () => {
             unsubscribe?.();
+            unsubscribeQuitConfirm?.();
         };
     }, [isDirty, message]);
 
