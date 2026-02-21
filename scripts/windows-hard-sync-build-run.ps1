@@ -15,6 +15,8 @@ $ClientExe = Join-Path $RepoRoot "build\bin\masala_inventory_client.exe"
 $InstallerScript = Join-Path $RepoRoot "scripts\windows\installer\masala-installer.nsi"
 $ServerInstaller = Join-Path $DistDir "Masala Inventory Server Setup.exe"
 $ClientInstaller = Join-Path $DistDir "Masala Inventory Client Setup.exe"
+$ServerIconPath = Join-Path $RepoRoot "cmd\server\assets\icon.ico"
+$RsrcMissingWarningShown = $false
 
 function Write-Step([string]$Message) {
     Write-Host ""
@@ -56,6 +58,33 @@ function Get-Ldflags {
     return "-X main.LicensePublicKey=$publicKey"
 }
 
+function Get-GoBuildLdflags([string]$WailsLdflags) {
+    $parts = @("-H=windowsgui")
+    if (-not [string]::IsNullOrWhiteSpace($WailsLdflags)) {
+        $parts += $WailsLdflags
+    }
+    return ($parts -join " ")
+}
+
+function Try-GenerateSyso([string]$PackageDir) {
+    if (-not (Test-Path $ServerIconPath)) {
+        return
+    }
+
+    $rsrcCmd = Get-Command rsrc -ErrorAction SilentlyContinue
+    if ($null -eq $rsrcCmd) {
+        if (-not $RsrcMissingWarningShown) {
+            Write-Warning "rsrc not found; fallback binaries will use default app icon. Install with: go install github.com/akavel/rsrc@latest"
+            $script:RsrcMissingWarningShown = $true
+        }
+        return
+    }
+
+    $sysoPath = Join-Path $PackageDir "rsrc_windows_amd64.syso"
+    & rsrc -ico $ServerIconPath -o $sysoPath
+    Assert-CommandSucceeded "rsrc icon resource generation"
+}
+
 function Build-App {
     $ldflags = Get-Ldflags
 
@@ -73,12 +102,14 @@ function Build-App {
         Write-Warning "Wails output is not a PE executable (header=$header). Falling back to go build."
         New-Item -ItemType Directory -Force -Path (Join-Path $RepoRoot "build\bin") | Out-Null
         $env:CGO_ENABLED = "1"
+        Try-GenerateSyso (Join-Path $RepoRoot "cmd\server")
+        $goLdflags = Get-GoBuildLdflags $ldflags
 
         if ([string]::IsNullOrWhiteSpace($ldflags)) {
-            & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -o $ServerBuildExe .\cmd\server
+            & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -ldflags $goLdflags -o $ServerBuildExe .\cmd\server
         }
         else {
-            & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -ldflags $ldflags -o $ServerBuildExe .\cmd\server
+            & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -ldflags $goLdflags -o $ServerBuildExe .\cmd\server
         }
         Assert-CommandSucceeded "go build fallback"
     }
@@ -88,16 +119,13 @@ function Build-App {
 
 function Build-ClientBinary {
     $ldflags = Get-Ldflags
+    $goLdflags = Get-GoBuildLdflags $ldflags
     New-Item -ItemType Directory -Force -Path (Join-Path $RepoRoot "build\bin") | Out-Null
     $env:CGO_ENABLED = "1"
+    Try-GenerateSyso (Join-Path $RepoRoot "cmd\client")
 
     Write-Step "Build client binary"
-    if ([string]::IsNullOrWhiteSpace($ldflags)) {
-        & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -o $ClientExe .\cmd\client
-    }
-    else {
-        & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -ldflags $ldflags -o $ClientExe .\cmd\client
-    }
+    & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -ldflags $goLdflags -o $ClientExe .\cmd\client
     Assert-CommandSucceeded "go build client"
     Assert-PeExecutable $ClientExe
 }
