@@ -45,8 +45,8 @@ function Ensure-ReportHeader {
         "# Story 1.11 Resilience Validation Report"
         ""
         "- Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")"
-        "- Protocol Reference: `docs/test-protocols/resilience-testing.md`"
-        "- Script: `scripts/story-1-11-windows-resilience-test.ps1`"
+        '- Protocol Reference: `docs/test-protocols/resilience-testing.md`'
+        '- Script: `scripts/story-1-11-windows-resilience-test.ps1`'
         ""
         "## Results"
         ""
@@ -215,4 +215,3 @@ try {
 finally {
     Pop-Location
 }
-
