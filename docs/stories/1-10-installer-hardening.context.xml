@@ -50,7 +50,7 @@
       <name>NSIS Script</name>
       <kind>Build Script</kind>
       <signature>ExecToLog (netsh ...)</signature>
-      <path>scripts/windows/installer/project.nsi</path>
+      <path>scripts/windows/installer/masala-installer.nsi</path>
     </interface>
   </interfaces>
 

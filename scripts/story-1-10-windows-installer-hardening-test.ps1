@@ -10,7 +10,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$InstallerScript = Join-Path $RepoRoot "scripts\windows\installer\project.nsi"
+$InstallerScript = Join-Path $RepoRoot "scripts\windows\installer\masala-installer.nsi"
 $DistDir = Join-Path $RepoRoot "dist"
 $ServerInstallerName = "Masala Inventory Server Setup.exe"
 $ClientInstallerName = "Masala Inventory Client Setup.exe"

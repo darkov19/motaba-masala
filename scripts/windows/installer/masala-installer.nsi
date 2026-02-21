@@ -1,7 +1,7 @@
 ; Masala Inventory NSIS installer script (client/server variants)
 ; Build examples:
-;   makensis /DAPP_KIND=server scripts/windows/installer/project.nsi
-;   makensis /DAPP_KIND=client scripts/windows/installer/project.nsi
+;   makensis /DAPP_KIND=server scripts/windows/installer/masala-installer.nsi
+;   makensis /DAPP_KIND=client scripts/windows/installer/masala-installer.nsi
 
 !include "MUI2.nsh"
 !include "LogicLib.nsh"

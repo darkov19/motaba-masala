@@ -9,12 +9,11 @@ $ErrorActionPreference = "Stop"
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $BuildDir = Join-Path $RepoRoot "build"
-$BuildBinDir = Join-Path $BuildDir "bin"
 $DistDir = Join-Path $RepoRoot "dist"
 $ServerBuildExe = Join-Path $RepoRoot "build\bin\masala_inventory_server.exe"
 $ServerExe = Join-Path $RepoRoot "build\bin\MasalaServer.exe"
 $ClientExe = Join-Path $RepoRoot "build\bin\MasalaClient.exe"
-$InstallerScript = Join-Path $RepoRoot "scripts\windows\installer\project.nsi"
+$InstallerScript = Join-Path $RepoRoot "scripts\windows\installer\masala-installer.nsi"
 $ServerInstaller = Join-Path $DistDir "Masala Inventory Server Setup.exe"
 $ClientInstaller = Join-Path $DistDir "Masala Inventory Client Setup.exe"
 
@@ -136,9 +135,9 @@ try {
     Write-Step "Hard reset to $Remote/$Branch"
     & git reset --hard "$Remote/$Branch"
 
-    Write-Step "Clean build outputs (preserve installer sources)"
-    if (Test-Path $BuildBinDir) {
-        Remove-Item -Recurse -Force $BuildBinDir
+    Write-Step "Delete build directory"
+    if (Test-Path $BuildDir) {
+        Remove-Item -Recurse -Force $BuildDir
     }
     if (Test-Path $DistDir) {
         Remove-Item -Recurse -Force $DistDir
