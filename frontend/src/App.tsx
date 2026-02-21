@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Layout, Typography, Card, Segmented, Space, Alert, Button, message } from "antd";
 import { useBlocker, useLocation, useNavigate } from "react-router-dom";
-import { EventsEmit, LogInfo, WindowMinimise } from "../wailsjs/runtime/runtime";
+import { EventsEmit, EventsOn, LogInfo, WindowFullscreen, WindowMinimise, WindowShow, WindowUnminimise } from "../wailsjs/runtime/runtime";
 import logo from "./assets/images/icon.png";
 import { ConnectionProvider } from "./context/ConnectionContext";
 import { ConnectionStatus } from "./components/layout/ConnectionStatus";
@@ -366,6 +366,28 @@ function App() {
         return () => {
             mounted = false;
             window.clearInterval(poller);
+        };
+    }, []);
+
+    useEffect(() => {
+        let unsubscribe: (() => void) | undefined;
+        try {
+            unsubscribe = EventsOn("app:request-open-dashboard", () => {
+                console.info("[UI][TrayFlow] app:request-open-dashboard event received");
+                try {
+                    WindowShow();
+                    WindowUnminimise();
+                    WindowFullscreen();
+                } catch {
+                    // no-op outside Wails runtime
+                }
+            });
+        } catch {
+            // no-op outside Wails runtime
+        }
+
+        return () => {
+            unsubscribe?.();
         };
     }, []);
 

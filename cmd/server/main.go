@@ -577,9 +577,7 @@ func run() error {
 									return
 									case <-mOpen.ClickedCh:
 										slog.Info("Tray action", "action", "open-dashboard")
-										runtime.WindowShow(ctx)
-										runtime.WindowUnminimise(ctx)
-										runtime.WindowFullscreen(ctx)
+										runtime.EventsEmit(ctx, "app:request-open-dashboard")
 									case <-mQuit.ClickedCh:
 										slog.Info("Tray action", "action", "exit-server")
 										runtime.WindowShow(ctx)
@@ -663,9 +661,6 @@ func run() error {
 							continue
 						}
 						if minimized && !lastMinimized {
-							if err := infraSys.ShowNotification(backgroundNotificationTitle, backgroundNotificationBody); err != nil {
-								slog.Error("Failed to show minimize notification", "error", err)
-							}
 							notifiedWhileMinimized = true
 						}
 						if !minimized {
