@@ -9,11 +9,15 @@ import (
 
 // CheckClockTampering verifies that the current system time is not earlier than the last recorded heartbeat
 func CheckClockTampering(heartbeatPath string) error {
+	return checkClockTamperingWithNow(heartbeatPath, time.Now)
+}
+
+func checkClockTamperingWithNow(heartbeatPath string, now func() time.Time) error {
 	data, err := os.ReadFile(heartbeatPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// First run, create the heartbeat
-			return UpdateHeartbeat(heartbeatPath)
+			return updateHeartbeatWithNow(heartbeatPath, now)
 		}
 		return fmt.Errorf("failed to read heartbeat file: %w", err)
 	}
@@ -27,7 +31,7 @@ func CheckClockTampering(heartbeatPath string) error {
 	lastHeartbeatUnix := int64(binary.BigEndian.Uint64(data))
 	// Simple obfuscation/XOR could be added here, but for now we'll stick to raw big-endian uint64
 
-	currentTime := time.Now().Unix()
+	currentTime := now().Unix()
 	if currentTime < lastHeartbeatUnix {
 		return fmt.Errorf("clock tampering detected: current time is earlier than last recorded heartbeat")
 	}
@@ -37,7 +41,11 @@ func CheckClockTampering(heartbeatPath string) error {
 
 // UpdateHeartbeat writes the current unix timestamp to the heartbeat file
 func UpdateHeartbeat(heartbeatPath string) error {
-	currentTime := time.Now().Unix()
+	return updateHeartbeatWithNow(heartbeatPath, time.Now)
+}
+
+func updateHeartbeatWithNow(heartbeatPath string, now func() time.Time) error {
+	currentTime := now().Unix()
 	data := make([]byte, 8)
 	binary.BigEndian.PutUint64(data, uint64(currentTime))
 

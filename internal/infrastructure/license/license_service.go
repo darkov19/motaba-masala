@@ -60,7 +60,7 @@ func (s *LicensingService) GetCurrentStatus() (StatusSnapshot, error) {
 	snapshot.HardwareID = hwID
 
 	// 2. Clock Tampering Check
-	err = CheckClockTampering(s.heartbeatPath)
+	err = checkClockTamperingWithNow(s.heartbeatPath, s.clockNow)
 	if err != nil {
 		return snapshot, err
 	}
@@ -103,7 +103,7 @@ func (s *LicensingService) startHeartbeatUpdater() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		if err := UpdateHeartbeat(s.heartbeatPath); err != nil {
+		if err := updateHeartbeatWithNow(s.heartbeatPath, s.clockNow); err != nil {
 			log.Printf("Warning: failed to update license heartbeat: %v", err)
 		}
 	}

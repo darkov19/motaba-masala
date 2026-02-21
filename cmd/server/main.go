@@ -72,6 +72,56 @@ type startupBackupLister interface {
 	ListBackups() ([]string, error)
 }
 
+type startupLicenseService interface {
+	GetCurrentStatus() (license.StatusSnapshot, error)
+	ValidateLicense() error
+}
+
+func evaluateStartupLicenseState(licenseSvc startupLicenseService) (bool, string, string, string, error) {
+	lockoutMode := false
+	lockoutReason := ""
+	lockoutMessage := ""
+	lockoutHardwareID := ""
+
+	initialSnapshot, err := licenseSvc.GetCurrentStatus()
+	if err != nil {
+		if errors.Is(err, license.ErrHardwareIDMismatch) {
+			lockoutMode = true
+			lockoutReason = "hardware-mismatch"
+			lockoutHardwareID = license.ExtractHardwareID(err)
+			lockoutMessage = "Hardware ID Mismatch. Application is locked."
+			slog.Error("Starting in license lockout mode", "error", err, "hardware_id", lockoutHardwareID)
+		} else {
+			return false, "", "", "", fmt.Errorf("licensing validation failed: %w", err)
+		}
+	} else if initialSnapshot.Status == license.StatusExpired {
+		lockoutMode = true
+		lockoutReason = "license-expired"
+		lockoutHardwareID = initialSnapshot.HardwareID
+		lockoutMessage = "License expired. Grace period ended. Application is locked."
+		slog.Warn("Starting in license-expired lockout mode", "hardware_id", lockoutHardwareID, "expires_at", initialSnapshot.ExpiresAt)
+	}
+
+	if !lockoutMode {
+		if err := licenseSvc.ValidateLicense(); err != nil {
+			if errors.Is(err, license.ErrLicenseExpired) {
+				latestSnapshot, statusErr := licenseSvc.GetCurrentStatus()
+				if statusErr != nil {
+					return false, "", "", "", fmt.Errorf("licensing validation failed: %w", err)
+				}
+				lockoutMode = true
+				lockoutReason = "license-expired"
+				lockoutHardwareID = latestSnapshot.HardwareID
+				lockoutMessage = "License expired. Grace period ended. Application is locked."
+			} else {
+				return false, "", "", "", fmt.Errorf("licensing validation failed: %w", err)
+			}
+		}
+	}
+
+	return lockoutMode, lockoutReason, lockoutMessage, lockoutHardwareID, nil
+}
+
 func isDevelopmentEnvironment() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(envAppEnvironment))) {
 	case "dev", "development", "local", "test":
@@ -309,44 +359,9 @@ func run() error {
 	LicensePublicKey = resolveLicensePublicKey()
 
 	licenseSvc := license.NewLicensingService(LicensePublicKey, "license.key", ".hw_hb")
-	lockoutMode := false
-	lockoutReason := ""
-	lockoutMessage := ""
-	lockoutHardwareID := ""
-	initialSnapshot, err := licenseSvc.GetCurrentStatus()
+	lockoutMode, lockoutReason, lockoutMessage, lockoutHardwareID, err := evaluateStartupLicenseState(licenseSvc)
 	if err != nil {
-		if errors.Is(err, license.ErrHardwareIDMismatch) {
-			lockoutMode = true
-			lockoutReason = "hardware-mismatch"
-			lockoutHardwareID = license.ExtractHardwareID(err)
-			lockoutMessage = "Hardware ID Mismatch. Application is locked."
-			slog.Error("Starting in license lockout mode", "error", err, "hardware_id", lockoutHardwareID)
-		} else {
-			return fmt.Errorf("licensing validation failed: %w", err)
-		}
-	} else if initialSnapshot.Status == license.StatusExpired {
-		lockoutMode = true
-		lockoutReason = "license-expired"
-		lockoutHardwareID = initialSnapshot.HardwareID
-		lockoutMessage = "License expired. Grace period ended. Application is locked."
-		slog.Warn("Starting in license-expired lockout mode", "hardware_id", lockoutHardwareID, "expires_at", initialSnapshot.ExpiresAt)
-	}
-
-	if !lockoutMode {
-		if err := licenseSvc.ValidateLicense(); err != nil {
-			if errors.Is(err, license.ErrLicenseExpired) {
-				latestSnapshot, statusErr := licenseSvc.GetCurrentStatus()
-				if statusErr != nil {
-					return fmt.Errorf("licensing validation failed: %w", err)
-				}
-				lockoutMode = true
-				lockoutReason = "license-expired"
-				lockoutHardwareID = latestSnapshot.HardwareID
-				lockoutMessage = "License expired. Grace period ended. Application is locked."
-			} else {
-				return fmt.Errorf("licensing validation failed: %w", err)
-			}
-		}
+		return err
 	}
 
 	application.SetLicenseStatusProvider(func() (app.LicenseStatus, error) {

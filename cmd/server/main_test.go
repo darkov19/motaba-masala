@@ -4,7 +4,10 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"masala_inventory_managment/internal/infrastructure/license"
 )
 
 type mockBackupLister struct {
@@ -70,5 +73,40 @@ func TestResolveStartupRecoveryState_BackupRefreshFailureUsesFallbackPrompt(t *t
 	}
 	if len(backups) != 1 || backups[0] != "backups/stale.zip" {
 		t.Fatalf("expected previous backup list to be preserved, got %#v", backups)
+	}
+}
+
+type stubStartupLicenseService struct {
+	snapshot    license.StatusSnapshot
+	statusErr   error
+	validateErr error
+}
+
+func (s stubStartupLicenseService) GetCurrentStatus() (license.StatusSnapshot, error) {
+	return s.snapshot, s.statusErr
+}
+
+func (s stubStartupLicenseService) ValidateLicense() error {
+	return s.validateErr
+}
+
+func TestEvaluateStartupLicenseState_ClockTamperFailureBlocksStartup(t *testing.T) {
+	svc := stubStartupLicenseService{
+		snapshot: license.StatusSnapshot{
+			Status:     license.StatusActive,
+			HardwareID: "hw-test",
+		},
+		validateErr: errors.New("clock tampering detected: current time is earlier than last recorded heartbeat"),
+	}
+
+	lockoutMode, _, _, _, err := evaluateStartupLicenseState(svc)
+	if err == nil {
+		t.Fatal("expected startup licensing failure for clock tampering")
+	}
+	if lockoutMode {
+		t.Fatal("expected startup to fail fast, not continue in lockout mode")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "licensing validation failed") {
+		t.Fatalf("expected startup licensing failure wrapper, got: %v", err)
 	}
 }

@@ -48,7 +48,7 @@ development_status:
     1-8-data-integrity-protection: done
     1-9-license-ux: done
     1-10-installer-hardening: done
-    1-11-resilience-verification: ready-for-dev
+    1-11-resilience-verification: done
     epic-1-retrospective: optional
 
     # Epic 2: Master Data & Configuration
