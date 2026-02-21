@@ -1,6 +1,7 @@
 param(
     [string]$Remote = "origin",
-    [string]$Branch = "main"
+    [string]$Branch = "main",
+    [switch]$SkipInstallers
 )
 
 Set-StrictMode -Version Latest
@@ -8,7 +9,13 @@ $ErrorActionPreference = "Stop"
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $BuildDir = Join-Path $RepoRoot "build"
-$BuildExe = Join-Path $RepoRoot "build\bin\masala_inventory_server.exe"
+$DistDir = Join-Path $RepoRoot "dist"
+$ServerBuildExe = Join-Path $RepoRoot "build\bin\masala_inventory_server.exe"
+$ServerExe = Join-Path $RepoRoot "build\bin\MasalaServer.exe"
+$ClientExe = Join-Path $RepoRoot "build\bin\MasalaClient.exe"
+$InstallerScript = Join-Path $RepoRoot "build\windows\installer\project.nsi"
+$ServerInstaller = Join-Path $DistDir "Masala Inventory Server Setup.exe"
+$ClientInstaller = Join-Path $DistDir "Masala Inventory Client Setup.exe"
 
 function Write-Step([string]$Message) {
     Write-Host ""
@@ -62,22 +69,62 @@ function Build-App {
     }
     Assert-CommandSucceeded "wails build"
 
-    $header = Get-HeaderHex $BuildExe
+    $header = Get-HeaderHex $ServerBuildExe
     if ($header -ne "4D5A") {
         Write-Warning "Wails output is not a PE executable (header=$header). Falling back to go build."
         New-Item -ItemType Directory -Force -Path (Join-Path $RepoRoot "build\bin") | Out-Null
         $env:CGO_ENABLED = "1"
 
         if ([string]::IsNullOrWhiteSpace($ldflags)) {
-            & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -o $BuildExe .\cmd\server
+            & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -o $ServerBuildExe .\cmd\server
         }
         else {
-            & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -ldflags $ldflags -o $BuildExe .\cmd\server
+            & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -ldflags $ldflags -o $ServerBuildExe .\cmd\server
         }
         Assert-CommandSucceeded "go build fallback"
     }
 
-    Assert-PeExecutable $BuildExe
+    Assert-PeExecutable $ServerBuildExe
+    Copy-Item -Path $ServerBuildExe -Destination $ServerExe -Force
+    Assert-PeExecutable $ServerExe
+}
+
+function Build-ClientBinary {
+    $ldflags = Get-Ldflags
+    New-Item -ItemType Directory -Force -Path (Join-Path $RepoRoot "build\bin") | Out-Null
+    $env:CGO_ENABLED = "1"
+
+    Write-Step "Build client binary"
+    if ([string]::IsNullOrWhiteSpace($ldflags)) {
+        & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -o $ClientExe .\cmd\client
+    }
+    else {
+        & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -ldflags $ldflags -o $ClientExe .\cmd\client
+    }
+    Assert-CommandSucceeded "go build client"
+    Assert-PeExecutable $ClientExe
+}
+
+function Assert-Makensis {
+    $cmd = Get-Command makensis -ErrorAction SilentlyContinue
+    if ($null -eq $cmd) {
+        throw "makensis not found in PATH. Install NSIS or run with -SkipInstallers."
+    }
+}
+
+function Build-Installers {
+    if (-not (Test-Path $InstallerScript)) {
+        throw "Installer script not found: $InstallerScript"
+    }
+    Assert-Makensis
+
+    Write-Step "Build server installer (NSIS)"
+    & makensis "/DAPP_KIND=server" $InstallerScript
+    Assert-CommandSucceeded "makensis server"
+
+    Write-Step "Build client installer (NSIS)"
+    & makensis "/DAPP_KIND=client" $InstallerScript
+    Assert-CommandSucceeded "makensis client"
 }
 
 Push-Location $RepoRoot
@@ -94,8 +141,19 @@ try {
     }
 
     Build-App
+    Build-ClientBinary
+
+    if (-not $SkipInstallers) {
+        Build-Installers
+    }
+
     Write-Step "Build completed"
-    Write-Host "Output: $BuildExe" -ForegroundColor Green
+    Write-Host "Output: $ServerExe" -ForegroundColor Green
+    Write-Host "Output: $ClientExe" -ForegroundColor Green
+    if (-not $SkipInstallers) {
+        Write-Host "Output: $ServerInstaller" -ForegroundColor Green
+        Write-Host "Output: $ClientInstaller" -ForegroundColor Green
+    }
 }
 finally {
     Pop-Location

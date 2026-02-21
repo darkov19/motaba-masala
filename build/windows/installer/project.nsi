@@ -1,0 +1,97 @@
+; Masala Inventory NSIS installer script (client/server variants)
+; Build examples:
+;   makensis /DAPP_KIND=server build/windows/installer/project.nsi
+;   makensis /DAPP_KIND=client build/windows/installer/project.nsi
+
+!include "MUI2.nsh"
+!include "LogicLib.nsh"
+!include "nsDialogs.nsh"
+!define BIN_DIR "${__FILEDIR__}\..\..\bin"
+
+!ifndef APP_KIND
+!define APP_KIND "server"
+!endif
+
+!if "${APP_KIND}" == "server"
+  !define APP_NAME "Masala Inventory Server"
+  !define APP_EXE "MasalaServer.exe"
+  !define STARTUP_LINK "MasalaServer.lnk"
+  !define FIREWALL_RULE_NAME "Masala Inventory Server"
+!else
+  !define APP_NAME "Masala Inventory Client"
+  !define APP_EXE "MasalaClient.exe"
+  !define STARTUP_LINK "MasalaClient.lnk"
+!endif
+
+Name "${APP_NAME}"
+OutFile "dist\\${APP_NAME} Setup.exe"
+InstallDir "$PROGRAMFILES\\Masala Inventory\\${APP_KIND}"
+RequestExecutionLevel admin
+
+Var StartOnBootCheckbox
+Var StartOnBootState
+
+!insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_DIRECTORY
+Page custom StartupPageCreate StartupPageLeave
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
+
+!insertmacro MUI_LANGUAGE "English"
+
+Function StartupPageCreate
+  nsDialogs::Create 1018
+  Pop $0
+  ${If} $0 == error
+    Abort
+  ${EndIf}
+
+  ${NSD_CreateLabel} 0 0 100% 20u "Startup behavior"
+  Pop $1
+  ${NSD_CreateCheckbox} 0 24u 100% 14u "Start automatically when Windows starts"
+  Pop $StartOnBootCheckbox
+  ${NSD_Check} $StartOnBootCheckbox
+  nsDialogs::Show
+FunctionEnd
+
+Function StartupPageLeave
+  ${NSD_GetState} $StartOnBootCheckbox $StartOnBootState
+FunctionEnd
+
+Section "Install"
+  SetOutPath "$INSTDIR"
+  File "/oname=${APP_EXE}" "${BIN_DIR}\${APP_EXE}"
+
+  !if "${APP_KIND}" == "server"
+    ; Required hardening command from story AC/task.
+    nsExec::ExecToLog 'netsh advfirewall firewall add rule name="Masala Inventory Server" dir=in action=allow program="$INSTDIR\MasalaServer.exe" enable=yes'
+    ; Explicit protocol rules to satisfy TCP/UDP traffic allowance.
+    nsExec::ExecToLog 'netsh advfirewall firewall add rule name="Masala Inventory Server TCP 8090" dir=in action=allow protocol=TCP localport=8090 program="$INSTDIR\MasalaServer.exe" enable=yes'
+    nsExec::ExecToLog 'netsh advfirewall firewall add rule name="Masala Inventory Server UDP 8090" dir=in action=allow protocol=UDP localport=8090 program="$INSTDIR\MasalaServer.exe" enable=yes'
+  !endif
+
+  ${If} $StartOnBootState == ${BST_CHECKED}
+    !if "${APP_KIND}" == "server"
+      CreateShortCut "$SMPROGRAMS\Startup\MasalaServer.lnk" "$INSTDIR\MasalaServer.exe"
+    !else
+      CreateShortCut "$SMPROGRAMS\Startup\MasalaClient.lnk" "$INSTDIR\MasalaClient.exe"
+    !endif
+  ${EndIf}
+
+  WriteUninstaller "$INSTDIR\Uninstall.exe"
+SectionEnd
+
+Section "Uninstall"
+  Delete "$SMPROGRAMS\Startup\MasalaClient.lnk"
+  Delete "$SMPROGRAMS\Startup\MasalaServer.lnk"
+
+  !if "${APP_KIND}" == "server"
+    nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="Masala Inventory Server"'
+    nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="Masala Inventory Server TCP 8090"'
+    nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="Masala Inventory Server UDP 8090"'
+  !endif
+
+  Delete "$INSTDIR\${APP_EXE}"
+  Delete "$INSTDIR\Uninstall.exe"
+  RMDir "$INSTDIR"
+SectionEnd

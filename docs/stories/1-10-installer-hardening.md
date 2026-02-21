@@ -1,6 +1,6 @@
 # Story 1.10: Installer Hardening
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -15,17 +15,17 @@ so that the deployment process is plug-and-play and works on the first try.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Implement Firewall Rule in NSIS (AC: 1)
-    - [ ] Locate `build/windows/installer/server.nsi` (or equivalent).
-    - [ ] Add `nsExec::ExecToLog` command to run `netsh advfirewall`.
-    - [ ] Command: `netsh advfirewall firewall add rule name="Masala Inventory Server" dir=in action=allow program="$INSTDIR\MasalaServer.exe" enable=yes`.
-    - [ ] Add rollback logic to remove rule on Uninstall.
+- [x] Task 1: Implement Firewall Rule in NSIS (AC: 1)
+    - [x] Locate `build/windows/installer/server.nsi` (or equivalent).
+    - [x] Add `nsExec::ExecToLog` command to run `netsh advfirewall`.
+    - [x] Command: `netsh advfirewall firewall add rule name="Masala Inventory Server" dir=in action=allow program="$INSTDIR\MasalaServer.exe" enable=yes`.
+    - [x] Add rollback logic to remove rule on Uninstall.
 
-- [ ] Task 2: Implement Auto-Start Option (AC: 2)
-    - [ ] Add Custom Page or Checkbox to NSIS UI ("Launch on Startup").
-    - [ ] Read checkbox state.
-    - [ ] If checked, `CreateShortCut "$SMPROGRAMS\Startup\MasalaClient.lnk" "$INSTDIR\MasalaClient.exe"`.
-    - [ ] Remove shortcut on Uninstall.
+- [x] Task 2: Implement Auto-Start Option (AC: 2)
+    - [x] Add Custom Page or Checkbox to NSIS UI ("Launch on Startup").
+    - [x] Read checkbox state.
+    - [x] If checked, `CreateShortCut "$SMPROGRAMS\Startup\MasalaClient.lnk" "$INSTDIR\MasalaClient.exe"`.
+    - [x] Remove shortcut on Uninstall.
 
 ## Dev Notes
 
@@ -56,13 +56,30 @@ so that the deployment process is plug-and-play and works on the first try.
 
 ### Debug Log References
 
+- 2026-02-21: Planned implementation around actual repo structure (no existing `build/windows/installer` tree); created equivalent NSIS script at `build/windows/installer/project.nsi` with parameterized client/server behavior.
+- 2026-02-21: Implemented firewall add/delete commands for server installer, startup checkbox page (default checked), and startup shortcut creation/removal logic on install/uninstall.
+- 2026-02-21: Added contract test `installer_nsi_contract_test.go` to validate required NSIS hardening directives remain present.
+- 2026-02-21: Regression validation: `go test ./...` passed; `frontend` lint initially failed on existing explicit `any`, resolved with typed `ReactNode`, then `npm run lint` and `npm run test:run` passed.
+
 ### Completion Notes List
+
+- Implemented Story 1.10 installer hardening in the repository via a new NSIS script at `build/windows/installer/project.nsi` (equivalent path to story notes).
+- Added `RequestExecutionLevel admin` and server firewall rule setup/cleanup using `nsExec::ExecToLog netsh advfirewall`.
+- Added explicit startup checkbox page ("Start automatically when Windows starts"), default checked, with conditional startup shortcut creation for both server and client installers.
+- Added uninstall cleanup for startup shortcuts and server firewall rules.
+- Added automated contract coverage to prevent regressions in critical NSIS hardening directives.
 
 ### File List
 
+- build/windows/installer/project.nsi
+- installer_nsi_contract_test.go
+- frontend/src/__tests__/AppRecoveryMode.test.tsx
+- docs/sprint-status.yaml
+- docs/stories/1-10-installer-hardening.md
 ## Change Log
 
 - 2026-02-15: Story drafted.
+- 2026-02-21: Implemented installer hardening (firewall rule + startup option), added NSIS contract test, and completed validation suite.
 
 ---
 

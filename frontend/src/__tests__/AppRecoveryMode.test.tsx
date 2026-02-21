@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { message } from "antd";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import type { ReactNode } from "react";
 import App from "../App";
 
 vi.mock("../components/forms/GRNForm", () => ({
@@ -13,7 +14,7 @@ vi.mock("../components/forms/BatchForm", () => ({
 }));
 
 vi.mock("../context/ConnectionContext", () => ({
-    ConnectionProvider: ({ children }: { children: any }) => <>{children}</>,
+    ConnectionProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
     useConnection: () => ({
         isConnected: true,
         isChecking: false,
