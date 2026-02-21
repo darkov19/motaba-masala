@@ -55,7 +55,10 @@ license.key
 .hw_hb
 
 masala-server
-.codex/
+# Codex
+.codex/*
+!.codex/prompts/
+!.codex/skills/
 
 # Environment files
 .env
