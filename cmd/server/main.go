@@ -574,28 +574,10 @@ func run() error {
 										runtime.WindowFullscreen(ctx)
 									case <-mQuit.ClickedCh:
 										slog.Info("Tray action", "action", "exit-server")
-										choice, dialogErr := runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
-											Type:          runtime.QuestionDialog,
-											Title:         "Confirm Exit",
-											Message:       "Are you sure you want to exit the server?",
-											Buttons:       []string{"Cancel", "Exit"},
-											DefaultButton: "Cancel",
-											CancelButton:  "Cancel",
-										})
-										if dialogErr != nil {
-											slog.Error("Failed to show exit confirmation dialog", "error", dialogErr)
-											continue
-										}
-										if choice != "Exit" {
-											slog.Info("Tray action", "action", "exit-server-cancelled")
-											continue
-										}
 										runtime.WindowShow(ctx)
 										runtime.WindowUnminimise(ctx)
 										runtime.WindowFullscreen(ctx)
-										application.SetForceQuit(true)
-										runtime.Quit(ctx)
-										return
+										runtime.EventsEmit(ctx, "app:request-quit-confirm")
 								}
 							}
 						}()

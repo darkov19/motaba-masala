@@ -13,6 +13,11 @@ import "./App.css";
 const { Header, Content, Footer } = Layout;
 const { Title, Text } = Typography;
 
+type WailsWindowRuntime = {
+    WindowMinimise?: () => void;
+    WindowHide?: () => void;
+};
+
 type RecoveryState = {
     enabled: boolean;
     message: string;
@@ -56,6 +61,38 @@ const VIEW_TO_PATH: Record<ViewKey, string> = {
     grn: "/grn",
     batch: "/batch",
 };
+
+function WindowControls() {
+    const getRuntime = (): WailsWindowRuntime | undefined =>
+        (window as Window & { runtime?: WailsWindowRuntime }).runtime;
+
+    const onMinimize = () => {
+        try {
+            getRuntime()?.WindowMinimise?.();
+        } catch {
+            // no-op outside Wails runtime
+        }
+    };
+
+    const onHideToTray = () => {
+        try {
+            getRuntime()?.WindowHide?.();
+        } catch {
+            // no-op outside Wails runtime
+        }
+    };
+
+    return (
+        <div className="window-controls">
+            <Button className="window-controls__btn" onClick={onMinimize} type="text" aria-label="Minimize">
+                _
+            </Button>
+            <Button className="window-controls__btn window-controls__btn--close" onClick={onHideToTray} type="text" aria-label="Hide to tray">
+                ×
+            </Button>
+        </div>
+    );
+}
 
 type ResilienceWorkspaceProps = {
     licenseStatus: LicenseStatus;
@@ -156,7 +193,10 @@ function ResilienceWorkspace({ licenseStatus }: ResilienceWorkspaceProps) {
                         Masala Inventory Management
                     </Title>
                 </Space>
-                <ConnectionStatus />
+                <Space align="center" size={8}>
+                    <ConnectionStatus />
+                    <WindowControls />
+                </Space>
             </Header>
 
             {renderLicenseBanner()}
@@ -415,6 +455,7 @@ function App() {
                             Masala Inventory Management
                         </Title>
                     </Space>
+                    <WindowControls />
                 </Header>
                 <Content className="app-content">
                     <Card className="app-card" variant="borderless">
@@ -455,6 +496,7 @@ function App() {
                             Masala Inventory Management
                         </Title>
                     </Space>
+                    <WindowControls />
                 </Header>
                 <Content className="app-content">
                     <Card className="app-card" variant="borderless">

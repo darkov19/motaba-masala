@@ -17,6 +17,31 @@
     margin: 0;
 }
 
+.window-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    -webkit-app-region: no-drag;
+}
+
+.window-controls__btn.ant-btn {
+    min-width: 34px;
+    height: 30px;
+    border-radius: 6px;
+    color: #f5dede;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.window-controls__btn.ant-btn:hover {
+    color: #fff !important;
+    background: rgba(255, 255, 255, 0.16) !important;
+}
+
+.window-controls__btn--close.ant-btn:hover {
+    background: #cb2f2f !important;
+}
+
 .app-content {
     padding: 24px 16px;
     display: flex;
