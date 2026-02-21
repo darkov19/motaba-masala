@@ -128,6 +128,20 @@ function Build-Installers {
     Assert-CommandSucceeded "makensis client"
 }
 
+function Restore-InstallerScriptIfMissing {
+    if (Test-Path $InstallerScript) {
+        return
+    }
+
+    Write-Warning "Installer script missing after build step. Restoring from git index..."
+    & git checkout -- "build/windows/installer/project.nsi"
+    Assert-CommandSucceeded "git checkout installer script"
+
+    if (-not (Test-Path $InstallerScript)) {
+        throw "Installer script not found after restore attempt: $InstallerScript"
+    }
+}
+
 Push-Location $RepoRoot
 try {
     Write-Step "Fetch latest from $Remote"
@@ -148,6 +162,7 @@ try {
     Build-ClientBinary
 
     if (-not $SkipInstallers) {
+        Restore-InstallerScriptIfMissing
         Build-Installers
     }
 
