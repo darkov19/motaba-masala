@@ -9,6 +9,7 @@ $ErrorActionPreference = "Stop"
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $BuildDir = Join-Path $RepoRoot "build"
+$BuildBinDir = Join-Path $BuildDir "bin"
 $DistDir = Join-Path $RepoRoot "dist"
 $ServerBuildExe = Join-Path $RepoRoot "build\bin\masala_inventory_server.exe"
 $ServerExe = Join-Path $RepoRoot "build\bin\MasalaServer.exe"
@@ -135,9 +136,12 @@ try {
     Write-Step "Hard reset to $Remote/$Branch"
     & git reset --hard "$Remote/$Branch"
 
-    Write-Step "Delete build directory"
-    if (Test-Path $BuildDir) {
-        Remove-Item -Recurse -Force $BuildDir
+    Write-Step "Clean build outputs (preserve installer sources)"
+    if (Test-Path $BuildBinDir) {
+        Remove-Item -Recurse -Force $BuildBinDir
+    }
+    if (Test-Path $DistDir) {
+        Remove-Item -Recurse -Force $DistDir
     }
 
     Build-App
