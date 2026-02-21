@@ -60,11 +60,19 @@ function Build-Installer([string]$Kind) {
 }
 
 function Get-StartupFolder {
-    return [Environment]::GetFolderPath("Startup")
+    return [Environment]::GetFolderPath("CommonStartup")
 }
 
 function Get-StartupLinkPath([string]$Kind) {
     $startup = Get-StartupFolder
+    if ($Kind -eq "server") {
+        return Join-Path $startup "MasalaServer.lnk"
+    }
+    return Join-Path $startup "MasalaClient.lnk"
+}
+
+function Get-LegacyUserStartupLinkPath([string]$Kind) {
+    $startup = [Environment]::GetFolderPath("Startup")
     if ($Kind -eq "server") {
         return Join-Path $startup "MasalaServer.lnk"
     }
@@ -210,6 +218,12 @@ function Remove-StartupLinkIfPresent([string]$Kind) {
     if (Test-Path $path) {
         Remove-Item -Force $path
         Write-Host "Removed startup shortcut: $path" -ForegroundColor Yellow
+    }
+
+    $legacyPath = Get-LegacyUserStartupLinkPath $Kind
+    if (Test-Path $legacyPath) {
+        Remove-Item -Force $legacyPath
+        Write-Host "Removed legacy user startup shortcut: $legacyPath" -ForegroundColor Yellow
     }
 }
 
