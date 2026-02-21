@@ -71,17 +71,18 @@ Section "Install"
     nsExec::ExecToLog 'netsh advfirewall firewall add rule name="Masala Inventory Server UDP 8090" dir=in action=allow protocol=UDP localport=8090 program="$INSTDIR\masala_inventory_server.exe" enable=yes'
   !endif
 
+  SetShellVarContext all
   ${If} $StartOnBootState == ${BST_CHECKED}
     !if "${APP_KIND}" == "server"
-      CreateShortCut "$SMPROGRAMS\Startup\MasalaServer.lnk" "$INSTDIR\masala_inventory_server.exe"
+      CreateShortCut "$SMSTARTUP\MasalaServer.lnk" "$INSTDIR\masala_inventory_server.exe"
     !else
-      CreateShortCut "$SMPROGRAMS\Startup\MasalaClient.lnk" "$INSTDIR\masala_inventory_client.exe"
+      CreateShortCut "$SMSTARTUP\MasalaClient.lnk" "$INSTDIR\masala_inventory_client.exe"
     !endif
   ${Else}
     !if "${APP_KIND}" == "server"
-      Delete "$SMPROGRAMS\Startup\MasalaServer.lnk"
+      Delete "$SMSTARTUP\MasalaServer.lnk"
     !else
-      Delete "$SMPROGRAMS\Startup\MasalaClient.lnk"
+      Delete "$SMSTARTUP\MasalaClient.lnk"
     !endif
   ${EndIf}
 
@@ -89,8 +90,9 @@ Section "Install"
 SectionEnd
 
 Section "Uninstall"
-  Delete "$SMPROGRAMS\Startup\MasalaClient.lnk"
-  Delete "$SMPROGRAMS\Startup\MasalaServer.lnk"
+  SetShellVarContext all
+  Delete "$SMSTARTUP\MasalaClient.lnk"
+  Delete "$SMSTARTUP\MasalaServer.lnk"
 
   !if "${APP_KIND}" == "server"
     nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="Masala Inventory Server"'

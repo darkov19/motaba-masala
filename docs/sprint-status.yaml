@@ -47,7 +47,7 @@ development_status:
     1-7-client-resilience-recovery: done
     1-8-data-integrity-protection: done
     1-9-license-ux: done
-    1-10-installer-hardening: review
+    1-10-installer-hardening: in-progress
     1-11-resilience-verification: ready-for-dev
     epic-1-retrospective: optional
 
