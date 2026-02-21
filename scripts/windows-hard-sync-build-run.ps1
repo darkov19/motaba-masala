@@ -15,6 +15,12 @@ function Write-Step([string]$Message) {
     Write-Host "==> $Message" -ForegroundColor Cyan
 }
 
+function Assert-CommandSucceeded([string]$CommandName) {
+    if ($LASTEXITCODE -ne 0) {
+        throw "$CommandName failed with exit code $LASTEXITCODE"
+    }
+}
+
 function Get-HeaderHex([string]$Path) {
     if (-not (Test-Path $Path)) {
         return ""
@@ -54,6 +60,7 @@ function Build-App {
     else {
         & wails build -clean -platform windows/amd64 -ldflags $ldflags
     }
+    Assert-CommandSucceeded "wails build"
 
     $header = Get-HeaderHex $BuildExe
     if ($header -ne "4D5A") {
@@ -62,11 +69,12 @@ function Build-App {
         $env:CGO_ENABLED = "1"
 
         if ([string]::IsNullOrWhiteSpace($ldflags)) {
-            & go build -tags "desktop,production,native_webview2loader" -o $BuildExe .\cmd\server
+            & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -o $BuildExe .\cmd\server
         }
         else {
-            & go build -tags "desktop,production,native_webview2loader" -ldflags $ldflags -o $BuildExe .\cmd\server
+            & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -ldflags $ldflags -o $BuildExe .\cmd\server
         }
+        Assert-CommandSucceeded "go build fallback"
     }
 
     Assert-PeExecutable $BuildExe
