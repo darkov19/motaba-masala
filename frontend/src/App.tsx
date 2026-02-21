@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Layout, Typography, Card, Segmented, Space, Alert, Button, message } from "antd";
 import { useBlocker, useLocation, useNavigate } from "react-router-dom";
-import { EventsEmit, EventsOn, LogInfo, WindowFullscreen, WindowShow, WindowUnminimise } from "../wailsjs/runtime/runtime";
+import { EventsEmit, EventsOn, LogInfo, WindowMaximise, WindowShow, WindowUnminimise } from "../wailsjs/runtime/runtime";
 import logo from "./assets/images/icon.png";
 import { ConnectionProvider } from "./context/ConnectionContext";
 import { ConnectionStatus } from "./components/layout/ConnectionStatus";
@@ -98,6 +98,18 @@ function WindowControls() {
     );
 }
 
+function WindowTitleBar() {
+    return (
+        <div className="window-titlebar">
+            <div className="window-titlebar__brand">
+                <img src={logo} className="window-titlebar__logo" alt="logo" />
+                <span className="window-titlebar__text">Masala Inventory Management</span>
+            </div>
+            <WindowControls />
+        </div>
+    );
+}
+
 type ResilienceWorkspaceProps = {
     licenseStatus: LicenseStatus;
 };
@@ -189,7 +201,8 @@ function ResilienceWorkspace({ licenseStatus }: ResilienceWorkspaceProps) {
     };
 
     return (
-        <Layout style={{ minHeight: "100vh" }}>
+        <Layout className="app-shell" style={{ minHeight: "100vh" }}>
+            <WindowTitleBar />
             <Header className="app-header">
                 <Space align="center" size={16}>
                     <img src={logo} className="app-header__logo" alt="logo" />
@@ -199,7 +212,6 @@ function ResilienceWorkspace({ licenseStatus }: ResilienceWorkspaceProps) {
                 </Space>
                 <Space align="center" size={8}>
                     <ConnectionStatus />
-                    <WindowControls />
                 </Space>
             </Header>
 
@@ -377,7 +389,7 @@ function App() {
                 try {
                     WindowShow();
                     WindowUnminimise();
-                    WindowFullscreen();
+                    WindowMaximise();
                 } catch {
                     // no-op outside Wails runtime
                 }
@@ -473,7 +485,8 @@ function App() {
             : "Contact support with this Hardware ID to request a new license.";
 
         return (
-            <Layout style={{ minHeight: "100vh" }}>
+            <Layout className="app-shell" style={{ minHeight: "100vh" }}>
+                <WindowTitleBar />
                 <Header className="app-header">
                     <Space align="center" size={16}>
                         <img src={logo} className="app-header__logo" alt="logo" />
@@ -481,7 +494,6 @@ function App() {
                             Masala Inventory Management
                         </Title>
                     </Space>
-                    <WindowControls />
                 </Header>
                 <Content className="app-content">
                     <Card className="app-card" variant="borderless">
@@ -514,7 +526,8 @@ function App() {
 
     if (!isLoadingRecovery && recoveryState?.enabled) {
         return (
-            <Layout style={{ minHeight: "100vh" }}>
+            <Layout className="app-shell" style={{ minHeight: "100vh" }}>
+                <WindowTitleBar />
                 <Header className="app-header">
                     <Space align="center" size={16}>
                         <img src={logo} className="app-header__logo" alt="logo" />
@@ -522,7 +535,6 @@ function App() {
                             Masala Inventory Management
                         </Title>
                     </Space>
-                    <WindowControls />
                 </Header>
                 <Content className="app-content">
                     <Card className="app-card" variant="borderless">

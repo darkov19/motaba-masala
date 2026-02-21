@@ -532,7 +532,6 @@ func run() error {
 		Width:             1024,
 		Height:            768,
 		Frameless:         true,
-		Fullscreen:        true,
 		HideWindowOnClose: false, // Route close via OnBeforeClose for explicit logging + notifications
 		AssetServer: &assetserver.Options{
 			Assets: masala_inventory_managment.Assets,
@@ -541,7 +540,7 @@ func run() error {
 		OnStartup: func(ctx context.Context) {
 			application.Startup(ctx)
 			monitorSvc.Start(ctx)
-			runtime.WindowFullscreen(ctx)
+			runtime.WindowMaximise(ctx)
 			runtime.EventsOn(ctx, "app:request-hide-to-tray", func(optionalData ...interface{}) {
 				slog.Info("UI event", "action", "request-hide-to-tray")
 				runtime.WindowHide(ctx)
@@ -553,7 +552,6 @@ func run() error {
 			runtime.EventsOn(ctx, "app:request-minimize", func(optionalData ...interface{}) {
 				slog.Info("UI event", "action", "request-minimize")
 				// Minimize should remain a true OS minimize (taskbar), not hide-to-tray.
-				runtime.WindowUnfullscreen(ctx)
 				runtime.WindowMinimise(ctx)
 			})
 
@@ -588,7 +586,7 @@ func run() error {
 										slog.Info("Tray action", "action", "exit-server")
 										runtime.WindowShow(ctx)
 										runtime.WindowUnminimise(ctx)
-										runtime.WindowFullscreen(ctx)
+										runtime.WindowMaximise(ctx)
 										slog.Info("Tray action", "action", "emit-custom-quit-confirm")
 										runtime.EventsEmit(ctx, "app:request-quit-confirm")
 								}
@@ -624,7 +622,7 @@ func run() error {
 							_ = os.Remove(pingFile)
 							runtime.WindowShow(ctx)
 							runtime.WindowUnminimise(ctx)
-							runtime.WindowFullscreen(ctx)
+							runtime.WindowMaximise(ctx)
 							runtime.WindowSetAlwaysOnTop(ctx, true)
 						go func() {
 							time.Sleep(500 * time.Millisecond)
@@ -670,9 +668,8 @@ func run() error {
 							notifiedWhileMinimized = true
 						}
 						if !minimized && lastMinimized {
-							// Ensure restored window returns to fullscreen even when opened from taskbar
-							// after an explicit minimize action.
-							runtime.WindowFullscreen(ctx)
+							// Restore to a normal maximized window when opened from taskbar.
+							runtime.WindowMaximise(ctx)
 						}
 						if !minimized {
 							notifiedWhileMinimized = false
