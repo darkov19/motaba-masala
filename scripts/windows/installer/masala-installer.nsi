@@ -15,12 +15,12 @@
 
 !if "${APP_KIND}" == "server"
   !define APP_NAME "Masala Inventory Server"
-  !define APP_EXE "MasalaServer.exe"
+  !define APP_EXE "masala_inventory_server.exe"
   !define STARTUP_LINK "MasalaServer.lnk"
   !define FIREWALL_RULE_NAME "Masala Inventory Server"
 !else
   !define APP_NAME "Masala Inventory Client"
-  !define APP_EXE "MasalaClient.exe"
+  !define APP_EXE "masala_inventory_client.exe"
   !define STARTUP_LINK "MasalaClient.lnk"
 !endif
 
@@ -65,17 +65,17 @@ Section "Install"
 
   !if "${APP_KIND}" == "server"
     ; Required hardening command from story AC/task.
-    nsExec::ExecToLog 'netsh advfirewall firewall add rule name="Masala Inventory Server" dir=in action=allow program="$INSTDIR\MasalaServer.exe" enable=yes'
+    nsExec::ExecToLog 'netsh advfirewall firewall add rule name="Masala Inventory Server" dir=in action=allow program="$INSTDIR\masala_inventory_server.exe" enable=yes'
     ; Explicit protocol rules to satisfy TCP/UDP traffic allowance.
-    nsExec::ExecToLog 'netsh advfirewall firewall add rule name="Masala Inventory Server TCP 8090" dir=in action=allow protocol=TCP localport=8090 program="$INSTDIR\MasalaServer.exe" enable=yes'
-    nsExec::ExecToLog 'netsh advfirewall firewall add rule name="Masala Inventory Server UDP 8090" dir=in action=allow protocol=UDP localport=8090 program="$INSTDIR\MasalaServer.exe" enable=yes'
+    nsExec::ExecToLog 'netsh advfirewall firewall add rule name="Masala Inventory Server TCP 8090" dir=in action=allow protocol=TCP localport=8090 program="$INSTDIR\masala_inventory_server.exe" enable=yes'
+    nsExec::ExecToLog 'netsh advfirewall firewall add rule name="Masala Inventory Server UDP 8090" dir=in action=allow protocol=UDP localport=8090 program="$INSTDIR\masala_inventory_server.exe" enable=yes'
   !endif
 
   ${If} $StartOnBootState == ${BST_CHECKED}
     !if "${APP_KIND}" == "server"
-      CreateShortCut "$SMPROGRAMS\Startup\MasalaServer.lnk" "$INSTDIR\MasalaServer.exe"
+      CreateShortCut "$SMPROGRAMS\Startup\MasalaServer.lnk" "$INSTDIR\masala_inventory_server.exe"
     !else
-      CreateShortCut "$SMPROGRAMS\Startup\MasalaClient.lnk" "$INSTDIR\MasalaClient.exe"
+      CreateShortCut "$SMPROGRAMS\Startup\MasalaClient.lnk" "$INSTDIR\masala_inventory_client.exe"
     !endif
   ${EndIf}
 

@@ -11,8 +11,7 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $BuildDir = Join-Path $RepoRoot "build"
 $DistDir = Join-Path $RepoRoot "dist"
 $ServerBuildExe = Join-Path $RepoRoot "build\bin\masala_inventory_server.exe"
-$ServerExe = Join-Path $RepoRoot "build\bin\MasalaServer.exe"
-$ClientExe = Join-Path $RepoRoot "build\bin\MasalaClient.exe"
+$ClientExe = Join-Path $RepoRoot "build\bin\masala_inventory_client.exe"
 $InstallerScript = Join-Path $RepoRoot "scripts\windows\installer\masala-installer.nsi"
 $ServerInstaller = Join-Path $DistDir "Masala Inventory Server Setup.exe"
 $ClientInstaller = Join-Path $DistDir "Masala Inventory Client Setup.exe"
@@ -85,8 +84,6 @@ function Build-App {
     }
 
     Assert-PeExecutable $ServerBuildExe
-    Copy-Item -Path $ServerBuildExe -Destination $ServerExe -Force
-    Assert-PeExecutable $ServerExe
 }
 
 function Build-ClientBinary {
@@ -152,7 +149,7 @@ try {
     }
 
     Write-Step "Build completed"
-    Write-Host "Output: $ServerExe" -ForegroundColor Green
+    Write-Host "Output: $ServerBuildExe" -ForegroundColor Green
     Write-Host "Output: $ClientExe" -ForegroundColor Green
     if (-not $SkipInstallers) {
         Write-Host "Output: $ServerInstaller" -ForegroundColor Green

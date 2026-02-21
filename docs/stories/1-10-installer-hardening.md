@@ -10,21 +10,21 @@ so that the deployment process is plug-and-play and works on the first try.
 
 ## Acceptance Criteria
 
-1.  **Firewall Rule**: The Server Installer adds an Inbound Rule to Windows Firewall allowing TCP/UDP traffic on the application port (default 8090) for the `MasalaServer.exe` executable. [Source: docs/resilience-audit-report.md#3.4]
+1.  **Firewall Rule**: The Server Installer adds an Inbound Rule to Windows Firewall allowing TCP/UDP traffic on the application port (default 8090) for the `masala_inventory_server.exe` executable. [Source: docs/resilience-audit-report.md#3.4]
 2.  **Auto-Start Option**: The Client and Server Installers both offer a checkbox "Start automatically when Windows starts" (default: checked). If selected, a shortcut is placed in the Windows `Startup` folder. [Source: docs/resilience-audit-report.md#2.3]
 
 ## Tasks / Subtasks
 
 - [x] Task 1: Implement Firewall Rule in NSIS (AC: 1)
-    - [x] Locate `build/windows/installer/server.nsi` (or equivalent).
+    - [x] Locate `scripts/windows/installer/masala-installer.nsi` (or equivalent).
     - [x] Add `nsExec::ExecToLog` command to run `netsh advfirewall`.
-    - [x] Command: `netsh advfirewall firewall add rule name="Masala Inventory Server" dir=in action=allow program="$INSTDIR\MasalaServer.exe" enable=yes`.
+    - [x] Command: `netsh advfirewall firewall add rule name="Masala Inventory Server" dir=in action=allow program="$INSTDIR\masala_inventory_server.exe" enable=yes`.
     - [x] Add rollback logic to remove rule on Uninstall.
 
 - [x] Task 2: Implement Auto-Start Option (AC: 2)
     - [x] Add Custom Page or Checkbox to NSIS UI ("Launch on Startup").
     - [x] Read checkbox state.
-    - [x] If checked, `CreateShortCut "$SMPROGRAMS\Startup\MasalaClient.lnk" "$INSTDIR\MasalaClient.exe"`.
+    - [x] If checked, `CreateShortCut "$SMPROGRAMS\Startup\MasalaClient.lnk" "$INSTDIR\masala_inventory_client.exe"`.
     - [x] Remove shortcut on Uninstall.
 
 ## Dev Notes
