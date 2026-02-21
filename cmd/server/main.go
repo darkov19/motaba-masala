@@ -321,7 +321,7 @@ func run() error {
 			lockoutHardwareID = license.ExtractHardwareID(err)
 			lockoutMessage = "Hardware ID Mismatch. Application is locked."
 			slog.Error("Starting in license lockout mode", "error", err, "hardware_id", lockoutHardwareID)
-		} else {
+		} else if !isDevelopmentEnvironment() {
 			return fmt.Errorf("licensing validation failed: %w", err)
 		}
 	} else if initialSnapshot.Status == license.StatusExpired {
@@ -333,7 +333,7 @@ func run() error {
 	}
 
 	if !lockoutMode {
-		if err := licenseSvc.ValidateLicense(); err != nil {
+		if err := licenseSvc.ValidateLicense(); err != nil && !isDevelopmentEnvironment() {
 			if errors.Is(err, license.ErrLicenseExpired) {
 				latestSnapshot, statusErr := licenseSvc.GetCurrentStatus()
 				if statusErr != nil {

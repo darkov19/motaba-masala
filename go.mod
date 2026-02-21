@@ -1,6 +1,6 @@
 module masala_inventory_managment
 
-go 1.26
+go 1.24.0
 
 require (
 	github.com/getlantern/systray v1.2.2
