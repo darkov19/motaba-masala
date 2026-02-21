@@ -7,6 +7,7 @@
 !include "LogicLib.nsh"
 !include "nsDialogs.nsh"
 !define BIN_DIR "${__FILEDIR__}\..\..\..\build\bin"
+!define DIST_DIR "${__FILEDIR__}\..\..\..\dist"
 
 !ifndef APP_KIND
 !define APP_KIND "server"
@@ -24,7 +25,7 @@
 !endif
 
 Name "${APP_NAME}"
-OutFile "dist\\${APP_NAME} Setup.exe"
+OutFile "${DIST_DIR}\\${APP_NAME} Setup.exe"
 InstallDir "$PROGRAMFILES\\Masala Inventory\\${APP_KIND}"
 RequestExecutionLevel admin
 

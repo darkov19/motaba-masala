@@ -117,6 +117,7 @@ function Build-Installers {
         throw "Installer script not found: $InstallerScript"
     }
     Assert-Makensis
+    New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
 
     Write-Step "Build server installer (NSIS)"
     & makensis "/DAPP_KIND=server" $InstallerScript
