@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Layout, Typography, Card, Segmented, Space, Alert, Button, message } from "antd";
 import { useBlocker, useLocation, useNavigate } from "react-router-dom";
-import { EventsEmit, EventsOn, LogInfo, WindowFullscreen, WindowMinimise, WindowShow, WindowUnminimise } from "../wailsjs/runtime/runtime";
+import { EventsEmit, EventsOn, LogInfo, WindowFullscreen, WindowShow, WindowUnminimise } from "../wailsjs/runtime/runtime";
 import logo from "./assets/images/icon.png";
 import { ConnectionProvider } from "./context/ConnectionContext";
 import { ConnectionStatus } from "./components/layout/ConnectionStatus";
@@ -69,9 +69,9 @@ function WindowControls() {
     };
 
     const onMinimize = () => {
-        trace("[UI][WindowControls] Minimize clicked");
+        trace("[UI][WindowControls] Minimize clicked -> emit app:request-minimize");
         try {
-            void WindowMinimise();
+            EventsEmit("app:request-minimize");
         } catch {
             // no-op outside Wails runtime
         }

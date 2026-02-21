@@ -550,6 +550,12 @@ func run() error {
 				}
 				runtime.EventsEmit(ctx, "server-minimized", nil)
 			})
+			runtime.EventsOn(ctx, "app:request-minimize", func(optionalData ...interface{}) {
+				slog.Info("UI event", "action", "request-minimize")
+				// Minimize should remain a true OS minimize (taskbar), not hide-to-tray.
+				runtime.WindowUnfullscreen(ctx)
+				runtime.WindowMinimise(ctx)
+			})
 
 			// Initialize System Tray
 			// Note: We run this in a goroutine because Wails requires the main thread.
