@@ -77,6 +77,12 @@ Section "Install"
     !else
       CreateShortCut "$SMPROGRAMS\Startup\MasalaClient.lnk" "$INSTDIR\masala_inventory_client.exe"
     !endif
+  ${Else}
+    !if "${APP_KIND}" == "server"
+      Delete "$SMPROGRAMS\Startup\MasalaServer.lnk"
+    !else
+      Delete "$SMPROGRAMS\Startup\MasalaClient.lnk"
+    !endif
   ${EndIf}
 
   WriteUninstaller "$INSTDIR\Uninstall.exe"
