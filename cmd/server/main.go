@@ -357,6 +357,7 @@ func run() error {
 					Status:        string(license.StatusExpired),
 					DaysRemaining: -7,
 					Message:       "Hardware ID Mismatch. Application is locked.",
+					HardwareID:    license.ExtractHardwareID(err),
 				}, nil
 			}
 			return app.LicenseStatus{}, err
@@ -366,6 +367,7 @@ func run() error {
 			Status:        string(snapshot.Status),
 			DaysRemaining: snapshot.DaysRemaining,
 			ExpiresAt:     snapshot.ExpiresAt,
+			HardwareID:    snapshot.HardwareID,
 		}
 		switch snapshot.Status {
 		case license.StatusExpiring:

@@ -16,6 +16,7 @@ type LicenseStatus struct {
 	DaysRemaining int    `json:"days_remaining"`
 	ExpiresAt     string `json:"expires_at,omitempty"`
 	Message       string `json:"message,omitempty"`
+	HardwareID    string `json:"hardware_id,omitempty"`
 }
 
 type LicenseLockoutState struct {

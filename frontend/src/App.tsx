@@ -24,6 +24,7 @@ type LicenseStatus = {
     days_remaining: number;
     expires_at?: string;
     message?: string;
+    hardware_id?: string;
 };
 
 type LicenseLockoutState = {
@@ -333,11 +334,11 @@ function App() {
                 enabled: true,
                 reason: "license-expired",
                 message: licenseStatus.message || "License expired. Application is locked.",
-                hardware_id: lockoutState?.hardware_id || "",
+                hardware_id: licenseStatus.hardware_id || lockoutState?.hardware_id || "",
             };
         }
         return null;
-    }, [licenseStatus.message, licenseStatus.status, lockoutState]);
+    }, [licenseStatus.hardware_id, licenseStatus.message, licenseStatus.status, lockoutState]);
 
     const onRestoreBackup = async (backupPath: string) => {
         const restoreBinding = (window as WindowWithAppBindings).go?.app?.App?.RestoreBackup;
@@ -356,17 +357,6 @@ function App() {
         } finally {
             setRestoringBackup(null);
         }
-    };
-
-    const onCopyHardwareID = async () => {
-        const hardwareID = effectiveLockoutState?.hardware_id || "";
-        if (!hardwareID) return;
-        const copied = await copyToClipboard(hardwareID);
-        if (copied) {
-            message.success("Hardware ID copied");
-            return;
-        }
-        message.error("Unable to copy Hardware ID. Please copy it manually.");
     };
 
     const copyToClipboard = async (text: string): Promise<boolean> => {
@@ -443,11 +433,8 @@ function App() {
                             <Card size="small">
                                 <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
                                     <Text code>{effectiveLockoutState.hardware_id || "Unavailable"}</Text>
-                                    <Button type="primary" onClick={() => void onCopyHardwareID()}>
-                                        Copy ID
-                                    </Button>
-                                    <Button onClick={() => void onCopySupportMessage()}>
-                                        Copy Support Message
+                                    <Button type="primary" onClick={() => void onCopySupportMessage()}>
+                                        Copy Support Request
                                     </Button>
                                 </Space>
                             </Card>

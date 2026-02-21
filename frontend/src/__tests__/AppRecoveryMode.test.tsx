@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { message } from "antd";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
@@ -10,6 +10,24 @@ vi.mock("../components/forms/GRNForm", () => ({
 
 vi.mock("../components/forms/BatchForm", () => ({
     BatchForm: () => <div>Mock Batch Form</div>,
+}));
+
+vi.mock("../context/ConnectionContext", () => ({
+    ConnectionProvider: ({ children }: { children: any }) => <>{children}</>,
+    useConnection: () => ({
+        isConnected: true,
+        isChecking: false,
+        lastCheckedAt: null,
+        retryNow: vi.fn(),
+    }),
+}));
+
+vi.mock("../components/layout/ConnectionStatus", () => ({
+    ConnectionStatus: () => null,
+}));
+
+vi.mock("../components/layout/ReconnectionOverlay", () => ({
+    ReconnectionOverlay: () => null,
 }));
 
 describe("App recovery and license states", () => {
@@ -130,13 +148,11 @@ describe("App recovery and license states", () => {
         expect(await screen.findByRole("heading", { name: "Hardware ID Mismatch. Application is locked." })).toBeInTheDocument();
         expect(screen.getByText("new-hw-123")).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole("button", { name: "Copy ID" }));
+        expect(screen.queryByRole("button", { name: "Copy ID" })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "Copy Support Request" }));
         await waitFor(() => {
-            expect(navigator.clipboard.writeText).toHaveBeenCalledWith("new-hw-123");
-        });
-        fireEvent.click(screen.getByRole("button", { name: "Copy Support Message" }));
-        await waitFor(() => {
-            expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(2);
+            expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+            expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining("Hardware ID: new-hw-123"));
         });
 
         router.dispose();
@@ -166,7 +182,7 @@ describe("App recovery and license states", () => {
         expect(await screen.findByRole("heading", { name: "License Expired. Application is locked." })).toBeInTheDocument();
         expect(screen.getByText("expired-hw-999")).toBeInTheDocument();
         expect(screen.getByText(/grace period has ended/i)).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Copy Support Message" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Copy Support Request" })).toBeInTheDocument();
 
         router.dispose();
     });
@@ -178,7 +194,7 @@ describe("App recovery and license states", () => {
             enabled: false,
             reason: "",
             message: "",
-            hardware_id: "runtime-hw-321",
+            hardware_id: "",
         });
         getLicenseStatus
             .mockResolvedValueOnce({
@@ -190,6 +206,7 @@ describe("App recovery and license states", () => {
                 status: "expired",
                 days_remaining: -7,
                 message: "License expired. Application is locked.",
+                hardware_id: "runtime-hw-321",
             });
 
         const router = createMemoryRouter(
@@ -206,9 +223,12 @@ describe("App recovery and license states", () => {
 
         expect(await screen.findByText("License Expired. Read-only mode active for 6 more days.")).toBeInTheDocument();
 
-        await vi.advanceTimersByTimeAsync(30000);
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(30000);
+        });
 
         expect(await screen.findByRole("heading", { name: "License Expired. Application is locked." })).toBeInTheDocument();
+        expect(screen.getByText("runtime-hw-321")).toBeInTheDocument();
 
         router.dispose();
         vi.useRealTimers();
