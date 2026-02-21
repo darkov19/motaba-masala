@@ -50,7 +50,7 @@
       <name>NSIS Script</name>
       <kind>Build Script</kind>
       <signature>ExecToLog (netsh ...)</signature>
-      <path>build/windows/installer/project.nsi</path>
+      <path>scripts/windows/installer/project.nsi</path>
     </interface>
   </interfaces>
 

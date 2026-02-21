@@ -32,7 +32,7 @@ so that the deployment process is plug-and-play and works on the first try.
 - **Tools**: Uses NSIS (Nullsoft Scriptable Install System).
 - **Permissions**: `netsh` requires Admin privileges. Ensure the installer requests `RequestExecutionLevel admin`.
 - **Project Structure Notes**:
-    - Modified: `build/windows/installer/project.nsi`
+    - Modified: `scripts/windows/installer/project.nsi`
 
 ## Learnings from Previous Story
 
@@ -56,14 +56,14 @@ so that the deployment process is plug-and-play and works on the first try.
 
 ### Debug Log References
 
-- 2026-02-21: Planned implementation around actual repo structure (no existing `build/windows/installer` tree); created equivalent NSIS script at `build/windows/installer/project.nsi` with parameterized client/server behavior.
+- 2026-02-21: Planned implementation around actual repo structure (no existing installer tree); created equivalent NSIS script at `scripts/windows/installer/project.nsi` with parameterized client/server behavior.
 - 2026-02-21: Implemented firewall add/delete commands for server installer, startup checkbox page (default checked), and startup shortcut creation/removal logic on install/uninstall.
 - 2026-02-21: Added contract test `installer_nsi_contract_test.go` to validate required NSIS hardening directives remain present.
 - 2026-02-21: Regression validation: `go test ./...` passed; `frontend` lint initially failed on existing explicit `any`, resolved with typed `ReactNode`, then `npm run lint` and `npm run test:run` passed.
 
 ### Completion Notes List
 
-- Implemented Story 1.10 installer hardening in the repository via a new NSIS script at `build/windows/installer/project.nsi` (equivalent path to story notes).
+- Implemented Story 1.10 installer hardening in the repository via a new NSIS script at `scripts/windows/installer/project.nsi` (equivalent path to story notes).
 - Added `RequestExecutionLevel admin` and server firewall rule setup/cleanup using `nsExec::ExecToLog netsh advfirewall`.
 - Added explicit startup checkbox page ("Start automatically when Windows starts"), default checked, with conditional startup shortcut creation for both server and client installers.
 - Added uninstall cleanup for startup shortcuts and server firewall rules.
@@ -71,7 +71,7 @@ so that the deployment process is plug-and-play and works on the first try.
 
 ### File List
 
-- build/windows/installer/project.nsi
+- scripts/windows/installer/project.nsi
 - installer_nsi_contract_test.go
 - frontend/src/__tests__/AppRecoveryMode.test.tsx
 - docs/sprint-status.yaml

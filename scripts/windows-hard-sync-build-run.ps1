@@ -14,7 +14,7 @@ $DistDir = Join-Path $RepoRoot "dist"
 $ServerBuildExe = Join-Path $RepoRoot "build\bin\masala_inventory_server.exe"
 $ServerExe = Join-Path $RepoRoot "build\bin\MasalaServer.exe"
 $ClientExe = Join-Path $RepoRoot "build\bin\MasalaClient.exe"
-$InstallerScript = Join-Path $RepoRoot "build\windows\installer\project.nsi"
+$InstallerScript = Join-Path $RepoRoot "scripts\windows\installer\project.nsi"
 $ServerInstaller = Join-Path $DistDir "Masala Inventory Server Setup.exe"
 $ClientInstaller = Join-Path $DistDir "Masala Inventory Client Setup.exe"
 
@@ -128,20 +128,6 @@ function Build-Installers {
     Assert-CommandSucceeded "makensis client"
 }
 
-function Restore-InstallerScriptIfMissing {
-    if (Test-Path $InstallerScript) {
-        return
-    }
-
-    Write-Warning "Installer script missing after build step. Restoring from git index..."
-    & git checkout -- "build/windows/installer/project.nsi"
-    Assert-CommandSucceeded "git checkout installer script"
-
-    if (-not (Test-Path $InstallerScript)) {
-        throw "Installer script not found after restore attempt: $InstallerScript"
-    }
-}
-
 Push-Location $RepoRoot
 try {
     Write-Step "Fetch latest from $Remote"
@@ -162,7 +148,6 @@ try {
     Build-ClientBinary
 
     if (-not $SkipInstallers) {
-        Restore-InstallerScriptIfMissing
         Build-Installers
     }
 

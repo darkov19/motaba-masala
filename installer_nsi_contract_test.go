@@ -9,7 +9,7 @@ import (
 )
 
 func TestInstallerScriptContainsStory110HardeningRequirements(t *testing.T) {
-	content, err := os.ReadFile("build/windows/installer/project.nsi")
+	content, err := os.ReadFile("scripts/windows/installer/project.nsi")
 	if err != nil {
 		t.Fatalf("read installer script: %v", err)
 	}
