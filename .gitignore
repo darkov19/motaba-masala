@@ -58,8 +58,6 @@ masala-server
 # Codex
 .codex/*
 !.codex/prompts/
-!.codex/skills/
-.codex/skills/.system/
 
 # Environment files
 .env
