@@ -669,6 +669,11 @@ func run() error {
 						if minimized && !lastMinimized {
 							notifiedWhileMinimized = true
 						}
+						if !minimized && lastMinimized {
+							// Ensure restored window returns to fullscreen even when opened from taskbar
+							// after an explicit minimize action.
+							runtime.WindowFullscreen(ctx)
+						}
 						if !minimized {
 							notifiedWhileMinimized = false
 						}
