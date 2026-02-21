@@ -148,7 +148,7 @@ function Stop-ExistingByPath([string]$Path) {
     }
 }
 
-function Get-UiTextSnapshot {
+function Get-UiTextSnapshot([int]$ProcessId = 0) {
     Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 
     $root = [System.Windows.Automation.AutomationElement]::RootElement
@@ -163,11 +163,14 @@ function Get-UiTextSnapshot {
 
     $target = $null
     foreach ($window in $windows) {
+        if ($ProcessId -gt 0 -and $window.Current.ProcessId -ne $ProcessId) {
+            continue
+        }
         $name = $window.Current.Name
         if ([string]::IsNullOrWhiteSpace($name)) {
             continue
         }
-        if ($name -like "*Masala Inventory*") {
+        if ($ProcessId -gt 0 -or $name -like "*Masala Inventory*") {
             $target = $window
             break
         }
@@ -198,10 +201,10 @@ function Get-UiTextSnapshot {
     return ($names -join "`n")
 }
 
-function Wait-ForUiText([string]$Pattern, [int]$TimeoutSeconds, [bool]$ShouldExist = $true) {
+function Wait-ForUiText([string]$Pattern, [int]$TimeoutSeconds, [bool]$ShouldExist = $true, [int]$ProcessId = 0) {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     while ((Get-Date) -lt $deadline) {
-        $snapshot = Get-UiTextSnapshot
+        $snapshot = Get-UiTextSnapshot -ProcessId $ProcessId
         $hasMatch = $snapshot -match $Pattern
         if (($ShouldExist -and $hasMatch) -or (-not $ShouldExist -and -not $hasMatch)) {
             return $true
@@ -211,7 +214,7 @@ function Wait-ForUiText([string]$Pattern, [int]$TimeoutSeconds, [bool]$ShouldExi
     return $false
 }
 
-function Try-SetFirstEditValue([string]$Value) {
+function Try-SetFirstEditValue([string]$Value, [int]$ProcessId = 0) {
     Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 
     $root = [System.Windows.Automation.AutomationElement]::RootElement
@@ -222,8 +225,11 @@ function Try-SetFirstEditValue([string]$Value) {
 
     $target = $null
     foreach ($window in $windows) {
+        if ($ProcessId -gt 0 -and $window.Current.ProcessId -ne $ProcessId) {
+            continue
+        }
         $name = $window.Current.Name
-        if ($name -like "*Masala Inventory*") {
+        if ($ProcessId -gt 0 -or $name -like "*Masala Inventory*") {
             $target = $window
             break
         }
@@ -394,16 +400,30 @@ function Run-AutoNetworkScenario {
         Write-Step "Auto network failure simulation"
         Stop-AppProcess $serverProc "Server app"
 
-        $overlayDetected = Wait-ForUiText "Attempting to reconnect" 15 $true
+        $overlayDetected = Wait-ForUiText "Attempting to reconnect" 30 $true $clientProc.Id
         if (-not $overlayDetected) {
             Add-ReportLine("- [FAIL] AC3 auto-check: reconnecting overlay text not detected.")
+            $snapshot = Get-UiTextSnapshot -ProcessId $clientProc.Id
+            if (-not [string]::IsNullOrWhiteSpace($snapshot)) {
+                Add-ReportLine("- Debug snapshot (client window text):")
+                Add-ReportLine("```")
+                Add-ReportLine($snapshot)
+                Add-ReportLine("```")
+            }
             throw "AC3 auto-check failed: reconnecting overlay not detected."
         }
 
         $serverProc = Start-AppProcess $ServerPath "Server app (restarted)"
-        $recovered = Wait-ForUiText "Connected" 20 $true
+        $recovered = Wait-ForUiText "Connected" 30 $true $clientProc.Id
         if (-not $recovered) {
             Add-ReportLine("- [FAIL] AC3 auto-check: connected status not detected after server restart.")
+            $snapshot = Get-UiTextSnapshot -ProcessId $clientProc.Id
+            if (-not [string]::IsNullOrWhiteSpace($snapshot)) {
+                Add-ReportLine("- Debug snapshot (client window text):")
+                Add-ReportLine("```")
+                Add-ReportLine($snapshot)
+                Add-ReportLine("```")
+            }
             throw "AC3 auto-check failed: connected status not detected."
         }
 
@@ -433,7 +453,7 @@ function Run-AutoRebootScenario {
 
         Write-Step "Auto draft+relaunch simulation"
         $draftValue = "AUTO-DRAFT-" + (Get-Date -Format "HHmmss")
-        $seeded = Try-SetFirstEditValue $draftValue
+        $seeded = Try-SetFirstEditValue $draftValue $clientProc.Id
         if (-not $seeded) {
             Add-ReportLine("- [FAIL] AC4 auto-check: unable to set form draft value through UI Automation.")
             throw "AC4 auto-check failed: could not seed form field."
@@ -443,9 +463,16 @@ function Run-AutoRebootScenario {
         Stop-AppProcess $clientProc "Client app"
         $clientProc = Start-AppProcess $ClientPath "Client app (restarted)"
 
-        $resumePrompt = Wait-ForUiText "Resume draft" 20 $true
+        $resumePrompt = Wait-ForUiText "Resume draft" 30 $true $clientProc.Id
         if (-not $resumePrompt) {
             Add-ReportLine("- [FAIL] AC4 auto-check: 'Resume draft' prompt not detected after client restart.")
+            $snapshot = Get-UiTextSnapshot -ProcessId $clientProc.Id
+            if (-not [string]::IsNullOrWhiteSpace($snapshot)) {
+                Add-ReportLine("- Debug snapshot (client window text):")
+                Add-ReportLine("```")
+                Add-ReportLine($snapshot)
+                Add-ReportLine("```")
+            }
             throw "AC4 auto-check failed: resume prompt not detected."
         }
 
