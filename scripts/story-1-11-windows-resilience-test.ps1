@@ -1,10 +1,12 @@
 param(
-    [ValidateSet("all", "build", "wal", "udp", "clock", "manual-network", "manual-reboot", "reset")]
-    [string]$Mode = "all",
+    [ValidateSet("all", "manual-all", "auto-app", "auto-network", "auto-reboot", "build", "wal", "udp", "clock", "manual-network", "manual-reboot", "reset")]
+    [string]$Mode = "auto-app",
     [switch]$Rebuild,
     [switch]$SkipInstallers,
     [string]$GoCachePath = "",
-    [string]$ReportPath = ""
+    [string]$ReportPath = "",
+    [string]$ServerPath = "",
+    [string]$ClientPath = ""
 )
 
 Set-StrictMode -Version Latest
@@ -14,6 +16,28 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $BuildScript = Join-Path $RepoRoot "scripts\windows-hard-sync-build-run.ps1"
 $ProtocolDoc = Join-Path $RepoRoot "docs\test-protocols\resilience-testing.md"
 $ManualTestingDir = Join-Path $RepoRoot "docs\manual_testing"
+$DefaultServerBuildExe = Join-Path $RepoRoot "build\bin\masala_inventory_server.exe"
+$DefaultClientBuildExe = Join-Path $RepoRoot "build\bin\masala_inventory_client.exe"
+$DefaultServerExe = Join-Path $RepoRoot "server.exe"
+$DefaultClientExe = Join-Path $RepoRoot "client.exe"
+
+if ([string]::IsNullOrWhiteSpace($ServerPath)) {
+    if (Test-Path $DefaultServerBuildExe) {
+        $ServerPath = $DefaultServerBuildExe
+    }
+    elseif (Test-Path $DefaultServerExe) {
+        $ServerPath = $DefaultServerExe
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($ClientPath)) {
+    if (Test-Path $DefaultClientBuildExe) {
+        $ClientPath = $DefaultClientBuildExe
+    }
+    elseif (Test-Path $DefaultClientExe) {
+        $ClientPath = $DefaultClientExe
+    }
+}
 
 if ([string]::IsNullOrWhiteSpace($GoCachePath)) {
     $GoCachePath = Join-Path $env:TEMP "go-build-masala-story-1-11"
@@ -23,6 +47,8 @@ if ([string]::IsNullOrWhiteSpace($ReportPath)) {
     $dateTag = Get-Date -Format "yyyy-MM-dd"
     $ReportPath = Join-Path $ManualTestingDir ("story-1-11-resilience-validation-{0}.md" -f $dateTag)
 }
+
+$script:LastCheckSummary = ""
 
 function Write-Step([string]$Message) {
     Write-Host ""
@@ -59,6 +85,173 @@ function Add-ReportLine([string]$Line) {
     Add-Content -Path $ReportPath -Value $Line
 }
 
+function Set-CheckSummary([string]$Summary) {
+    $script:LastCheckSummary = $Summary
+}
+
+function Wait-ForNextCheck([string]$CheckName) {
+    Write-Host ""
+    Write-Host "Check Result: $CheckName" -ForegroundColor Cyan
+    if (-not [string]::IsNullOrWhiteSpace($script:LastCheckSummary)) {
+        Write-Host $script:LastCheckSummary -ForegroundColor DarkGray
+    }
+    Read-Host "Check complete: $CheckName. Press Enter to continue to the next check" | Out-Null
+}
+
+function Get-ExecutableName([string]$Path) {
+    return [System.IO.Path]::GetFileNameWithoutExtension($Path)
+}
+
+function Resolve-AppPaths {
+    if ([string]::IsNullOrWhiteSpace($ServerPath) -or -not (Test-Path $ServerPath)) {
+        throw "Server executable not found. Provide -ServerPath or build first."
+    }
+    if ([string]::IsNullOrWhiteSpace($ClientPath) -or -not (Test-Path $ClientPath)) {
+        throw "Client executable not found. Provide -ClientPath or build first."
+    }
+}
+
+function Start-AppProcess([string]$Path, [string]$Label) {
+    Write-Step "Starting $Label"
+    $proc = Start-Process -FilePath $Path -WorkingDirectory $RepoRoot -PassThru
+    Start-Sleep -Seconds 4
+    if ($proc.HasExited) {
+        throw "$Label exited immediately. Path: $Path"
+    }
+    return $proc
+}
+
+function Stop-AppProcess([System.Diagnostics.Process]$Process, [string]$Label) {
+    if ($null -eq $Process) {
+        return
+    }
+    if (-not $Process.HasExited) {
+        try {
+            Stop-Process -Id $Process.Id -Force -ErrorAction Stop
+            Start-Sleep -Milliseconds 500
+        }
+        catch {
+            Write-Warning "Failed to stop $Label process $($Process.Id): $($_.Exception.Message)"
+        }
+    }
+}
+
+function Stop-ExistingByPath([string]$Path) {
+    $name = Get-ExecutableName $Path
+    Get-Process -Name $name -ErrorAction SilentlyContinue | ForEach-Object {
+        try {
+            Stop-Process -Id $_.Id -Force -ErrorAction Stop
+        }
+        catch {
+            Write-Warning "Unable to stop pre-existing process '$name' ($($_.Id)): $($_.Exception.Message)"
+        }
+    }
+}
+
+function Get-UiTextSnapshot {
+    Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+
+    $root = [System.Windows.Automation.AutomationElement]::RootElement
+    if ($null -eq $root) {
+        return ""
+    }
+
+    $windows = $root.FindAll(
+        [System.Windows.Automation.TreeScope]::Children,
+        [System.Windows.Automation.Condition]::TrueCondition
+    )
+
+    $target = $null
+    foreach ($window in $windows) {
+        $name = $window.Current.Name
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            continue
+        }
+        if ($name -like "*Masala Inventory*") {
+            $target = $window
+            break
+        }
+    }
+
+    if ($null -eq $target) {
+        return ""
+    }
+
+    $names = New-Object System.Collections.Generic.List[string]
+    $windowName = $target.Current.Name
+    if (-not [string]::IsNullOrWhiteSpace($windowName)) {
+        $names.Add($windowName)
+    }
+
+    $desc = $target.FindAll(
+        [System.Windows.Automation.TreeScope]::Descendants,
+        [System.Windows.Automation.Condition]::TrueCondition
+    )
+
+    foreach ($el in $desc) {
+        $name = $el.Current.Name
+        if (-not [string]::IsNullOrWhiteSpace($name)) {
+            $names.Add($name)
+        }
+    }
+
+    return ($names -join "`n")
+}
+
+function Wait-ForUiText([string]$Pattern, [int]$TimeoutSeconds, [bool]$ShouldExist = $true) {
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        $snapshot = Get-UiTextSnapshot
+        $hasMatch = $snapshot -match $Pattern
+        if (($ShouldExist -and $hasMatch) -or (-not $ShouldExist -and -not $hasMatch)) {
+            return $true
+        }
+        Start-Sleep -Seconds 1
+    }
+    return $false
+}
+
+function Try-SetFirstEditValue([string]$Value) {
+    Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+
+    $root = [System.Windows.Automation.AutomationElement]::RootElement
+    $windows = $root.FindAll(
+        [System.Windows.Automation.TreeScope]::Children,
+        [System.Windows.Automation.Condition]::TrueCondition
+    )
+
+    $target = $null
+    foreach ($window in $windows) {
+        $name = $window.Current.Name
+        if ($name -like "*Masala Inventory*") {
+            $target = $window
+            break
+        }
+    }
+    if ($null -eq $target) {
+        return $false
+    }
+
+    $editCondition = New-Object System.Windows.Automation.PropertyCondition(
+        [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+        [System.Windows.Automation.ControlType]::Edit
+    )
+
+    $edits = $target.FindAll([System.Windows.Automation.TreeScope]::Descendants, $editCondition)
+    if ($edits.Count -eq 0) {
+        return $false
+    }
+
+    $edit = $edits.Item(0)
+    $vp = $null
+    if ($edit.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$vp)) {
+        $vp.SetValue($Value)
+        return $true
+    }
+
+    return $false
+}
+
 function Invoke-HardSyncBuild {
     Assert-PathExists $BuildScript "Build script"
     Write-Step "Running windows-hard-sync-build-run.ps1"
@@ -80,10 +273,12 @@ function Invoke-GoTest([string]$Label, [string]$Package, [string]$RunPattern) {
     & go test $Package -run $RunPattern -count=1
     if ($LASTEXITCODE -ne 0) {
         Add-ReportLine("- [FAIL] $Label")
+        Set-CheckSummary("FAILED. Command: go test $Package -run $RunPattern -count=1")
         throw "Automated check failed: $Label"
     }
     Write-Host "PASS: $Label" -ForegroundColor Green
     Add-ReportLine("- [PASS] $Label")
+    Set-CheckSummary("PASS. Command: go test $Package -run $RunPattern -count=1")
 }
 
 function Run-WalTest {
@@ -130,9 +325,11 @@ function Prompt-ManualChecklist(
 
     if ($allPass) {
         Write-Host "PASS: $ScenarioName" -ForegroundColor Green
+        Set-CheckSummary("PASS. Manual checklist completed with all confirmations marked yes.")
     }
     else {
         Write-Warning "One or more checks failed in: $ScenarioName"
+        Set-CheckSummary("FAILED. One or more manual confirmations were marked no. See report: $ReportPath")
     }
 }
 
@@ -162,10 +359,111 @@ function Run-ManualRebootScenario {
 
 function Run-All {
     Run-WalTest
+    Wait-ForNextCheck "WAL Recovery Integration Test (AC1)"
     Run-UdpTest
+    Wait-ForNextCheck "UDP Re-Discovery Integration Test (AC2)"
     Run-ClockTamperTest
+    Wait-ForNextCheck "Clock Tamper Test (AC5)"
     Run-ManualNetworkScenario
+    Wait-ForNextCheck "Manual Network Failure Simulation (AC3)"
     Run-ManualRebootScenario
+    Wait-ForNextCheck "Manual Client Reboot Recovery (AC4)"
+}
+
+function Run-ManualAll {
+    Run-ManualNetworkScenario
+    Wait-ForNextCheck "Manual Network Failure Simulation (AC3)"
+    Run-ManualRebootScenario
+    Wait-ForNextCheck "Manual Client Reboot Recovery (AC4)"
+}
+
+function Run-AutoNetworkScenario {
+    Resolve-AppPaths
+    Ensure-ReportHeader
+
+    $serverProc = $null
+    $clientProc = $null
+
+    try {
+        Stop-ExistingByPath $ServerPath
+        Stop-ExistingByPath $ClientPath
+
+        $serverProc = Start-AppProcess $ServerPath "Server app"
+        $clientProc = Start-AppProcess $ClientPath "Client app"
+
+        Write-Step "Auto network failure simulation"
+        Stop-AppProcess $serverProc "Server app"
+
+        $overlayDetected = Wait-ForUiText "Attempting to reconnect" 15 $true
+        if (-not $overlayDetected) {
+            Add-ReportLine("- [FAIL] AC3 auto-check: reconnecting overlay text not detected.")
+            throw "AC3 auto-check failed: reconnecting overlay not detected."
+        }
+
+        $serverProc = Start-AppProcess $ServerPath "Server app (restarted)"
+        $recovered = Wait-ForUiText "Connected" 20 $true
+        if (-not $recovered) {
+            Add-ReportLine("- [FAIL] AC3 auto-check: connected status not detected after server restart.")
+            throw "AC3 auto-check failed: connected status not detected."
+        }
+
+        Add-ReportLine("- [PASS] AC3 auto-check: reconnect overlay detected and connection recovered.")
+        Write-Host "PASS: Auto network scenario (AC3)" -ForegroundColor Green
+        Set-CheckSummary("PASS. Actions: started server+client, stopped server, detected 'Attempting to reconnect...', restarted server, detected 'Connected'.")
+    }
+    finally {
+        Stop-AppProcess $clientProc "Client app"
+        Stop-AppProcess $serverProc "Server app"
+    }
+}
+
+function Run-AutoRebootScenario {
+    Resolve-AppPaths
+    Ensure-ReportHeader
+
+    $serverProc = $null
+    $clientProc = $null
+
+    try {
+        Stop-ExistingByPath $ServerPath
+        Stop-ExistingByPath $ClientPath
+
+        $serverProc = Start-AppProcess $ServerPath "Server app"
+        $clientProc = Start-AppProcess $ClientPath "Client app"
+
+        Write-Step "Auto draft+relaunch simulation"
+        $draftValue = "AUTO-DRAFT-" + (Get-Date -Format "HHmmss")
+        $seeded = Try-SetFirstEditValue $draftValue
+        if (-not $seeded) {
+            Add-ReportLine("- [FAIL] AC4 auto-check: unable to set form draft value through UI Automation.")
+            throw "AC4 auto-check failed: could not seed form field."
+        }
+
+        Start-Sleep -Seconds 7
+        Stop-AppProcess $clientProc "Client app"
+        $clientProc = Start-AppProcess $ClientPath "Client app (restarted)"
+
+        $resumePrompt = Wait-ForUiText "Resume draft" 20 $true
+        if (-not $resumePrompt) {
+            Add-ReportLine("- [FAIL] AC4 auto-check: 'Resume draft' prompt not detected after client restart.")
+            throw "AC4 auto-check failed: resume prompt not detected."
+        }
+
+        Add-ReportLine("- [PASS] AC4 auto-check: resume draft prompt detected after restart.")
+        Write-Host "PASS: Auto reboot scenario (AC4)" -ForegroundColor Green
+        Set-CheckSummary("PASS. Actions: started server+client, seeded draft field, waited for autosave, restarted client, detected 'Resume draft' prompt.")
+    }
+    finally {
+        Stop-AppProcess $clientProc "Client app"
+        Stop-AppProcess $serverProc "Server app"
+    }
+}
+
+function Run-AutoApp {
+    Run-AutoNetworkScenario
+    Wait-ForNextCheck "Auto Network Failure Simulation (AC3)"
+    Run-AutoRebootScenario
+    Wait-ForNextCheck "Auto Client Reboot Recovery (AC4)"
 }
 
 Push-Location $RepoRoot
@@ -189,6 +487,10 @@ try {
         "manual-network" { Run-ManualNetworkScenario }
         "manual-reboot"  { Run-ManualRebootScenario }
         "all"            { Run-All }
+        "manual-all"     { Run-ManualAll }
+        "auto-network"   { Run-AutoNetworkScenario }
+        "auto-reboot"    { Run-AutoRebootScenario }
+        "auto-app"       { Run-AutoApp }
         "reset" {
             Write-Step "Reset mode"
             if (Test-Path $ReportPath) {
