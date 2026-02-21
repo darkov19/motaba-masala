@@ -1,6 +1,6 @@
 # Story 1.9: License & Security UX
 
-Status: review
+Status: done
 
 ## Story
 
@@ -126,6 +126,7 @@ so that I can resolve issues without sudden production downtime or confusion.
 - 2026-02-20: Updated full-expiry handling to lockout UI with Hardware ID and support-message copy flow; updated Windows manual test script expectations.
 - 2026-02-20: Senior Developer Review notes appended (Outcome: Blocked).
 - 2026-02-20: Addressed code review findings - 4 items resolved (Date: 2026-02-20).
+- 2026-02-21: Senior Developer Review notes appended (Outcome: Approve).
 
 ---
 
@@ -164,36 +165,36 @@ Implementation quality is good overall, but AC2 is only partially complete. Full
 
 ### Acceptance Criteria Coverage
 
-| AC# | Description | Status | Evidence |
-| --- | --- | --- | --- |
-| AC1 | Expiry warning banner starts 30 days before expiry | IMPLEMENTED | `internal/infrastructure/license/status.go:131`, `cmd/server/main.go:371`, `frontend/src/App.tsx:112`, `frontend/src/App.tsx:161` |
-| AC2 | 7-day read-only grace period with banner, then full lockout | PARTIAL | Read-only and banner: `cmd/server/main.go:374`, `frontend/src/App.tsx:123`, `frontend/src/App.tsx:175`, `internal/app/inventory/service.go:22`; runtime lockout transition gap: `frontend/src/App.tsx:261`, `frontend/src/App.tsx:311` |
-| AC3 | Hardware mismatch lockout screen with new Hardware ID and Copy ID | IMPLEMENTED | `internal/infrastructure/license/license_service.go:82`, `cmd/server/main.go:318`, `cmd/server/main.go:321`, `frontend/src/App.tsx:390`, `frontend/src/App.tsx:425`, `frontend/src/__tests__/AppRecoveryMode.test.tsx:130` |
+| AC# | Description                                                       | Status      | Evidence                                                                                                                                                                                                                               |
+| --- | ----------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | Expiry warning banner starts 30 days before expiry                | IMPLEMENTED | `internal/infrastructure/license/status.go:131`, `cmd/server/main.go:371`, `frontend/src/App.tsx:112`, `frontend/src/App.tsx:161`                                                                                                      |
+| AC2 | 7-day read-only grace period with banner, then full lockout       | PARTIAL     | Read-only and banner: `cmd/server/main.go:374`, `frontend/src/App.tsx:123`, `frontend/src/App.tsx:175`, `internal/app/inventory/service.go:22`; runtime lockout transition gap: `frontend/src/App.tsx:261`, `frontend/src/App.tsx:311` |
+| AC3 | Hardware mismatch lockout screen with new Hardware ID and Copy ID | IMPLEMENTED | `internal/infrastructure/license/license_service.go:82`, `cmd/server/main.go:318`, `cmd/server/main.go:321`, `frontend/src/App.tsx:390`, `frontend/src/App.tsx:425`, `frontend/src/__tests__/AppRecoveryMode.test.tsx:130`             |
 
 Summary: 2 of 3 acceptance criteria fully implemented.
 
 ### Task Completion Validation
 
-| Task | Marked As | Verified As | Evidence |
-| --- | --- | --- | --- |
-| Task 1: Update License Service | [x] | VERIFIED COMPLETE | `internal/infrastructure/license/status.go:24`, `internal/infrastructure/license/status.go:116`, `internal/infrastructure/license/license_service.go:94` |
-| Update `LicenseStatus` enum (`Expiring`, `GracePeriod`, `Expired`) | [x] | VERIFIED COMPLETE | `internal/infrastructure/license/status.go:26` |
-| Implement expiry check thresholds | [x] | VERIFIED COMPLETE | `internal/infrastructure/license/status.go:125`, `internal/infrastructure/license/status.go:128`, `internal/infrastructure/license/status.go:131` |
-| Expose `DaysRemaining` in license status API | [x] | VERIFIED COMPLETE | `internal/app/app.go:16`, `internal/app/app.go:115`, `cmd/server/main.go:367` |
-| Task 2: Implement Read-Only Enforcement | [x] | PARTIAL | `internal/app/licensemode/licensemode.go:25`, `internal/app/inventory/service.go:22` |
-| Create middleware/interceptor in domain services | [x] | VERIFIED COMPLETE | `internal/app/licensemode/licensemode.go:15`, `cmd/server/main.go:381` |
-| **Block all Write/Update/Delete ops in GracePeriod with 403** | [x] | **NOT DONE (as specified)** | Guard present only in inventory update methods: `internal/app/inventory/service.go:22`, `internal/app/inventory/service.go:35`, `internal/app/inventory/service.go:48` |
-| Allow read operations | [x] | VERIFIED COMPLETE | No read-path enforcement introduced; guard is write-oriented in inventory service |
-| Task 3: Implement Hardware Error Screen | [x] | VERIFIED COMPLETE | `cmd/server/main.go:318`, `frontend/src/App.tsx:390` |
-| Update startup license check | [x] | VERIFIED COMPLETE | `cmd/server/main.go:311` |
-| Launch lockout mode on hardware mismatch | [x] | VERIFIED COMPLETE | `cmd/server/main.go:319` |
-| Pass computed Hardware ID to frontend | [x] | VERIFIED COMPLETE | `cmd/server/main.go:321`, `cmd/server/main.go:503` |
-| Create frontend lockout view with Copy button | [x] | VERIFIED COMPLETE | `frontend/src/App.tsx:412`, `frontend/src/App.tsx:425` |
-| Task 4: Frontend Banners | [x] | VERIFIED COMPLETE | `frontend/src/App.tsx:111` |
-| Poll/check license status | [x] | VERIFIED COMPLETE | `frontend/src/App.tsx:311` |
-| Render yellow warning banner for `Expiring` | [x] | VERIFIED COMPLETE | `frontend/src/App.tsx:112` |
-| Render red error banner for `GracePeriod`/`Expired` | [x] | VERIFIED COMPLETE | `frontend/src/App.tsx:123`, `frontend/src/App.tsx:135` |
-| Disable `New GRN` / `New Batch` in grace period | [x] | VERIFIED COMPLETE | `frontend/src/App.tsx:71`, `frontend/src/App.tsx:179`, `frontend/src/App.tsx:185` |
+| Task                                                               | Marked As | Verified As                 | Evidence                                                                                                                                                               |
+| ------------------------------------------------------------------ | --------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Task 1: Update License Service                                     | [x]       | VERIFIED COMPLETE           | `internal/infrastructure/license/status.go:24`, `internal/infrastructure/license/status.go:116`, `internal/infrastructure/license/license_service.go:94`               |
+| Update `LicenseStatus` enum (`Expiring`, `GracePeriod`, `Expired`) | [x]       | VERIFIED COMPLETE           | `internal/infrastructure/license/status.go:26`                                                                                                                         |
+| Implement expiry check thresholds                                  | [x]       | VERIFIED COMPLETE           | `internal/infrastructure/license/status.go:125`, `internal/infrastructure/license/status.go:128`, `internal/infrastructure/license/status.go:131`                      |
+| Expose `DaysRemaining` in license status API                       | [x]       | VERIFIED COMPLETE           | `internal/app/app.go:16`, `internal/app/app.go:115`, `cmd/server/main.go:367`                                                                                          |
+| Task 2: Implement Read-Only Enforcement                            | [x]       | PARTIAL                     | `internal/app/licensemode/licensemode.go:25`, `internal/app/inventory/service.go:22`                                                                                   |
+| Create middleware/interceptor in domain services                   | [x]       | VERIFIED COMPLETE           | `internal/app/licensemode/licensemode.go:15`, `cmd/server/main.go:381`                                                                                                 |
+| **Block all Write/Update/Delete ops in GracePeriod with 403**      | [x]       | **NOT DONE (as specified)** | Guard present only in inventory update methods: `internal/app/inventory/service.go:22`, `internal/app/inventory/service.go:35`, `internal/app/inventory/service.go:48` |
+| Allow read operations                                              | [x]       | VERIFIED COMPLETE           | No read-path enforcement introduced; guard is write-oriented in inventory service                                                                                      |
+| Task 3: Implement Hardware Error Screen                            | [x]       | VERIFIED COMPLETE           | `cmd/server/main.go:318`, `frontend/src/App.tsx:390`                                                                                                                   |
+| Update startup license check                                       | [x]       | VERIFIED COMPLETE           | `cmd/server/main.go:311`                                                                                                                                               |
+| Launch lockout mode on hardware mismatch                           | [x]       | VERIFIED COMPLETE           | `cmd/server/main.go:319`                                                                                                                                               |
+| Pass computed Hardware ID to frontend                              | [x]       | VERIFIED COMPLETE           | `cmd/server/main.go:321`, `cmd/server/main.go:503`                                                                                                                     |
+| Create frontend lockout view with Copy button                      | [x]       | VERIFIED COMPLETE           | `frontend/src/App.tsx:412`, `frontend/src/App.tsx:425`                                                                                                                 |
+| Task 4: Frontend Banners                                           | [x]       | VERIFIED COMPLETE           | `frontend/src/App.tsx:111`                                                                                                                                             |
+| Poll/check license status                                          | [x]       | VERIFIED COMPLETE           | `frontend/src/App.tsx:311`                                                                                                                                             |
+| Render yellow warning banner for `Expiring`                        | [x]       | VERIFIED COMPLETE           | `frontend/src/App.tsx:112`                                                                                                                                             |
+| Render red error banner for `GracePeriod`/`Expired`                | [x]       | VERIFIED COMPLETE           | `frontend/src/App.tsx:123`, `frontend/src/App.tsx:135`                                                                                                                 |
+| Disable `New GRN` / `New Batch` in grace period                    | [x]       | VERIFIED COMPLETE           | `frontend/src/App.tsx:71`, `frontend/src/App.tsx:179`, `frontend/src/App.tsx:185`                                                                                      |
 
 Summary: 16 of 17 completed items verified, 0 questionable, 1 false completion.
 
@@ -224,10 +225,123 @@ Summary: 16 of 17 completed items verified, 0 questionable, 1 false completion.
 ### Action Items
 
 **Code Changes Required:**
+
 - [x] [High] Enforce lockout-state transition continuously (not only once at startup) so post-grace sessions are forced into lockout UI (AC #2) [file: `frontend/src/App.tsx:261`]
 - [x] [High] Apply grace-period write guard to all relevant write/update/delete command paths, not only inventory update methods (AC #2) [file: `internal/app/inventory/service.go:22`]
 - [x] [Med] Replace fail-open `active` fallback when `GetLicenseStatus` fails with a safe degraded state and explicit warning (AC #2) [file: `frontend/src/App.tsx:296`]
 - [x] [Low] Add automated test for grace-period -> expired runtime transition and lockout activation [file: `frontend/src/__tests__/AppRecoveryMode.test.tsx:145`]
 
 **Advisory Notes:**
+
 - Note: Manual scenario script expectations now match lockout UX intent for full expiry and mismatch flows. [file: `scripts/story-1-9-windows-license-ux-test.ps1:194`]
+
+---
+
+## Senior Developer Review (AI)
+
+### Reviewer
+
+darko
+
+### Date
+
+2026-02-21
+
+### Outcome
+
+Approve
+
+### Summary
+
+Re-review confirms previously blocked items are now resolved. All acceptance criteria are implemented with direct evidence, all checked tasks/subtasks are verifiably complete, and targeted backend/frontend tests pass.
+
+### Key Findings
+
+#### HIGH Severity
+
+- None.
+
+#### MEDIUM Severity
+
+- None.
+
+#### LOW Severity
+
+- None.
+
+### Acceptance Criteria Coverage
+
+| AC# | Description                                                           | Status      | Evidence                                                                                                                                                                                                                                                    |
+| --- | --------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | Expiry warning banner starts 30 days before expiry                    | IMPLEMENTED | `internal/infrastructure/license/status.go:131`, `cmd/server/main.go:373`, `frontend/src/App.tsx:113`                                                                                                                                                       |
+| AC2 | 7-day read-only grace period with banner, then full lockout           | IMPLEMENTED | Read-only + banner: `cmd/server/main.go:375`, `internal/app/inventory/service.go:21`, `frontend/src/App.tsx:124`; runtime lockout transition: `frontend/src/App.tsx:318`, `frontend/src/App.tsx:332`, `frontend/src/__tests__/AppRecoveryMode.test.tsx:190` |
+| AC3 | Hardware mismatch lockout screen with new Hardware ID and copy action | IMPLEMENTED | `internal/infrastructure/license/license_service.go:82`, `cmd/server/main.go:318`, `cmd/server/main.go:321`, `frontend/src/App.tsx:402`, `frontend/src/App.tsx:435`                                                                                         |
+
+Summary: 3 of 3 acceptance criteria fully implemented.
+
+### Task Completion Validation
+
+| Task                                                                                                   | Marked As | Verified As       | Evidence                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------ | --------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Task 1: Update License Service                                                                         | [x]       | VERIFIED COMPLETE | `internal/infrastructure/license/status.go:22`, `internal/infrastructure/license/license_service.go:94`                                                                                                                                                                                                     |
+| Update `LicenseStatus` enum to include `Expiring`, `GracePeriod`, `Expired`                            | [x]       | VERIFIED COMPLETE | `internal/infrastructure/license/status.go:26`                                                                                                                                                                                                                                                              |
+| Implement expiry check logic thresholds                                                                | [x]       | VERIFIED COMPLETE | `internal/infrastructure/license/status.go:125`, `internal/infrastructure/license/status.go:128`, `internal/infrastructure/license/status.go:131`                                                                                                                                                           |
+| Expose `DaysRemaining` in license status API                                                           | [x]       | VERIFIED COMPLETE | `internal/app/app.go:14`, `cmd/server/main.go:367`                                                                                                                                                                                                                                                          |
+| Task 2: Implement Read-Only Enforcement                                                                | [x]       | VERIFIED COMPLETE | `internal/app/licensemode/licensemode.go:15`, `cmd/server/main.go:383`                                                                                                                                                                                                                                      |
+| Create middleware/interceptor in domain services                                                       | [x]       | VERIFIED COMPLETE | `internal/app/licensemode/licensemode.go:25`, `internal/app/inventory/service.go:22`                                                                                                                                                                                                                        |
+| If `LicenseStatus == GracePeriod`, block all Write/Update/Delete operations with `403 License Expired` | [x]       | VERIFIED COMPLETE | Guard enforced on all current inventory write command paths: `internal/app/inventory/service.go:21`, `internal/app/inventory/service.go:31`, `internal/app/inventory/service.go:44`, `internal/app/inventory/service.go:54`, `internal/app/inventory/service.go:67`, `internal/app/inventory/service.go:77` |
+| Allow Read operations                                                                                  | [x]       | VERIFIED COMPLETE | No read guards introduced; enforcement is write-only (`RequireWriteAccess`) across mutation commands                                                                                                                                                                                                        |
+| Task 3: Implement Hardware Error Screen                                                                | [x]       | VERIFIED COMPLETE | `cmd/server/main.go:318`, `frontend/src/App.tsx:401`                                                                                                                                                                                                                                                        |
+| Update startup license check (`cmd/server/main.go`)                                                    | [x]       | VERIFIED COMPLETE | `cmd/server/main.go:316`                                                                                                                                                                                                                                                                                    |
+| If `HardwareMismatch` occurs, launch Wails in lockout mode                                             | [x]       | VERIFIED COMPLETE | `cmd/server/main.go:319`, `cmd/server/main.go:505`                                                                                                                                                                                                                                                          |
+| Pass new computed Hardware ID to frontend                                                              | [x]       | VERIFIED COMPLETE | `cmd/server/main.go:321`, `cmd/server/main.go:505`                                                                                                                                                                                                                                                          |
+| Create lockout view with copy button                                                                   | [x]       | VERIFIED COMPLETE | `frontend/src/App.tsx:435`, `frontend/src/App.tsx:436`                                                                                                                                                                                                                                                      |
+| Task 4: Frontend Banners                                                                               | [x]       | VERIFIED COMPLETE | `frontend/src/App.tsx:112`                                                                                                                                                                                                                                                                                  |
+| Update Main Layout to poll/check License Status                                                        | [x]       | VERIFIED COMPLETE | `frontend/src/App.tsx:318`, `frontend/src/App.tsx:319`                                                                                                                                                                                                                                                      |
+| Render Yellow Warning Banner if `Expiring`                                                             | [x]       | VERIFIED COMPLETE | `frontend/src/App.tsx:113`                                                                                                                                                                                                                                                                                  |
+| Render Red Error Banner if `GracePeriod` or `Expired`                                                  | [x]       | VERIFIED COMPLETE | `frontend/src/App.tsx:124`, `frontend/src/App.tsx:136`                                                                                                                                                                                                                                                      |
+| Disable `New GRN`, `New Batch` buttons in UI if `GracePeriod`                                          | [x]       | VERIFIED COMPLETE | `frontend/src/App.tsx:72`, `frontend/src/App.tsx:178`, `frontend/src/App.tsx:184`                                                                                                                                                                                                                           |
+| Review Follow-ups (AI)                                                                                 | [x]       | VERIFIED COMPLETE | `frontend/src/App.tsx:318`, `internal/app/inventory/service.go:21`, `frontend/src/App.tsx:231`, `frontend/src/__tests__/AppRecoveryMode.test.tsx:190`                                                                                                                                                       |
+| [AI-Review][High] Enforce lockout-state transition continuously for active sessions                    | [x]       | VERIFIED COMPLETE | `frontend/src/App.tsx:318`, `frontend/src/App.tsx:332`, `frontend/src/__tests__/AppRecoveryMode.test.tsx:190`                                                                                                                                                                                               |
+| [AI-Review][High] Apply grace-period write guard across relevant write/update/delete command paths     | [x]       | VERIFIED COMPLETE | `internal/app/inventory/service.go:21`, `internal/domain/inventory/repository.go:3`                                                                                                                                                                                                                         |
+| [AI-Review][Med] Replace fail-open fallback with safe degraded warning state                           | [x]       | VERIFIED COMPLETE | `frontend/src/App.tsx:231`, `frontend/src/App.tsx:305`, `frontend/src/__tests__/AppLicenseStatus.test.tsx:60`                                                                                                                                                                                               |
+| [AI-Review][Low] Add test for grace-period to expired runtime lockout activation                       | [x]       | VERIFIED COMPLETE | `frontend/src/__tests__/AppRecoveryMode.test.tsx:190`                                                                                                                                                                                                                                                       |
+
+Summary: 23 of 23 completed items verified, 0 questionable, 0 false completions.
+
+### Test Coverage and Gaps
+
+- AC1 covered by status classification unit tests and banner rendering tests. Evidence: `internal/infrastructure/license/status_test.go:35`, `frontend/src/__tests__/AppLicenseStatus.test.tsx:15`.
+- AC2 covered by backend write-guard tests and runtime transition lockout test. Evidence: `internal/app/inventory/service_test.go:70`, `internal/app/inventory/service_test.go:85`, `frontend/src/__tests__/AppRecoveryMode.test.tsx:190`.
+- AC3 covered by hardware lockout rendering/copy interaction tests. Evidence: `frontend/src/__tests__/AppRecoveryMode.test.tsx:120`.
+- Executed verification commands:
+    - `GOCACHE=/tmp/go-cache go test ./internal/infrastructure/license ./internal/app ./internal/app/inventory ./cmd/server`
+    - `cd frontend && npm run test:run -- src/__tests__/AppLicenseStatus.test.tsx src/__tests__/AppRecoveryMode.test.tsx`
+
+### Architectural Alignment
+
+- Implementation aligns with architecture intent: backend-enforced license write guards and Wails lockout-aware application startup/runtime state handling.
+- No architecture constraint violations found against `docs/architecture.md` and `docs/tech-spec-epic-1.md`.
+
+### Security Notes
+
+- License verification remains cryptographically validated with Ed25519 signature and strict key/signature size checks. Evidence: `internal/infrastructure/license/crypto.go:21`, `internal/infrastructure/license/crypto.go:25`.
+- Write-access restriction is enforced server-side, reducing reliance on frontend-only controls. Evidence: `cmd/server/main.go:383`, `internal/app/inventory/service.go:22`.
+
+### Best-Practices and References
+
+- Wails runtime/events: https://wails.io/docs/reference/runtime/events
+- Wails runtime basics: https://wails.io/docs/reference/runtime/intro
+- React effects and synchronization: https://react.dev/learn/synchronizing-with-effects
+- Go error handling (`errors.Is`/`errors.As`): https://go.dev/blog/go1.13-errors
+- Go database safety patterns: https://go.dev/doc/database/querying
+
+### Action Items
+
+**Code Changes Required:**
+
+- None.
+
+**Advisory Notes:**
+
+- Note: Keep the existing polling cadence (`30s`) under observation in production and tune if UX needs faster lockout propagation.
