@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Layout, Typography, Card, Segmented, Space, Alert, Button, message } from "antd";
 import { useBlocker, useLocation, useNavigate } from "react-router-dom";
+import { LogInfo, WindowClose, WindowMinimise } from "../wailsjs/runtime/runtime";
 import logo from "./assets/images/icon.png";
 import { ConnectionProvider } from "./context/ConnectionContext";
 import { ConnectionStatus } from "./components/layout/ConnectionStatus";
@@ -12,11 +13,6 @@ import "./App.css";
 
 const { Header, Content, Footer } = Layout;
 const { Title, Text } = Typography;
-
-type WailsWindowRuntime = {
-    WindowMinimise?: () => void;
-    WindowHide?: () => void;
-};
 
 type RecoveryState = {
     enabled: boolean;
@@ -63,20 +59,29 @@ const VIEW_TO_PATH: Record<ViewKey, string> = {
 };
 
 function WindowControls() {
-    const getRuntime = (): WailsWindowRuntime | undefined =>
-        (window as Window & { runtime?: WailsWindowRuntime }).runtime;
+    const trace = (msg: string) => {
+        console.info(msg);
+        try {
+            LogInfo(msg);
+        } catch {
+            // no-op outside Wails runtime
+        }
+    };
 
     const onMinimize = () => {
+        trace("[UI][WindowControls] Minimize clicked");
         try {
-            getRuntime()?.WindowMinimise?.();
+            void WindowMinimise();
         } catch {
             // no-op outside Wails runtime
         }
     };
 
     const onHideToTray = () => {
+        trace("[UI][WindowControls] Close clicked -> WindowClose (OnBeforeClose path)");
         try {
-            getRuntime()?.WindowHide?.();
+            // Route through WindowClose so backend OnBeforeClose handles hide-to-tray and notification consistently.
+            void WindowClose();
         } catch {
             // no-op outside Wails runtime
         }

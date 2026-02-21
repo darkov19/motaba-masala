@@ -3,7 +3,7 @@ import { Modal } from "antd";
 import { createElement, useEffect } from "react";
 import type { Blocker } from "react-router-dom";
 import { SetForceQuit } from "../../wailsjs/go/app/App";
-import { EventsOn, Quit } from "../../wailsjs/runtime/runtime";
+import { EventsOn, LogInfo, Quit } from "../../wailsjs/runtime/runtime";
 
 type UseUnsavedChangesOptions = {
     isDirty: boolean;
@@ -19,6 +19,15 @@ function setForceQuit(force: boolean) {
     } catch {
         // Ignore when bridge is unavailable.
         return Promise.resolve();
+    }
+}
+
+function trace(message: string) {
+    console.info(message);
+    try {
+        LogInfo(message);
+    } catch {
+        // no-op outside Wails runtime
     }
 }
 
@@ -76,6 +85,7 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
 
         try {
             unsubscribe = EventsOn("app:before-close", () => {
+                trace("[UI][QuitFlow] app:before-close event received");
                 if (!isDirty) {
                     void setForceQuit(true).finally(() => {
                         Quit();
@@ -97,6 +107,7 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
             });
 
             unsubscribeQuitConfirm = EventsOn("app:request-quit-confirm", () => {
+                trace("[UI][QuitFlow] app:request-quit-confirm event received");
                 Modal.confirm({
                     title: "Exit Masala Inventory Server?",
                     content: isDirty
@@ -110,9 +121,13 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
                     cancelText: "Keep Running",
                     okButtonProps: { danger: true },
                     onOk: () => {
+                        trace("[UI][QuitFlow] Confirm dialog accepted -> quitting");
                         return setForceQuit(true).finally(() => {
                             Quit();
                         });
+                    },
+                    onCancel: () => {
+                        trace("[UI][QuitFlow] Confirm dialog cancelled -> keep running");
                     },
                 });
             });

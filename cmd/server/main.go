@@ -577,6 +577,7 @@ func run() error {
 										runtime.WindowShow(ctx)
 										runtime.WindowUnminimise(ctx)
 										runtime.WindowFullscreen(ctx)
+										slog.Info("Tray action", "action", "emit-custom-quit-confirm")
 										runtime.EventsEmit(ctx, "app:request-quit-confirm")
 								}
 							}
