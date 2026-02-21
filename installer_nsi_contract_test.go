@@ -1,3 +1,5 @@
+//go:build !bindings
+
 package masala_inventory_managment
 
 import (
