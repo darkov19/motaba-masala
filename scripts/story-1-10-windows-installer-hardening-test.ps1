@@ -162,15 +162,35 @@ function Run-ScenarioUnchecked([string]$Kind) {
 }
 
 function Get-UninstallerPath([string]$Kind) {
-    $base = Join-Path ${env:ProgramFiles} "Masala Inventory\$Kind"
-    return Join-Path $base "Uninstall.exe"
+    $candidates = @()
+    if (-not [string]::IsNullOrWhiteSpace($env:ProgramFiles)) {
+        $candidates += (Join-Path $env:ProgramFiles "Masala Inventory\$Kind\Uninstall.exe")
+    }
+    if (-not [string]::IsNullOrWhiteSpace(${env:ProgramFiles(x86)})) {
+        $candidates += (Join-Path ${env:ProgramFiles(x86)} "Masala Inventory\$Kind\Uninstall.exe")
+    }
+
+    foreach ($path in $candidates) {
+        if (Test-Path $path) {
+            return $path
+        }
+    }
+
+    return ""
 }
 
 function Run-UninstallerIfPresent([string]$Kind) {
     $uninstaller = Get-UninstallerPath $Kind
-    if (-not (Test-Path $uninstaller)) {
-        Write-Warning "Uninstaller not found for $Kind at $uninstaller"
-        return
+    if ([string]::IsNullOrWhiteSpace($uninstaller)) {
+        $checked = @()
+        if (-not [string]::IsNullOrWhiteSpace($env:ProgramFiles)) {
+            $checked += (Join-Path $env:ProgramFiles "Masala Inventory\$Kind\Uninstall.exe")
+        }
+        if (-not [string]::IsNullOrWhiteSpace(${env:ProgramFiles(x86)})) {
+            $checked += (Join-Path ${env:ProgramFiles(x86)} "Masala Inventory\$Kind\Uninstall.exe")
+        }
+        $paths = $checked -join "; "
+        throw "Uninstaller not found for $Kind. Checked: $paths"
     }
     Write-Step "Run $Kind uninstaller"
     Start-Process -FilePath $uninstaller -Wait
