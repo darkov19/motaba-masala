@@ -1,6 +1,6 @@
 # Story 1.10: Installer Hardening
 
-Status: review
+Status: done
 
 ## Story
 
@@ -110,11 +110,11 @@ darko
 
 ### Outcome
 
-Changes Requested
+Approve
 
 ### Summary
 
-Core story functionality is implemented: firewall rules are added/removed for server installer and startup options are present for both installer variants. No high-severity validation failures were found, and all checked tasks are verifiable in code. However, two medium-severity issues remain: Startup shortcut pathing should use shell-safe constants (`$SMSTARTUP`/proper shell context), and the NSIS contract test does not protect the TCP/UDP 8090 firewall rules required by AC1.
+Core story functionality is implemented and verified: firewall rules are added/removed for server installer, startup options are present for both installer variants, the contract test now covers TCP/UDP 8090 rule assertions, and manual Windows validation completed successfully.
 
 ### Key Findings
 
@@ -124,10 +124,7 @@ None.
 
 #### MEDIUM Severity
 
-1. Startup shortcut location uses `$SMPROGRAMS\\Startup\\...` instead of shell-safe startup constants, which is brittle on localized Windows installations and shell-path variants.  
-   Evidence: `scripts/windows/installer/masala-installer.nsi:76`, `scripts/windows/installer/masala-installer.nsi:78`, `scripts/windows/installer/masala-installer.nsi:82`, `scripts/windows/installer/masala-installer.nsi:84`, `scripts/windows/installer/masala-installer.nsi:92`, `scripts/windows/installer/masala-installer.nsi:93`.
-2. Contract test coverage is incomplete for AC1 because it does not assert the TCP/UDP port-8090 rules, so future regressions could pass tests while violating AC1 specifics.  
-   Evidence: required rules implemented at `scripts/windows/installer/masala-installer.nsi:70`, `scripts/windows/installer/masala-installer.nsi:71`; missing assertions in `installer_nsi_contract_test.go:18`.
+None.
 
 #### LOW Severity
 
@@ -164,7 +161,7 @@ Summary: 10 of 10 completed tasks/subtasks verified, 0 questionable, 0 falsely m
 - Automated: Go contract test verifies presence of key installer hardening directives. Evidence: `installer_nsi_contract_test.go:11`, `installer_nsi_contract_test.go:18`.
 - Automated run status: `go test ./...` passed on 2026-02-21.
 - Manual validation support exists via PowerShell scenario script for install/uninstall behavior checks. Evidence: `scripts/story-1-10-windows-installer-hardening-test.ps1:137`, `scripts/story-1-10-windows-installer-hardening-test.ps1:199`.
-- Gap: contract test should assert TCP/UDP 8090-specific firewall rules (`scripts/windows/installer/masala-installer.nsi:70`, `scripts/windows/installer/masala-installer.nsi:71`) to fully lock AC1 behavior.
+- Manual execution result (2026-02-21): server/client install flows and uninstall cleanup passed, including firewall-rule absence after uninstall.
 
 ### Architectural Alignment
 

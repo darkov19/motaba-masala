@@ -19,5 +19,5 @@ Routing guidance:
 | 2026-02-18 | 1.8   | 1    | Security | Med | TBD | ✅ Done | Removed plaintext bootstrap password logging and replaced with non-secret setup guidance. Ref: `cmd/server/main.go:127`. |
 | 2026-02-18 | 1.8   | 1    | TechDebt | Med | TBD | ✅ Done | Added startup integration coverage for integrity-check/connect-error recovery mode transition. Ref: `cmd/server/startup_recovery_test.go:144`. |
 
-| 2026-02-21 | 1.10 | 1 | TechDebt | Med | TBD | Open | Replace startup shortcut path handling with shell-safe Startup constants (`$SMSTARTUP`) and validate install/uninstall behavior for server/client. Ref: `scripts/windows/installer/masala-installer.nsi:76`. |
-| 2026-02-21 | 1.10 | 1 | TechDebt | Med | TBD | Open | Extend NSIS contract test to assert TCP/UDP 8090 firewall rules for AC1 regression coverage. Ref: `installer_nsi_contract_test.go:18`, `scripts/windows/installer/masala-installer.nsi:70`. |
+| 2026-02-21 | 1.10 | 1 | TechDebt | Med | TBD | ✅ Done | Replace startup shortcut path handling with shell-safe Startup constants (`$SMSTARTUP`) and validate install/uninstall behavior for server/client. Ref: `scripts/windows/installer/masala-installer.nsi:76`. |
+| 2026-02-21 | 1.10 | 1 | TechDebt | Med | TBD | ✅ Done | Extend NSIS contract test to assert TCP/UDP 8090 firewall rules for AC1 regression coverage. Ref: `installer_nsi_contract_test.go:18`, `scripts/windows/installer/masala-installer.nsi:70`. |

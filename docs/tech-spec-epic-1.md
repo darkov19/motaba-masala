@@ -196,5 +196,5 @@ CREATE TABLE items (
 3.  **Security Audit**: Test IPC middleware for Role leakage (attempting unauthorized RPC calls).
 4.  **Resilience Test**: Simulate power failure during DB write/backup to ensure WAL recovery works.
 
-- [ ] [Story 1.10] Replace startup shortcut path handling with shell-safe Startup constants (`$SMSTARTUP`) and validate install/uninstall behavior for server/client. Ref: `scripts/windows/installer/masala-installer.nsi:76`.
-- [ ] [Story 1.10] Extend NSIS contract test to assert TCP/UDP 8090 firewall rules for AC1 regression coverage. Ref: `installer_nsi_contract_test.go:18`, `scripts/windows/installer/masala-installer.nsi:70`.
+- [x] [Story 1.10] Replace startup shortcut path handling with shell-safe Startup constants (`$SMSTARTUP`) and validate install/uninstall behavior for server/client. ✅ Done. Ref: `scripts/windows/installer/masala-installer.nsi:76`.
+- [x] [Story 1.10] Extend NSIS contract test to assert TCP/UDP 8090 firewall rules for AC1 regression coverage. ✅ Done. Ref: `installer_nsi_contract_test.go:18`, `scripts/windows/installer/masala-installer.nsi:70`.
