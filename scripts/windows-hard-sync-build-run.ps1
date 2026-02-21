@@ -153,6 +153,32 @@ function Build-Installers {
     Assert-CommandSucceeded "makensis client"
 }
 
+function Write-DevLauncher {
+    $launcherPath = Join-Path $RepoRoot "build\bin\run-server-dev.ps1"
+    $content = @'
+param(
+    [string]$JwtSecret = "dev-only-jwt-secret-change-me"
+)
+
+$ErrorActionPreference = "Stop"
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$exePath = Join-Path $scriptDir "masala_inventory_server.exe"
+
+if (-not (Test-Path $exePath)) {
+    throw "Server executable not found: $exePath"
+}
+
+$env:MASALA_APP_ENV = "development"
+$env:MASALA_JWT_SECRET = $JwtSecret
+
+Write-Host "Launching server in development mode..." -ForegroundColor Cyan
+Write-Host "MASALA_APP_ENV=$env:MASALA_APP_ENV" -ForegroundColor DarkGray
+Write-Host "MASALA_JWT_SECRET=***" -ForegroundColor DarkGray
+& $exePath
+'@
+    Set-Content -Path $launcherPath -Value $content -Encoding UTF8
+}
+
 Push-Location $RepoRoot
 try {
     Write-Step "Fetch latest from $Remote"
@@ -171,6 +197,7 @@ try {
 
     Build-App
     Build-ClientBinary
+    Write-DevLauncher
 
     if (-not $SkipInstallers) {
         Build-Installers
@@ -179,6 +206,7 @@ try {
     Write-Step "Build completed"
     Write-Host "Output: $ServerBuildExe" -ForegroundColor Green
     Write-Host "Output: $ClientExe" -ForegroundColor Green
+    Write-Host "Helper: $(Join-Path $RepoRoot 'build\bin\run-server-dev.ps1')" -ForegroundColor Green
     if (-not $SkipInstallers) {
         Write-Host "Output: $ServerInstaller" -ForegroundColor Green
         Write-Host "Output: $ClientInstaller" -ForegroundColor Green
