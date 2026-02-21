@@ -3,7 +3,7 @@ param(
     [string]$Mode = "all",
     [ValidateSet("server", "client")]
     [string]$UncheckedKind = "client",
-    [switch]$SkipBuild
+    [switch]$Rebuild
 )
 
 Set-StrictMode -Version Latest
@@ -216,13 +216,17 @@ try {
         return
     }
 
-    if (-not $SkipBuild) {
+    if ($Rebuild) {
         if ($Mode -in @("all", "build", "server", "uninstall")) {
             Build-Installer "server"
         }
         if ($Mode -in @("all", "build", "client", "unchecked", "uninstall")) {
             Build-Installer "client"
         }
+    } elseif ($Mode -eq "build") {
+        Write-Step "Build mode requires -Rebuild"
+        Write-Host "Use: .\\scripts\\story-1-10-windows-installer-hardening-test.ps1 -Mode build -Rebuild" -ForegroundColor Yellow
+        return
     }
 
     switch ($Mode) {
