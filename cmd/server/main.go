@@ -531,6 +531,8 @@ func run() error {
 		Title:             "Masala Inventory Server",
 		Width:             1024,
 		Height:            768,
+		Frameless:         true,
+		Fullscreen:        true,
 		HideWindowOnClose: false, // Route close via OnBeforeClose for explicit logging + notifications
 		AssetServer: &assetserver.Options{
 			Assets: masala_inventory_managment.Assets,
@@ -539,6 +541,7 @@ func run() error {
 		OnStartup: func(ctx context.Context) {
 			application.Startup(ctx)
 			monitorSvc.Start(ctx)
+			runtime.WindowFullscreen(ctx)
 
 			// Initialize System Tray
 			// Note: We run this in a goroutine because Wails requires the main thread.
@@ -564,17 +567,35 @@ func run() error {
 								select {
 								case <-ctx.Done():
 									return
-								case <-mOpen.ClickedCh:
-									slog.Info("Tray action", "action", "open-dashboard")
-									runtime.WindowShow(ctx)
-									runtime.WindowUnminimise(ctx)
-								case <-mQuit.ClickedCh:
-									slog.Info("Tray action", "action", "exit-server")
-									runtime.WindowShow(ctx)
-									runtime.WindowUnminimise(ctx)
-									application.SetForceQuit(true)
-									runtime.Quit(ctx)
-									return
+									case <-mOpen.ClickedCh:
+										slog.Info("Tray action", "action", "open-dashboard")
+										runtime.WindowShow(ctx)
+										runtime.WindowUnminimise(ctx)
+										runtime.WindowFullscreen(ctx)
+									case <-mQuit.ClickedCh:
+										slog.Info("Tray action", "action", "exit-server")
+										choice, dialogErr := runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
+											Type:          runtime.QuestionDialog,
+											Title:         "Confirm Exit",
+											Message:       "Are you sure you want to exit the server?",
+											Buttons:       []string{"Cancel", "Exit"},
+											DefaultButton: "Cancel",
+											CancelButton:  "Cancel",
+										})
+										if dialogErr != nil {
+											slog.Error("Failed to show exit confirmation dialog", "error", dialogErr)
+											continue
+										}
+										if choice != "Exit" {
+											slog.Info("Tray action", "action", "exit-server-cancelled")
+											continue
+										}
+										runtime.WindowShow(ctx)
+										runtime.WindowUnminimise(ctx)
+										runtime.WindowFullscreen(ctx)
+										application.SetForceQuit(true)
+										runtime.Quit(ctx)
+										return
 								}
 							}
 						}()
@@ -604,11 +625,12 @@ func run() error {
 			go func() {
 				pingFile := filepath.Join(os.TempDir(), "MasalaServerMutex.ping")
 				for {
-					if _, err := os.Stat(pingFile); err == nil {
-						_ = os.Remove(pingFile)
-						runtime.WindowShow(ctx)
-						runtime.WindowUnminimise(ctx)
-						runtime.WindowSetAlwaysOnTop(ctx, true)
+						if _, err := os.Stat(pingFile); err == nil {
+							_ = os.Remove(pingFile)
+							runtime.WindowShow(ctx)
+							runtime.WindowUnminimise(ctx)
+							runtime.WindowFullscreen(ctx)
+							runtime.WindowSetAlwaysOnTop(ctx, true)
 						go func() {
 							time.Sleep(500 * time.Millisecond)
 							runtime.WindowSetAlwaysOnTop(ctx, false)

@@ -5,19 +5,26 @@ package license
 import (
 	"fmt"
 	"os/exec"
+	"syscall"
 	"strings"
 )
 
 // WindowsHardwareProvider implements HardwareProvider for Windows systems
 type WindowsHardwareProvider struct{}
 
+func newHiddenCommand(name string, args ...string) *exec.Cmd {
+	cmd := exec.Command(name, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	return cmd
+}
+
 func (p *WindowsHardwareProvider) GetBIOSUUID() (string, error) {
 	// Execute: wmic csproduct get uuid
-	cmd := exec.Command("wmic", "csproduct", "get", "uuid")
+	cmd := newHiddenCommand("wmic", "csproduct", "get", "uuid")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Fallback to PowerShell if wmic fails (which might happen on newer Windows)
-		psCmd := exec.Command("powershell", "-Command", "Get-WmiObject Win32_ComputerSystemProduct | Select-Object -ExpandProperty UUID")
+		psCmd := newHiddenCommand("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "Get-WmiObject Win32_ComputerSystemProduct | Select-Object -ExpandProperty UUID")
 		psOutput, psErr := psCmd.CombinedOutput()
 		if psErr != nil {
 			return "", fmt.Errorf("failed to get BIOS UUID: %v (wmic) / %v (powershell)", err, psErr)
@@ -29,11 +36,11 @@ func (p *WindowsHardwareProvider) GetBIOSUUID() (string, error) {
 
 func (p *WindowsHardwareProvider) GetDiskSerial() (string, error) {
 	// Execute: wmic diskdrive get serialnumber
-	cmd := exec.Command("wmic", "diskdrive", "get", "serialnumber")
+	cmd := newHiddenCommand("wmic", "diskdrive", "get", "serialnumber")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Fallback to PowerShell
-		psCmd := exec.Command("powershell", "-Command", "Get-WmiObject Win32_DiskDrive | Select-Object -ExpandProperty SerialNumber")
+		psCmd := newHiddenCommand("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "Get-WmiObject Win32_DiskDrive | Select-Object -ExpandProperty SerialNumber")
 		psOutput, psErr := psCmd.CombinedOutput()
 		if psErr != nil {
 			return "GENERIC-DISK-SERIAL", nil // Non-fatal
