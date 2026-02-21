@@ -542,6 +542,14 @@ func run() error {
 			application.Startup(ctx)
 			monitorSvc.Start(ctx)
 			runtime.WindowFullscreen(ctx)
+			runtime.EventsOn(ctx, "app:request-hide-to-tray", func(optionalData ...interface{}) {
+				slog.Info("UI event", "action", "request-hide-to-tray")
+				runtime.WindowHide(ctx)
+				if err := infraSys.ShowNotification(backgroundNotificationTitle, backgroundNotificationBody); err != nil {
+					slog.Error("Failed to show notification", "error", err)
+				}
+				runtime.EventsEmit(ctx, "server-minimized", nil)
+			})
 
 			// Initialize System Tray
 			// Note: We run this in a goroutine because Wails requires the main thread.

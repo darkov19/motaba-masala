@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Layout, Typography, Card, Segmented, Space, Alert, Button, message } from "antd";
 import { useBlocker, useLocation, useNavigate } from "react-router-dom";
-import { LogInfo, Quit, WindowMinimise } from "../wailsjs/runtime/runtime";
+import { EventsEmit, LogInfo, WindowMinimise } from "../wailsjs/runtime/runtime";
 import logo from "./assets/images/icon.png";
 import { ConnectionProvider } from "./context/ConnectionContext";
 import { ConnectionStatus } from "./components/layout/ConnectionStatus";
@@ -78,10 +78,9 @@ function WindowControls() {
     };
 
     const onHideToTray = () => {
-        trace("[UI][WindowControls] Close clicked -> WindowClose (OnBeforeClose path)");
+        trace("[UI][WindowControls] Close clicked -> emit app:request-hide-to-tray");
         try {
-            // Quit routes through backend OnBeforeClose; with forceQuit=false it hides to tray.
-            void Quit();
+            EventsEmit("app:request-hide-to-tray");
         } catch {
             // no-op outside Wails runtime
         }
