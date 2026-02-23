@@ -684,6 +684,8 @@ function Run-ManualUiAll {
         Write-Host "Flow is now fully automated for AC1/AC2/AC3/AC4/AC5; only observation pauses remain." -ForegroundColor DarkGray
 
         Write-Step "AC1 automation step"
+        Write-Host "Observe current baseline state now (before restart)." -ForegroundColor Yellow
+        Read-Host "Press Enter to begin AC1 automated server restart check" | Out-Null
         Write-Host "Restarting server automatically to validate recovery behavior..." -ForegroundColor Yellow
         Restart-AppProcess ([ref]$serverProc) $ServerPath "Server app (AC1 restart)"
         $ac1Connected = Wait-ForUiText "Connected" 30 $true $clientProc.Id
