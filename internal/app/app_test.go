@@ -110,6 +110,22 @@ func TestCheckServerReachability_UsesLocalDevFallbackProbe(t *testing.T) {
 	}
 }
 
+func TestCheckServerReachability_DefaultsToLocalProcessProbeWhenNoServerAddrConfigured(t *testing.T) {
+	t.Setenv(envServerProbeAddr, "")
+	t.Setenv(envLocalSingleMachine, "0")
+
+	a := NewApp(false)
+	a.connectivityProbe = func() error { return nil }
+
+	connected, err := a.CheckServerReachability()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !connected {
+		t.Fatal("expected reachability true via default local process probe path")
+	}
+}
+
 func TestResolveProbeAddress(t *testing.T) {
 	if got := resolveProbeAddress(""); got != defaultServerProbeAddr {
 		t.Fatalf("expected default addr %q, got %q", defaultServerProbeAddr, got)

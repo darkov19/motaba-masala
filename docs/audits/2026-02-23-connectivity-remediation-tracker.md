@@ -21,7 +21,8 @@
 
 - `internal/app/app.go`
     - Added `CheckServerReachability() (bool, error)`:
-        - network-first TCP probe (default target `127.0.0.1:8090`)
+        - explicit network probe when `MASALA_SERVER_PROBE_ADDR` is set
+        - single-machine compatibility: local process probe default when probe address is not configured
         - optional local-dev fallback probe only when `MASALA_LOCAL_SINGLE_MACHINE_MODE=1`
     - `Greet` no longer performs connectivity probing.
     - Added helpers:

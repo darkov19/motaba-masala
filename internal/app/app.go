@@ -90,14 +90,31 @@ func (a *App) Greet(name string) (string, error) {
 }
 
 // CheckServerReachability probes server reachability for client-mode connectivity status.
-// Default behavior is network-level probing. Optional local-dev fallback can be enabled
-// via MASALA_LOCAL_SINGLE_MACHINE_MODE=1 to use process probing when network probe fails.
+// Behavior:
+//   - If MASALA_SERVER_PROBE_ADDR is set: use network probe for that target.
+//   - If not set: use local process probe by default (single-machine compatibility).
+//   - Optional local-dev fallback can be enabled via MASALA_LOCAL_SINGLE_MACHINE_MODE=1
+//     to use process probing when explicit network probe fails.
 func (a *App) CheckServerReachability() (bool, error) {
 	if a.isServer {
 		return true, nil
 	}
 
-	probeAddr := resolveProbeAddress(os.Getenv(envServerProbeAddr))
+	rawProbeAddr := strings.TrimSpace(os.Getenv(envServerProbeAddr))
+	if rawProbeAddr == "" {
+		if a.connectivityProbe != nil {
+			if err := a.connectivityProbe(); err == nil {
+				return true, nil
+			}
+		}
+		// Secondary fallback for environments with a local TCP server but no process match.
+		if err := probeTCPAddress(defaultServerProbeAddr); err == nil {
+			return true, nil
+		}
+		return false, nil
+	}
+
+	probeAddr := resolveProbeAddress(rawProbeAddr)
 	if err := probeTCPAddress(probeAddr); err == nil {
 		return true, nil
 	}
