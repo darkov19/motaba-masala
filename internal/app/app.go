@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"encoding/csv"
 	"fmt"
+	"io"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -87,6 +89,8 @@ func probeLocalServerProcess() error {
 	candidates := []string{
 		"masala_inventory_server.exe",
 		"masala_inventory_server",
+		"masala_inventory_managment.exe",
+		"masala_inventory_managment",
 		"server.exe",
 		"server",
 	}
@@ -107,11 +111,40 @@ func probeLocalServerProcess() error {
 func isProcessRunning(processName string) (bool, error) {
 	switch runtime.GOOS {
 	case "windows":
-		out, err := newProbeCommand("tasklist", "/FI", "IMAGENAME eq "+processName).CombinedOutput()
+		target := processName
+		if !strings.HasSuffix(strings.ToLower(target), ".exe") {
+			target += ".exe"
+		}
+
+		out, err := newProbeCommand("tasklist", "/FO", "CSV", "/NH", "/FI", "IMAGENAME eq "+target).CombinedOutput()
 		if err != nil {
 			return false, fmt.Errorf("tasklist probe failed: %w", err)
 		}
-		return strings.Contains(strings.ToLower(string(out)), strings.ToLower(processName)), nil
+
+		reader := csv.NewReader(strings.NewReader(string(out)))
+		for {
+			record, readErr := reader.Read()
+			if readErr == io.EOF {
+				break
+			}
+			if readErr != nil {
+				break
+			}
+			if len(record) == 0 {
+				continue
+			}
+
+			imageName := strings.TrimSpace(record[0])
+			if strings.EqualFold(imageName, target) {
+				return true, nil
+			}
+		}
+
+		lowerOut := strings.ToLower(string(out))
+		if strings.Contains(lowerOut, strings.ToLower(target)) {
+			return true, nil
+		}
+		return false, nil
 	default:
 		cmd := newProbeCommand("pgrep", "-f", processName)
 		if err := cmd.Run(); err != nil {
