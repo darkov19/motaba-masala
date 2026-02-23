@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Layout, Typography, Card, Segmented, Space, Alert, Button, message } from "antd";
 import { useBlocker, useLocation, useNavigate } from "react-router-dom";
-import { EventsEmit, EventsOn, LogInfo, WindowMaximise, WindowShow, WindowUnminimise } from "../wailsjs/runtime/runtime";
+import { EventsEmit, EventsOn, LogInfo, WindowShow, WindowUnminimise } from "../wailsjs/runtime/runtime";
 import logo from "./assets/images/icon.png";
 import { ConnectionProvider } from "./context/ConnectionContext";
 import { useConnection } from "./context/ConnectionContext";
@@ -401,7 +401,6 @@ function App() {
                 try {
                     WindowShow();
                     WindowUnminimise();
-                    WindowMaximise();
                 } catch {
                     // no-op outside Wails runtime
                 }
@@ -497,95 +496,99 @@ function App() {
             : "Contact support with this Hardware ID to request a new license.";
 
         return (
-            <Layout className="app-shell" style={{ minHeight: "100vh" }}>
-                <WindowTitleBar />
-                <Header className="app-header">
-                    <Space align="center" size={16}>
-                        <img src={logo} className="app-header__logo" alt="logo" />
-                        <Title level={4} className="app-header__title">
-                            Masala Inventory Management
-                        </Title>
-                    </Space>
-                </Header>
-                <Content className="app-content">
-                    <Card className="app-card" variant="borderless">
-                        <Space orientation="vertical" size={16} style={{ width: "100%" }}>
-                            <Title level={3} style={{ marginBottom: 0 }}>
-                                {heading}
+            <ConnectionProvider>
+                <Layout className="app-shell" style={{ minHeight: "100vh" }}>
+                    <WindowTitleBar />
+                    <Header className="app-header">
+                        <Space align="center" size={16}>
+                            <img src={logo} className="app-header__logo" alt="logo" />
+                            <Title level={4} className="app-header__title">
+                                Masala Inventory Management
                             </Title>
-                            <Alert
-                                type="error"
-                                showIcon
-                                title={effectiveLockoutState.message || heading}
-                            />
-                            <Text type="secondary">
-                                {guidance}
-                            </Text>
-                            <Card size="small">
-                                <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
-                                    <Text code>{effectiveLockoutState.hardware_id || "Unavailable"}</Text>
-                                    <Button type="primary" onClick={() => void onCopySupportMessage()}>
-                                        Copy Support Request
-                                    </Button>
-                                </Space>
-                            </Card>
                         </Space>
-                    </Card>
-                </Content>
-            </Layout>
+                    </Header>
+                    <Content className="app-content">
+                        <Card className="app-card" variant="borderless">
+                            <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+                                <Title level={3} style={{ marginBottom: 0 }}>
+                                    {heading}
+                                </Title>
+                                <Alert
+                                    type="error"
+                                    showIcon
+                                    title={effectiveLockoutState.message || heading}
+                                />
+                                <Text type="secondary">
+                                    {guidance}
+                                </Text>
+                                <Card size="small">
+                                    <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
+                                        <Text code>{effectiveLockoutState.hardware_id || "Unavailable"}</Text>
+                                        <Button type="primary" onClick={() => void onCopySupportMessage()}>
+                                            Copy Support Request
+                                        </Button>
+                                    </Space>
+                                </Card>
+                            </Space>
+                        </Card>
+                    </Content>
+                </Layout>
+            </ConnectionProvider>
         );
     }
 
     if (!isLoadingRecovery && recoveryState?.enabled) {
         return (
-            <Layout className="app-shell" style={{ minHeight: "100vh" }}>
-                <WindowTitleBar />
-                <Header className="app-header">
-                    <Space align="center" size={16}>
-                        <img src={logo} className="app-header__logo" alt="logo" />
-                        <Title level={4} className="app-header__title">
-                            Masala Inventory Management
-                        </Title>
-                    </Space>
-                </Header>
-                <Content className="app-content">
-                    <Card className="app-card" variant="borderless">
-                        <Space orientation="vertical" size={16} style={{ width: "100%" }}>
-                            <Title level={3} style={{ marginBottom: 0 }}>
-                                Database Recovery Mode
+            <ConnectionProvider>
+                <Layout className="app-shell" style={{ minHeight: "100vh" }}>
+                    <WindowTitleBar />
+                    <Header className="app-header">
+                        <Space align="center" size={16}>
+                            <img src={logo} className="app-header__logo" alt="logo" />
+                            <Title level={4} className="app-header__title">
+                                Masala Inventory Management
                             </Title>
-                            <Alert
-                                type="warning"
-                                showIcon
-                                title={recoveryState.message || "Database recovery is required before normal startup."}
-                            />
-                            <Text type="secondary">
-                                Select a backup archive to restore. The server will restart automatically after restore.
-                            </Text>
-                            {recoveryState.backups.length === 0 ? (
-                                <Text type="secondary">No backups found in backups/ directory.</Text>
-                            ) : (
-                                <Space orientation="vertical" size={12} style={{ width: "100%" }}>
-                                    {recoveryState.backups.map(backupPath => (
-                                        <Card key={backupPath} size="small">
-                                            <Space align="center" style={{ width: "100%", justifyContent: "space-between" }}>
-                                                <Text code>{backupPath}</Text>
-                                                <Button
-                                                    type="primary"
-                                                    loading={restoringBackup === backupPath}
-                                                    onClick={() => void onRestoreBackup(backupPath)}
-                                                >
-                                                    Restore
-                                                </Button>
-                                            </Space>
-                                        </Card>
-                                    ))}
-                                </Space>
-                            )}
                         </Space>
-                    </Card>
-                </Content>
-            </Layout>
+                    </Header>
+                    <Content className="app-content">
+                        <Card className="app-card" variant="borderless">
+                            <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+                                <Title level={3} style={{ marginBottom: 0 }}>
+                                    Database Recovery Mode
+                                </Title>
+                                <Alert
+                                    type="warning"
+                                    showIcon
+                                    title={recoveryState.message || "Database recovery is required before normal startup."}
+                                />
+                                <Text type="secondary">
+                                    Select a backup archive to restore. The server will restart automatically after restore.
+                                </Text>
+                                {recoveryState.backups.length === 0 ? (
+                                    <Text type="secondary">No backups found in backups/ directory.</Text>
+                                ) : (
+                                    <Space orientation="vertical" size={12} style={{ width: "100%" }}>
+                                        {recoveryState.backups.map(backupPath => (
+                                            <Card key={backupPath} size="small">
+                                                <Space align="center" style={{ width: "100%", justifyContent: "space-between" }}>
+                                                    <Text code>{backupPath}</Text>
+                                                    <Button
+                                                        type="primary"
+                                                        loading={restoringBackup === backupPath}
+                                                        onClick={() => void onRestoreBackup(backupPath)}
+                                                    >
+                                                        Restore
+                                                    </Button>
+                                                </Space>
+                                            </Card>
+                                        ))}
+                                    </Space>
+                                )}
+                            </Space>
+                        </Card>
+                    </Content>
+                </Layout>
+            </ConnectionProvider>
         );
     }
 
