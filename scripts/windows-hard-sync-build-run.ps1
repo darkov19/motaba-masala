@@ -1,11 +1,22 @@
 param(
     [string]$Remote = "origin",
     [string]$Branch = "main",
-    [switch]$SkipInstallers
+    [switch]$SkipInstallers,
+    [switch]$DebugFrontend
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+# Default to debug frontend builds unless explicitly disabled by passing -DebugFrontend:$false.
+if (-not $PSBoundParameters.ContainsKey("DebugFrontend")) {
+    $DebugFrontend = $true
+}
+
+# Default to skipping installer generation unless explicitly enabled with -SkipInstallers:$false.
+if (-not $PSBoundParameters.ContainsKey("SkipInstallers")) {
+    $SkipInstallers = $true
+}
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $BuildDir = Join-Path $RepoRoot "build"
@@ -89,6 +100,14 @@ function Build-App {
     $ldflags = Get-Ldflags
 
     Write-Step "Build app with Wails"
+    if ($DebugFrontend) {
+        Write-Host "Using DEBUG frontend build (no minify + sourcemaps enabled)." -ForegroundColor Yellow
+        $env:MASALA_DEBUG_FRONTEND = "1"
+    }
+    else {
+        $env:MASALA_DEBUG_FRONTEND = "0"
+    }
+
     if ([string]::IsNullOrWhiteSpace($ldflags)) {
         & wails build -clean -platform windows/amd64
     }
@@ -213,5 +232,6 @@ try {
     }
 }
 finally {
+    Remove-Item Env:MASALA_DEBUG_FRONTEND -ErrorAction SilentlyContinue
     Pop-Location
 }

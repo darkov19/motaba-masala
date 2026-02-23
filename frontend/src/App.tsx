@@ -90,9 +90,9 @@ function WindowControls() {
             return;
         }
 
-        trace("[UI][WindowControls] Close clicked -> emit app:before-close");
+        trace("[UI][WindowControls] Close clicked -> emit app:request-quit-confirm");
         try {
-            EventsEmit("app:before-close");
+            EventsEmit("app:request-quit-confirm");
         } catch {
             // no-op outside Wails runtime
         }

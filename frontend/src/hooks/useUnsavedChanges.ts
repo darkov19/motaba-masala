@@ -1,6 +1,6 @@
 import { ExclamationCircleFilled } from "@ant-design/icons";
 import { Modal } from "antd";
-import { createElement, useEffect } from "react";
+import { createElement, useEffect, useRef } from "react";
 import type { Blocker } from "react-router-dom";
 import { SetForceQuit } from "../../wailsjs/go/app/App";
 import { EventsOn, LogInfo, Quit } from "../../wailsjs/runtime/runtime";
@@ -37,6 +37,18 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
         message = "You have unsaved changes. Leave anyway?",
         blocker,
     } = options;
+    const quitInProgressRef = useRef(false);
+    const quitDialogOpenRef = useRef(false);
+
+    const requestQuit = () => {
+        if (quitInProgressRef.current) {
+            return;
+        }
+        quitInProgressRef.current = true;
+        void setForceQuit(true).finally(() => {
+            Quit();
+        });
+    };
 
     useEffect(() => {
         // Keep close interception enabled by default. Force quit should only be
@@ -86,28 +98,35 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
         try {
             unsubscribe = EventsOn("app:before-close", () => {
                 trace("[UI][QuitFlow] app:before-close event received");
+                if (quitInProgressRef.current || quitDialogOpenRef.current) {
+                    return;
+                }
                 if (!isDirty) {
-                    void setForceQuit(true).finally(() => {
-                        Quit();
-                    });
+                    requestQuit();
                     return;
                 }
 
+                quitDialogOpenRef.current = true;
                 Modal.confirm({
                     title: "Unsaved changes",
                     content: message,
                     okText: "Leave anyway",
                     cancelText: "Stay",
                     onOk: () => {
-                        return setForceQuit(true).finally(() => {
-                            Quit();
-                        });
+                        requestQuit();
+                    },
+                    onCancel: () => {
+                        quitDialogOpenRef.current = false;
                     },
                 });
             });
 
             unsubscribeQuitConfirm = EventsOn("app:request-quit-confirm", () => {
                 trace("[UI][QuitFlow] app:request-quit-confirm event received");
+                if (quitInProgressRef.current || quitDialogOpenRef.current) {
+                    return;
+                }
+                quitDialogOpenRef.current = true;
                 Modal.confirm({
                     title: "Exit Masala Inventory Server?",
                     content: isDirty
@@ -122,11 +141,10 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
                     okButtonProps: { danger: true },
                     onOk: () => {
                         trace("[UI][QuitFlow] Confirm dialog accepted -> quitting");
-                        return setForceQuit(true).finally(() => {
-                            Quit();
-                        });
+                        requestQuit();
                     },
                     onCancel: () => {
+                        quitDialogOpenRef.current = false;
                         trace("[UI][QuitFlow] Confirm dialog cancelled -> keep running");
                     },
                 });
