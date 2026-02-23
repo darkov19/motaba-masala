@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Layout, Typography, Card, Segmented, Space, Alert, Button, message } from "antd";
 import { useBlocker, useLocation, useNavigate } from "react-router-dom";
 import { EventsEmit, EventsOn, LogInfo, WindowShow, WindowUnminimise } from "../wailsjs/runtime/runtime";
@@ -158,12 +158,25 @@ function ResilienceWorkspace({ licenseStatus }: ResilienceWorkspaceProps) {
         blocker,
     });
 
-    const setDirtyFor = (view: ViewKey, isDirty: boolean) => {
-        setDirtyByView(prev => ({
-            ...prev,
-            [view]: isDirty,
-        }));
-    };
+    const setDirtyFor = useCallback((view: ViewKey, isDirty: boolean) => {
+        setDirtyByView(prev => {
+            if (prev[view] === isDirty) {
+                return prev;
+            }
+            return {
+                ...prev,
+                [view]: isDirty,
+            };
+        });
+    }, []);
+
+    const onGRNDirtyChange = useCallback((isDirty: boolean) => {
+        setDirtyFor("grn", isDirty);
+    }, [setDirtyFor]);
+
+    const onBatchDirtyChange = useCallback((isDirty: boolean) => {
+        setDirtyFor("batch", isDirty);
+    }, [setDirtyFor]);
 
     const onViewChange = (value: string | number) => {
         const nextView = String(value) as ViewKey;
@@ -269,14 +282,14 @@ function ResilienceWorkspace({ licenseStatus }: ResilienceWorkspaceProps) {
                             <GRNForm
                                 userKey="operator"
                                 writeDisabled={writeDisabled}
-                                onDirtyChange={isDirty => setDirtyFor("grn", isDirty)}
+                                onDirtyChange={onGRNDirtyChange}
                             />
                         </div>
                         <div style={{ display: activeView === "batch" ? "block" : "none" }}>
                             <BatchForm
                                 userKey="operator"
                                 writeDisabled={writeDisabled}
-                                onDirtyChange={isDirty => setDirtyFor("batch", isDirty)}
+                                onDirtyChange={onBatchDirtyChange}
                             />
                         </div>
                     </Space>
