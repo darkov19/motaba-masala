@@ -489,10 +489,12 @@ function Run-AutoNetworkScenario {
 
         Write-Step "Auto network failure simulation"
         Start-AutomationCheck "AC3" "Running AC3: simulating server stop and client reconnect"
+        Write-Host "[AC3] Step 1/4: Stopping server to simulate network/backend failure..." -ForegroundColor DarkGray
         Stop-AppProcess $serverProc "Server app"
         # Give the connection loop one normal probe cycle to transition from connected->reconnecting.
         Start-Sleep -Seconds 12
 
+        Write-Host "[AC3] Step 2/4: Waiting for disconnect/reconnect symptom text in client UI..." -ForegroundColor DarkGray
         $overlayDetected = Wait-ForAnyUiText @(
             "Attempting to reconnect",
             "Disconnected",
@@ -513,7 +515,9 @@ function Run-AutoNetworkScenario {
             throw "AC3 auto-check failed: reconnecting overlay not detected."
         }
 
+        Write-Host "[AC3] Step 3/4: Restarting server..." -ForegroundColor DarkGray
         $serverProc = Start-AppProcess $ServerPath "Server app (restarted)"
+        Write-Host "[AC3] Step 4/4: Waiting for client to recover back to Connected..." -ForegroundColor DarkGray
         $recovered = Wait-ForUiText "Connected" 30 $true $clientProc.Id
         if (-not $recovered) {
             Add-ReportLine("- [FAIL] AC3 auto-check: connected status not detected after server restart.")
@@ -557,6 +561,7 @@ function Run-AutoRebootScenario {
 
         Write-Step "Auto draft+relaunch simulation"
         Start-AutomationCheck "AC4" "Running AC4: seeding draft and restarting client"
+        Write-Host "[AC4] Step 1/5: Waiting for form UI to be ready..." -ForegroundColor DarkGray
         $uiReady = Wait-ForAnyUiText @("Supplier Name", "GRN Form", "Batch Form") 25 $clientProc.Id
         if (-not $uiReady) {
             Add-ReportLine("- [FAIL] AC4 auto-check: client form UI did not become ready before seeding.")
@@ -566,6 +571,7 @@ function Run-AutoRebootScenario {
 
         $draftValue = "AUTO-DRAFT-" + (Get-Date -Format "HHmmss")
         $seeded = $false
+        Write-Host "[AC4] Step 2/5: Seeding a draft value into the form..." -ForegroundColor DarkGray
         for ($attempt = 1; $attempt -le 5; $attempt++) {
             $seeded = Try-SetFirstEditValue $draftValue $clientProc.Id
             if ($seeded) {
@@ -586,10 +592,13 @@ function Run-AutoRebootScenario {
             throw "AC4 auto-check failed: could not seed form field."
         }
 
+        Write-Host "[AC4] Step 3/5: Waiting for autosave interval to persist draft..." -ForegroundColor DarkGray
         Start-Sleep -Seconds 7
+        Write-Host "[AC4] Step 4/5: Restarting client process..." -ForegroundColor DarkGray
         Stop-AppProcess $clientProc "Client app"
         $clientProc = Start-AppProcess $ClientPath "Client app (restarted)"
 
+        Write-Host "[AC4] Step 5/5: Waiting for 'Resume draft' prompt..." -ForegroundColor DarkGray
         $resumePrompt = Wait-ForUiText "Resume draft" 30 $true $clientProc.Id
         if (-not $resumePrompt) {
             Add-ReportLine("- [FAIL] AC4 auto-check: 'Resume draft' prompt not detected after client restart.")
@@ -616,18 +625,30 @@ function Run-AutoRebootScenario {
 }
 
 function Run-AutoApp {
-    Write-Step "Auto end-to-end flow (AC1, AC2, AC5, AC3, AC4)"
-    Write-Host "Client UI will show live symptom/status updates while backend checks run." -ForegroundColor DarkGray
-    Run-WalTest
-    Wait-ForNextCheck "WAL Recovery Integration Test (AC1)"
-    Run-UdpTest
-    Wait-ForNextCheck "UDP Re-Discovery Integration Test (AC2)"
-    Run-ClockTamperTest
-    Wait-ForNextCheck "Clock Tamper Test (AC5)"
-    Run-AutoNetworkScenario
-    Wait-ForNextCheck "Auto Network Failure Simulation (AC3)"
-    Run-AutoRebootScenario
-    Wait-ForNextCheck "Auto Client Reboot Recovery (AC4)"
+    Resolve-AppPaths
+    $statusClientProc = $null
+
+    try {
+        Stop-ExistingByPath $ClientPath
+        $statusClientProc = Start-AppProcess $ClientPath "Client app (status viewer)"
+        Write-Host "UI status viewer started. Watch the Automation Status panel in the client window." -ForegroundColor DarkGray
+
+        Write-Step "Auto end-to-end flow (AC1, AC2, AC5, AC3, AC4)"
+        Write-Host "Client UI will show live symptom/status updates while backend checks run." -ForegroundColor DarkGray
+        Run-WalTest
+        Wait-ForNextCheck "WAL Recovery Integration Test (AC1)"
+        Run-UdpTest
+        Wait-ForNextCheck "UDP Re-Discovery Integration Test (AC2)"
+        Run-ClockTamperTest
+        Wait-ForNextCheck "Clock Tamper Test (AC5)"
+        Run-AutoNetworkScenario
+        Wait-ForNextCheck "Auto Network Failure Simulation (AC3)"
+        Run-AutoRebootScenario
+        Wait-ForNextCheck "Auto Client Reboot Recovery (AC4)"
+    }
+    finally {
+        Stop-AppProcess $statusClientProc "Client app (status viewer)"
+    }
 }
 
 Push-Location $RepoRoot
