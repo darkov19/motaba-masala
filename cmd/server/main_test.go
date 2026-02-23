@@ -91,22 +91,29 @@ func (s stubStartupLicenseService) ValidateLicense() error {
 }
 
 func TestEvaluateStartupLicenseState_ClockTamperFailureBlocksStartup(t *testing.T) {
+	tamperErr := &license.ClockTamperError{
+		LastHeartbeatUnix: 200,
+		CurrentUnix:       100,
+	}
 	svc := stubStartupLicenseService{
 		snapshot: license.StatusSnapshot{
 			Status:     license.StatusActive,
 			HardwareID: "hw-test",
 		},
-		validateErr: errors.New("clock tampering detected: current time is earlier than last recorded heartbeat"),
+		validateErr: tamperErr,
 	}
 
-	lockoutMode, _, _, _, err := evaluateStartupLicenseState(svc)
-	if err == nil {
-		t.Fatal("expected startup licensing failure for clock tampering")
+	lockoutMode, lockoutReason, lockoutMessage, _, err := evaluateStartupLicenseState(svc)
+	if err != nil {
+		t.Fatalf("expected lockout mode for clock tampering, got startup error: %v", err)
 	}
-	if lockoutMode {
-		t.Fatal("expected startup to fail fast, not continue in lockout mode")
+	if !lockoutMode {
+		t.Fatal("expected startup to continue in lockout mode for clock tampering")
 	}
-	if !strings.Contains(strings.ToLower(err.Error()), "licensing validation failed") {
-		t.Fatalf("expected startup licensing failure wrapper, got: %v", err)
+	if lockoutReason != "clock-tamper" {
+		t.Fatalf("expected clock-tamper lockout reason, got %q", lockoutReason)
+	}
+	if !strings.Contains(strings.ToLower(lockoutMessage), "clock tampering detected") {
+		t.Fatalf("expected tamper lockout message, got: %s", lockoutMessage)
 	}
 }

@@ -77,6 +77,21 @@ type startupLicenseService interface {
 	ValidateLicense() error
 }
 
+func formatClockTamperLockoutMessage(err error) string {
+	lastHeartbeat, current, ok := license.ExtractClockTamperTimes(err)
+	if !ok {
+		return "Clock tampering detected. Set system time correctly and restart."
+	}
+
+	last := time.Unix(lastHeartbeat, 0).Local().Format(time.RFC3339)
+	now := time.Unix(current, 0).Local().Format(time.RFC3339)
+	return fmt.Sprintf(
+		"Clock tampering detected. Last heartbeat: %s, current time: %s. Correct system time and retry validation or restart.",
+		last,
+		now,
+	)
+}
+
 func evaluateStartupLicenseState(licenseSvc startupLicenseService) (bool, string, string, string, error) {
 	lockoutMode := false
 	lockoutReason := ""
@@ -91,6 +106,11 @@ func evaluateStartupLicenseState(licenseSvc startupLicenseService) (bool, string
 			lockoutHardwareID = license.ExtractHardwareID(err)
 			lockoutMessage = "Hardware ID Mismatch. Application is locked."
 			slog.Error("Starting in license lockout mode", "error", err, "hardware_id", lockoutHardwareID)
+		} else if errors.Is(err, license.ErrClockTampering) {
+			lockoutMode = true
+			lockoutReason = "clock-tamper"
+			lockoutMessage = formatClockTamperLockoutMessage(err)
+			slog.Error("Starting in clock tamper lockout mode", "error", err)
 		} else {
 			return false, "", "", "", fmt.Errorf("licensing validation failed: %w", err)
 		}
@@ -113,6 +133,10 @@ func evaluateStartupLicenseState(licenseSvc startupLicenseService) (bool, string
 				lockoutReason = "license-expired"
 				lockoutHardwareID = latestSnapshot.HardwareID
 				lockoutMessage = "License expired. Grace period ended. Application is locked."
+			} else if errors.Is(err, license.ErrClockTampering) {
+				lockoutMode = true
+				lockoutReason = "clock-tamper"
+				lockoutMessage = formatClockTamperLockoutMessage(err)
 			} else {
 				return false, "", "", "", fmt.Errorf("licensing validation failed: %w", err)
 			}
@@ -393,6 +417,40 @@ func run() error {
 			status.Message = "License expired. Contact support to renew."
 		}
 		return status, nil
+	})
+
+	application.SetLockoutRetryHandler(func() (app.LockoutRetryResult, error) {
+		snapshot, err := licenseSvc.GetCurrentStatus()
+		if err != nil {
+			if errors.Is(err, license.ErrClockTampering) {
+				return app.LockoutRetryResult{
+					Passed:  false,
+					Message: formatClockTamperLockoutMessage(err),
+				}, nil
+			}
+			return app.LockoutRetryResult{
+				Passed:  false,
+				Message: fmt.Sprintf("Validation failed: %v", err),
+			}, nil
+		}
+
+		if err := licenseSvc.ValidateLicense(); err != nil {
+			if errors.Is(err, license.ErrClockTampering) {
+				return app.LockoutRetryResult{
+					Passed:  false,
+					Message: formatClockTamperLockoutMessage(err),
+				}, nil
+			}
+			return app.LockoutRetryResult{
+				Passed:  false,
+				Message: fmt.Sprintf("Validation failed: %v", err),
+			}, nil
+		}
+
+		return app.LockoutRetryResult{
+			Passed:  true,
+			Message: fmt.Sprintf("Validation passed (status: %s). Restart app to resume normal operations.", snapshot.Status),
+		}, nil
 	})
 
 	appLicenseMode.SetWriteEnforcer(func() error {

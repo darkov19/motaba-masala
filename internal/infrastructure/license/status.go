@@ -17,6 +17,7 @@ const (
 var (
 	ErrHardwareIDMismatch = errors.New("hardware id mismatch")
 	ErrLicenseExpired     = errors.New("license expired")
+	ErrClockTampering     = errors.New("clock tampering detected")
 )
 
 type LicenseStatus string
@@ -61,6 +62,35 @@ func ExtractHardwareID(err error) string {
 		return mismatchErr.HardwareID
 	}
 	return ""
+}
+
+type ClockTamperError struct {
+	LastHeartbeatUnix int64
+	CurrentUnix       int64
+}
+
+func (e *ClockTamperError) Error() string {
+	if e == nil {
+		return ErrClockTampering.Error()
+	}
+	return fmt.Sprintf(
+		"%s: current time (%d) is earlier than last recorded heartbeat (%d)",
+		ErrClockTampering,
+		e.CurrentUnix,
+		e.LastHeartbeatUnix,
+	)
+}
+
+func (e *ClockTamperError) Unwrap() error {
+	return ErrClockTampering
+}
+
+func ExtractClockTamperTimes(err error) (int64, int64, bool) {
+	var tamperErr *ClockTamperError
+	if errors.As(err, &tamperErr) {
+		return tamperErr.LastHeartbeatUnix, tamperErr.CurrentUnix, true
+	}
+	return 0, 0, false
 }
 
 type licensePayload struct {

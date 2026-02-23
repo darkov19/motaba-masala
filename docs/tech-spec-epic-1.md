@@ -169,7 +169,7 @@ CREATE TABLE items (
 
 1.  **Project Init**: Application initializes successfully as a Wails project with correct frontend (React+AntD) and backend (Go) structure.
 2.  **DB Migrations**: App runs embedded SQL migrations on startup to create `users`, `roles`, `items`, and `stock_ledger` tables.
-3.  **HW Licensing**: App extracts BIOS UUID and Disk Serial; blocks startup if a valid, machine-specific `license.key` is missing or tampered.
+3.  **HW Licensing**: App extracts BIOS UUID and Disk Serial; blocks normal startup if a valid, machine-specific `license.key` is missing or tampered, and enters explicit lockout UI mode for operator guidance.
 4.  **RBAC Enforcement**: Admin users can create roles; "Data Entry Operator" roles are restricted from accessing Stock Valuation reports via IPC middleware.
 5.  **Auto-Backup**: A zipped database backup is created on the configured daily schedule with older files automatically pruned.
 

@@ -124,6 +124,7 @@ so that I can resolve issues without sudden production downtime or confusion.
 - 2026-02-15: Story drafted.
 - 2026-02-20: Implemented license status lifecycle, grace-period read-only enforcement, hardware mismatch lockout mode UI, and frontend license banners/polling; added backend/frontend automated tests.
 - 2026-02-20: Updated full-expiry handling to lockout UI with Hardware ID and support-message copy flow; updated Windows manual test script expectations.
+- 2026-02-24: Extended lockout UX for clock-tamper detection path with explicit tamper lockout messaging and safe actions (retry validation, copy diagnostics, exit) instead of hard process exit.
 - 2026-02-20: Senior Developer Review notes appended (Outcome: Blocked).
 - 2026-02-20: Addressed code review findings - 4 items resolved (Date: 2026-02-20).
 - 2026-02-21: Senior Developer Review notes appended (Outcome: Approve).

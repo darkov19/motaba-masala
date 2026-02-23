@@ -151,7 +151,7 @@ describe("App recovery and license states", () => {
         expect(screen.getByText("new-hw-123")).toBeInTheDocument();
 
         expect(screen.queryByRole("button", { name: "Copy ID" })).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole("button", { name: "Copy Support Request" }));
+        fireEvent.click(screen.getByRole("button", { name: "Copy Diagnostics" }));
         await waitFor(() => {
             expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
             expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining("Hardware ID: new-hw-123"));
@@ -184,7 +184,7 @@ describe("App recovery and license states", () => {
         expect(await screen.findByRole("heading", { name: "License Expired. Application is locked." })).toBeInTheDocument();
         expect(screen.getByText("expired-hw-999")).toBeInTheDocument();
         expect(screen.getByText(/grace period has ended/i)).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Copy Support Request" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Copy Diagnostics" })).toBeInTheDocument();
 
         router.dispose();
     });

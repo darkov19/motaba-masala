@@ -33,7 +33,10 @@ func checkClockTamperingWithNow(heartbeatPath string, now func() time.Time) erro
 
 	currentTime := now().Unix()
 	if currentTime < lastHeartbeatUnix {
-		return fmt.Errorf("clock tampering detected: current time is earlier than last recorded heartbeat")
+		return &ClockTamperError{
+			LastHeartbeatUnix: lastHeartbeatUnix,
+			CurrentUnix:       currentTime,
+		}
 	}
 
 	return nil

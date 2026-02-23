@@ -31,9 +31,14 @@ type LicenseStatus = {
 
 type LicenseLockoutState = {
     enabled: boolean;
-    reason?: "hardware-mismatch" | "license-expired";
+    reason?: "hardware-mismatch" | "license-expired" | "clock-tamper";
     message: string;
     hardware_id?: string;
+};
+
+type LockoutRetryResult = {
+    passed: boolean;
+    message: string;
 };
 
 type AutomationStatus = {
@@ -53,6 +58,7 @@ type WindowWithAppBindings = Window & {
                 GetLicenseStatus?: () => Promise<LicenseStatus>;
                 GetLicenseLockoutState?: () => Promise<LicenseLockoutState>;
                 GetAutomationStatus?: () => Promise<AutomationStatus>;
+                RetryLockoutValidation?: () => Promise<LockoutRetryResult>;
             };
         };
     };
@@ -557,10 +563,13 @@ function App() {
         const hardwareID = effectiveLockoutState?.hardware_id || "Unavailable";
         const issue = effectiveLockoutState?.reason === "license-expired"
             ? "License expired (grace period ended)"
-            : "Hardware ID mismatch";
+            : effectiveLockoutState?.reason === "clock-tamper"
+                ? "Clock tampering detected"
+                : "Hardware ID mismatch";
         const supportMessage = [
-            "License Renewal Request",
+            "Lockout Diagnostics",
             `Issue: ${issue}`,
+            `Details: ${effectiveLockoutState?.message || "Unavailable"}`,
             `Hardware ID: ${hardwareID}`,
             `Date: ${new Date().toISOString()}`,
         ].join("\n");
@@ -573,13 +582,45 @@ function App() {
         message.error("Unable to copy support message.");
     };
 
+    const onRetryLockoutValidation = async () => {
+        const retryBinding = (window as WindowWithAppBindings).go?.app?.App?.RetryLockoutValidation;
+        if (typeof retryBinding !== "function") {
+            message.error("Retry validation is unavailable in this environment.");
+            return;
+        }
+
+        try {
+            const result = await retryBinding();
+            if (result.passed) {
+                message.success(result.message || "Validation passed. Restart app to resume.");
+            } else {
+                message.warning(result.message || "Validation still failing.");
+            }
+        } catch (error) {
+            const details = error instanceof Error ? error.message : "Unknown validation error";
+            message.error(`Retry validation failed: ${details}`);
+        }
+    };
+
+    const onExitApplication = () => {
+        try {
+            EventsEmit("app:request-quit-confirm");
+        } catch {
+            // no-op outside Wails runtime
+        }
+    };
+
     if (!isLoadingRecovery && effectiveLockoutState?.enabled) {
         const heading = effectiveLockoutState.reason === "license-expired"
             ? "License Expired. Application is locked."
-            : "Hardware ID Mismatch. Application is locked.";
+            : effectiveLockoutState.reason === "clock-tamper"
+                ? "Clock Tampering Detected. Application is locked."
+                : "Hardware ID Mismatch. Application is locked.";
         const guidance = effectiveLockoutState.reason === "license-expired"
             ? "Your grace period has ended. Contact support with this Hardware ID to renew your license."
-            : "Contact support with this Hardware ID to request a new license.";
+            : effectiveLockoutState.reason === "clock-tamper"
+                ? "Set system time correctly, then use Retry Validation. Restart app after validation succeeds."
+                : "Contact support with this Hardware ID to request a new license.";
 
         return (
             <ConnectionProvider>
@@ -610,9 +651,17 @@ function App() {
                                 <Card size="small">
                                     <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
                                         <Text code>{effectiveLockoutState.hardware_id || "Unavailable"}</Text>
-                                        <Button type="primary" onClick={() => void onCopySupportMessage()}>
-                                            Copy Support Request
-                                        </Button>
+                                        <Space>
+                                            <Button onClick={() => void onRetryLockoutValidation()}>
+                                                Retry Validation
+                                            </Button>
+                                            <Button type="primary" onClick={() => void onCopySupportMessage()}>
+                                                Copy Diagnostics
+                                            </Button>
+                                            <Button danger onClick={onExitApplication}>
+                                                Exit
+                                            </Button>
+                                        </Space>
                                     </Space>
                                 </Card>
                             </Space>

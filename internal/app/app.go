@@ -35,6 +35,11 @@ type LicenseLockoutState struct {
 	HardwareID string `json:"hardware_id,omitempty"`
 }
 
+type LockoutRetryResult struct {
+	Passed  bool   `json:"passed"`
+	Message string `json:"message"`
+}
+
 // App struct
 type App struct {
 	ctx                   context.Context
@@ -45,6 +50,7 @@ type App struct {
 	licenseStatusProvider func() (LicenseStatus, error)
 	lockoutState          LicenseLockoutState
 	connectivityProbe     func() error
+	lockoutRetryHandler   func() (LockoutRetryResult, error)
 }
 
 const (
@@ -297,4 +303,18 @@ func (a *App) SetLicenseLockoutState(enabled bool, reason, message, hardwareID s
 
 func (a *App) GetLicenseLockoutState() LicenseLockoutState {
 	return a.lockoutState
+}
+
+func (a *App) SetLockoutRetryHandler(handler func() (LockoutRetryResult, error)) {
+	a.lockoutRetryHandler = handler
+}
+
+func (a *App) RetryLockoutValidation() (LockoutRetryResult, error) {
+	if a.lockoutRetryHandler == nil {
+		return LockoutRetryResult{
+			Passed:  false,
+			Message: "Retry validation is not configured for this mode.",
+		}, nil
+	}
+	return a.lockoutRetryHandler()
 }

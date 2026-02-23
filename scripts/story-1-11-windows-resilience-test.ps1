@@ -11,7 +11,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-$ScriptVersion = "2026-02-24.3"
+$ScriptVersion = "2026-02-24.4"
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $BuildScript = Join-Path $RepoRoot "scripts\windows-hard-sync-build-run.ps1"

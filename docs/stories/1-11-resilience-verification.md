@@ -14,7 +14,7 @@ so that we can prove the system is robust and meets the audit requirements.
 2.  **UDP Re-Discovery Test**: An integration test where the Client is connected to a mock Server; the mock Server is stopped and restarted on a _different_ port/IP (simulating IP change); the Client must auto-reconnect within 5 seconds via the new UDP broadcast. [Source: docs/resilience-audit-report.md#3.2]
 3.  **Network Failure Simulation**: A manual test protocol document describing how to disconnect the LAN cable, verify the "Reconnecting" overlay, and verify auto-recovery upon reconnection. [Source: docs/resilience-audit-report.md#3.3]
 4.  **Client Reboot Recovery**: A manual test protocol describing how to reboot the Client PC while a draft is open, wait for auto-start, and verify the "Resume Draft" prompt appears. [Source: docs/resilience-audit-report.md#2.3]
-5.  **Clock Tamper Test**: An automated test that sets the system clock back by 1 day and asserts that the Server refuses to start/authenticates failure (using the encrypted heartbeat logic from Story 1.3). [Source: docs/resilience-audit-report.md#5.2]
+5.  **Clock Tamper Test**: An automated test that sets the system clock back by 1 day and asserts that the Server refuses normal startup by entering lockout/tamper mode (no services/API started) using the encrypted heartbeat logic from Story 1.3. [Source: docs/resilience-audit-report.md#5.2]
 
 ## Tasks / Subtasks
 
@@ -149,7 +149,7 @@ None.
 | AC2 | UDP re-discovery reconnects to changed endpoint within 5s | IMPLEMENTED | Initial discovery and changed endpoint validation within 5s at `test/integration/resilience_test.go:119`, `test/integration/resilience_test.go:132`, mock broadcaster at `test/integration/resilience_test.go:401` |
 | AC3 | Manual network-failure protocol documented | IMPLEMENTED | Protocol section and expected results in `docs/test-protocols/resilience-testing.md:7`, `docs/test-protocols/resilience-testing.md:36` |
 | AC4 | Manual client reboot recovery protocol documented | IMPLEMENTED | Protocol section and expected results in `docs/test-protocols/resilience-testing.md:49`, `docs/test-protocols/resilience-testing.md:73` |
-| AC5 | Automated clock-tamper test validates refusal behavior | IMPLEMENTED | Clock tamper detection coverage at `internal/infrastructure/license/clock_tamper_test.go:12`; startup-path refusal validated at `cmd/server/main_test.go:93` through `evaluateStartupLicenseState` in `cmd/server/main.go:79` |
+| AC5 | Automated clock-tamper test validates lockout/refusal behavior | IMPLEMENTED | Clock tamper detection coverage at `internal/infrastructure/license/clock_tamper_test.go:12`; startup-path lockout handling validated in `cmd/server/main_test.go` through `evaluateStartupLicenseState` in `cmd/server/main.go:79` |
 
 Summary: 5 of 5 acceptance criteria fully implemented.
 
