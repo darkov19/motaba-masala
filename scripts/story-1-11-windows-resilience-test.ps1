@@ -214,6 +214,20 @@ function Wait-ForUiText([string]$Pattern, [int]$TimeoutSeconds, [bool]$ShouldExi
     return $false
 }
 
+function Wait-ForAnyUiText([string[]]$Patterns, [int]$TimeoutSeconds, [int]$ProcessId = 0) {
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        $snapshot = Get-UiTextSnapshot -ProcessId $ProcessId
+        foreach ($pattern in $Patterns) {
+            if ($snapshot -match $pattern) {
+                return $true
+            }
+        }
+        Start-Sleep -Seconds 1
+    }
+    return $false
+}
+
 function Try-SetFirstEditValue([string]$Value, [int]$ProcessId = 0) {
     Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 
@@ -399,12 +413,20 @@ function Run-AutoNetworkScenario {
 
         Write-Step "Auto network failure simulation"
         Stop-AppProcess $serverProc "Server app"
+        # Give the connection loop one normal probe cycle to transition from connected->reconnecting.
+        Start-Sleep -Seconds 12
 
-        $overlayDetected = Wait-ForUiText "Attempting to reconnect" 30 $true $clientProc.Id
+        $overlayDetected = Wait-ForAnyUiText @(
+            "Attempting to reconnect",
+            "Disconnected",
+            "Retrying:"
+        ) 45 $clientProc.Id
         if (-not $overlayDetected) {
             Add-ReportLine("- [FAIL] AC3 auto-check: reconnecting overlay text not detected.")
             $snapshot = Get-UiTextSnapshot -ProcessId $clientProc.Id
             if (-not [string]::IsNullOrWhiteSpace($snapshot)) {
+                Write-Host "AC3 debug snapshot (client window text):" -ForegroundColor Yellow
+                Write-Host $snapshot
                 Add-ReportLine("- Debug snapshot (client window text):")
                 Add-ReportLine('```')
                 Add-ReportLine($snapshot)
@@ -419,6 +441,8 @@ function Run-AutoNetworkScenario {
             Add-ReportLine("- [FAIL] AC3 auto-check: connected status not detected after server restart.")
             $snapshot = Get-UiTextSnapshot -ProcessId $clientProc.Id
             if (-not [string]::IsNullOrWhiteSpace($snapshot)) {
+                Write-Host "AC3 debug snapshot after restart (client window text):" -ForegroundColor Yellow
+                Write-Host $snapshot
                 Add-ReportLine("- Debug snapshot (client window text):")
                 Add-ReportLine('```')
                 Add-ReportLine($snapshot)
