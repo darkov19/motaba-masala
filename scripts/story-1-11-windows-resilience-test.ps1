@@ -1,6 +1,6 @@
 param(
-    [ValidateSet("all", "manual-all", "auto-app", "auto-network", "auto-reboot", "build", "wal", "udp", "clock", "manual-network", "manual-reboot", "reset")]
-    [string]$Mode = "auto-app",
+    [ValidateSet("all", "manual-all", "manual-ui-all", "auto-app", "auto-network", "auto-reboot", "build", "wal", "udp", "clock", "manual-network", "manual-reboot", "reset")]
+    [string]$Mode = "manual-ui-all",
     [switch]$Rebuild,
     [switch]$SkipInstallers,
     [string]$GoCachePath = "",
@@ -400,13 +400,24 @@ function Run-ClockTamperTest {
 
 function Prompt-ManualChecklist(
     [string]$ScenarioName,
-    [string[]]$Checks
+    [string[]]$Checks,
+    [string]$CheckId = "",
+    [string[]]$Steps = @()
 ) {
     Ensure-ReportHeader
     Write-Step "Manual scenario: $ScenarioName"
     Write-Host "Reference protocol doc: $ProtocolDoc" -ForegroundColor DarkGray
     Write-Host "Run the scenario now, then confirm each check." -ForegroundColor Yellow
     Write-Host ""
+    if (-not [string]::IsNullOrWhiteSpace($CheckId)) {
+        Start-AutomationCheck $CheckId "Running manual checklist for $ScenarioName"
+    }
+    if ($Steps.Count -gt 0) {
+        for ($i = 0; $i -lt $Steps.Count; $i++) {
+            Write-Host "[$CheckId] Step $($i + 1)/$($Steps.Count): $($Steps[$i])" -ForegroundColor DarkGray
+        }
+        Write-Host ""
+    }
 
     $allPass = $true
     Add-ReportLine("")
@@ -431,17 +442,87 @@ function Prompt-ManualChecklist(
     if ($allPass) {
         Write-Host "PASS: $ScenarioName" -ForegroundColor Green
         Set-CheckSummary("PASS. Manual checklist completed with all confirmations marked yes.")
+        if (-not [string]::IsNullOrWhiteSpace($CheckId)) {
+            Complete-AutomationCheck $CheckId "Completed manual checklist: $ScenarioName"
+        }
     }
     else {
         Write-Warning "One or more checks failed in: $ScenarioName"
         Set-CheckSummary("FAILED. One or more manual confirmations were marked no. See report: $ReportPath")
+        if (-not [string]::IsNullOrWhiteSpace($CheckId)) {
+            Fail-AutomationCheck $CheckId "Manual checklist failed: $ScenarioName"
+        }
     }
+}
+
+function Run-ManualWalScenario {
+    Assert-PathExists $ProtocolDoc "Protocol document"
+    Prompt-ManualChecklist `
+        -ScenarioName "Protocol 3: WAL Recovery (Manual UI) (AC1)" `
+        -CheckId "AC1" `
+        -Steps @(
+            "Ensure server and client are running. Open GRN or Batch form in client.",
+            "Enter sample values so there is visible in-memory state and recent activity.",
+            "Force-stop server process, then restart server process.",
+            "Observe client and server recovery behavior, then continue to checklist confirmations."
+        ) `
+        -Checks @(
+            "Application recovers after server restart without crash loop.",
+            "No obvious data corruption or broken form state after recovery.",
+            "Expected recovery symptom was visible in UI/logs during restart.",
+            "Evidence captured (screenshots + timestamps)."
+        )
+}
+
+function Run-ManualUdpScenario {
+    Assert-PathExists $ProtocolDoc "Protocol document"
+    Prompt-ManualChecklist `
+        -ScenarioName "Protocol 4: UDP Re-Discovery (Manual UI) (AC2)" `
+        -CheckId "AC2" `
+        -Steps @(
+            "Keep server and client running on LAN.",
+            "Simulate discovery interruption (server restart or brief network disruption).",
+            "Observe client transition to reconnect/disconnected symptoms, then recovery.",
+            "Confirm client rediscovers server automatically and stabilizes."
+        ) `
+        -Checks @(
+            "Client showed reconnect/disconnected symptom during interruption.",
+            "Client rediscovered server automatically without full manual relaunch.",
+            "Connection stabilized again under normal LAN conditions.",
+            "Evidence captured (screenshots + timings)."
+        )
+}
+
+function Run-ManualClockTamperScenario {
+    Assert-PathExists $ProtocolDoc "Protocol document"
+    Prompt-ManualChecklist `
+        -ScenarioName "Protocol 5: Clock Tamper Detection (Manual UI) (AC5)" `
+        -CheckId "AC5" `
+        -Steps @(
+            "With app running, perform your clock-tamper test procedure on the client machine.",
+            "Return to app and trigger license validation path (reopen app if needed).",
+            "Observe license/security symptom in UI (warning/lockout/read-only behavior per policy).",
+            "Revert clock to correct value after verification."
+        ) `
+        -Checks @(
+            "Clock tamper symptom was detected by the application behavior.",
+            "UI reflected expected license/security state for tamper condition.",
+            "Application remained stable (no crash) while handling tamper state.",
+            "Evidence captured (screenshots + timestamps)."
+        )
 }
 
 function Run-ManualNetworkScenario {
     Assert-PathExists $ProtocolDoc "Protocol document"
     Prompt-ManualChecklist `
         -ScenarioName "Protocol 1: Network Failure Simulation (Pull LAN Cable) (AC3)" `
+        -CheckId "AC3" `
+        -Steps @(
+            "Keep server and client running in normal connected state.",
+            "Disconnect LAN (or equivalent network interruption) for a short period.",
+            "Observe reconnect overlay/status changes in client, then restore network.",
+            "Verify automatic recovery and normal connected state."
+        ) `
         -Checks @(
             "Reconnecting overlay appears after LAN disconnect.",
             "Client reconnects automatically after network restoration.",
@@ -454,6 +535,13 @@ function Run-ManualRebootScenario {
     Assert-PathExists $ProtocolDoc "Protocol document"
     Prompt-ManualChecklist `
         -ScenarioName "Protocol 2: Client Reboot Recovery (AC4)" `
+        -CheckId "AC4" `
+        -Steps @(
+            "With server running, enter draft values in a client form and wait for autosave interval.",
+            "Restart only the client application.",
+            "Observe resume-discard draft prompt and test both paths if needed.",
+            "Confirm client returns to connected/usable state after restart."
+        ) `
         -Checks @(
             "Resume draft prompt appears after reboot with unsaved draft.",
             "Choosing Resume restores draft values.",
@@ -480,6 +568,40 @@ function Run-ManualAll {
     Wait-ForNextCheck "Manual Network Failure Simulation (AC3)"
     Run-ManualRebootScenario
     Wait-ForNextCheck "Manual Client Reboot Recovery (AC4)"
+}
+
+function Run-ManualUiAll {
+    Resolve-AppPaths
+    Ensure-ReportHeader
+
+    $serverProc = $null
+    $clientProc = $null
+
+    try {
+        Stop-ExistingByPath $ServerPath
+        Stop-ExistingByPath $ClientPath
+        $serverProc = Start-AppProcess $ServerPath "Server app"
+        $clientProc = Start-AppProcess $ClientPath "Client app"
+
+        Write-Step "Manual UI validation flow (AC1, AC2, AC5, AC3, AC4)"
+        Write-Host "No go test commands are executed in this mode." -ForegroundColor Yellow
+        Write-Host "Follow the terminal steps, perform actions in the running apps, then answer checklist prompts." -ForegroundColor DarkGray
+
+        Run-ManualWalScenario
+        Wait-ForNextCheck "Manual WAL Recovery (AC1)"
+        Run-ManualUdpScenario
+        Wait-ForNextCheck "Manual UDP Re-Discovery (AC2)"
+        Run-ManualClockTamperScenario
+        Wait-ForNextCheck "Manual Clock Tamper Detection (AC5)"
+        Run-ManualNetworkScenario
+        Wait-ForNextCheck "Manual Network Failure Simulation (AC3)"
+        Run-ManualRebootScenario
+        Wait-ForNextCheck "Manual Client Reboot Recovery (AC4)"
+    }
+    finally {
+        Stop-AppProcess $clientProc "Client app"
+        Stop-AppProcess $serverProc "Server app"
+    }
 }
 
 function Run-AutoNetworkScenario {
@@ -695,6 +817,7 @@ try {
         "clock"          { Run-ClockTamperTest }
         "manual-network" { Run-ManualNetworkScenario }
         "manual-reboot"  { Run-ManualRebootScenario }
+        "manual-ui-all"  { Run-ManualUiAll }
         "all"            { Run-All }
         "manual-all"     { Run-ManualAll }
         "auto-network"   { Run-AutoNetworkScenario }
