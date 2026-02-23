@@ -230,6 +230,7 @@ function Wait-ForAnyUiText([string[]]$Patterns, [int]$TimeoutSeconds, [int]$Proc
 
 function Try-SetFirstEditValue([string]$Value, [int]$ProcessId = 0) {
     Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+    Add-Type -AssemblyName System.Windows.Forms
 
     $root = [System.Windows.Automation.AutomationElement]::RootElement
     $windows = $root.FindAll(
@@ -262,11 +263,37 @@ function Try-SetFirstEditValue([string]$Value, [int]$ProcessId = 0) {
         return $false
     }
 
-    $edit = $edits.Item(0)
-    $vp = $null
-    if ($edit.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$vp)) {
-        $vp.SetValue($Value)
-        return $true
+    for ($i = 0; $i -lt $edits.Count; $i++) {
+        $edit = $edits.Item($i)
+        if (-not $edit.Current.IsEnabled) {
+            continue
+        }
+
+        $vp = $null
+        if ($edit.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$vp)) {
+            try {
+                $vp.SetValue($Value)
+                return $true
+            }
+            catch {
+                # Fall through to focus+keyboard fallback.
+            }
+        }
+
+        try {
+            $target.SetFocus()
+            Start-Sleep -Milliseconds 150
+            $edit.SetFocus()
+            Start-Sleep -Milliseconds 150
+            [System.Windows.Forms.SendKeys]::SendWait("^a")
+            Start-Sleep -Milliseconds 100
+            [System.Windows.Forms.SendKeys]::SendWait($Value)
+            Start-Sleep -Milliseconds 150
+            return $true
+        }
+        catch {
+            continue
+        }
     }
 
     return $false
@@ -476,10 +503,30 @@ function Run-AutoRebootScenario {
         $clientProc = Start-AppProcess $ClientPath "Client app"
 
         Write-Step "Auto draft+relaunch simulation"
+        $uiReady = Wait-ForAnyUiText @("Supplier Name", "GRN Form", "Batch Form") 25 $clientProc.Id
+        if (-not $uiReady) {
+            Add-ReportLine("- [FAIL] AC4 auto-check: client form UI did not become ready before seeding.")
+            throw "AC4 auto-check failed: client form UI not ready."
+        }
+
         $draftValue = "AUTO-DRAFT-" + (Get-Date -Format "HHmmss")
-        $seeded = Try-SetFirstEditValue $draftValue $clientProc.Id
+        $seeded = $false
+        for ($attempt = 1; $attempt -le 5; $attempt++) {
+            $seeded = Try-SetFirstEditValue $draftValue $clientProc.Id
+            if ($seeded) {
+                break
+            }
+            Start-Sleep -Seconds 1
+        }
         if (-not $seeded) {
             Add-ReportLine("- [FAIL] AC4 auto-check: unable to set form draft value through UI Automation.")
+            $snapshot = Get-UiTextSnapshot -ProcessId $clientProc.Id
+            if (-not [string]::IsNullOrWhiteSpace($snapshot)) {
+                Add-ReportLine("- Debug snapshot (client window text):")
+                Add-ReportLine('```')
+                Add-ReportLine($snapshot)
+                Add-ReportLine('```')
+            }
             throw "AC4 auto-check failed: could not seed form field."
         }
 
