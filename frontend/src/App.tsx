@@ -145,6 +145,10 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
     });
     const activeView = PATH_TO_VIEW[location.pathname] ?? "grn";
     const writeDisabled = licenseStatus.status === "grace-period" || licenseStatus.status === "expired";
+    const suppressReconnectionOverlay = automationStatus?.enabled
+        && (automationStatus.current_check === "AC1"
+            || automationStatus.current_check === "AC2"
+            || automationStatus.current_check === "AC5");
 
     useEffect(() => {
         if (!PATH_TO_VIEW[location.pathname]) {
@@ -329,7 +333,7 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
             <Footer style={{ textAlign: "center" }}>
                 Masala Inventory Management ©2026
             </Footer>
-            <ReconnectionOverlay />
+            <ReconnectionOverlay suppress={Boolean(suppressReconnectionOverlay)} />
         </Layout>
     );
 }

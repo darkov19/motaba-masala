@@ -3,10 +3,14 @@ import { useConnection } from "../../context/ConnectionContext";
 
 const { Title, Text } = Typography;
 
-export function ReconnectionOverlay() {
+type ReconnectionOverlayProps = {
+    suppress?: boolean;
+};
+
+export function ReconnectionOverlay({ suppress = false }: ReconnectionOverlayProps) {
     const { appMode, isConnected, retryNow, isChecking } = useConnection();
 
-    if (appMode === "server" || isConnected) {
+    if (suppress || appMode === "server" || isConnected) {
         return null;
     }
 
