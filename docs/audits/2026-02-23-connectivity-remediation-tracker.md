@@ -43,15 +43,17 @@
 - `internal/app/app_test.go`
     - Removed assumption that `Greet` fails when local process is absent.
     - Added coverage for:
-        - network probe true case (via local-dev fallback path and real dial path logic wiring)
-        - network probe false case
         - local-dev fallback true case
+        - network probe false case
         - probe address parsing
         - local-dev env parsing
 - `frontend/src/context/__tests__/ConnectionContext.test.tsx`
     - Updated mocks from `Greet` to `CheckServerReachability`.
 
 ### 3.1) Remaining Test Gaps (from audit plan)
+
+Owner: Dev Agent  
+Target Date: 2026-02-24
 
 1. Add deterministic unit/integration test for explicit network reachable case using a temporary TCP listener and `MASALA_SERVER_PROBE_ADDR`.
 2. Add deterministic test for endpoint change/recovery scenario (or document why covered by Story 1.11 AC2 operational test only).
@@ -63,6 +65,9 @@
 - `frontend npm run lint` ✅
 
 ## Pending: Windows Real-Flow Validation (Step 5)
+
+Owner: QA + Operator (Windows validation)  
+Target Date: 2026-02-24
 
 Run on Windows:
 
