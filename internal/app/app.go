@@ -107,13 +107,13 @@ func probeLocalServerProcess() error {
 func isProcessRunning(processName string) (bool, error) {
 	switch runtime.GOOS {
 	case "windows":
-		out, err := exec.Command("tasklist", "/FI", "IMAGENAME eq "+processName).CombinedOutput()
+		out, err := newProbeCommand("tasklist", "/FI", "IMAGENAME eq "+processName).CombinedOutput()
 		if err != nil {
 			return false, fmt.Errorf("tasklist probe failed: %w", err)
 		}
 		return strings.Contains(strings.ToLower(string(out)), strings.ToLower(processName)), nil
 	default:
-		cmd := exec.Command("pgrep", "-f", processName)
+		cmd := newProbeCommand("pgrep", "-f", processName)
 		if err := cmd.Run(); err != nil {
 			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
 				return false, nil
