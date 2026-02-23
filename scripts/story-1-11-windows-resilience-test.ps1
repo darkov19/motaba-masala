@@ -361,8 +361,14 @@ function Invoke-HardSyncBuild {
 
 function Invoke-GoTest([string]$Label, [string]$Package, [string]$RunPattern, [string]$AutomationCheckId = "") {
     Write-Step "Automated check: $Label"
+    if (-not [string]::IsNullOrWhiteSpace($AutomationCheckId)) {
+        Write-Host "[$AutomationCheckId] Step 1/3: Preparing backend validation context..." -ForegroundColor DarkGray
+    }
     Write-Host "Running backend validation: go test $Package -run $RunPattern -count=1" -ForegroundColor DarkGray
     Start-AutomationCheck $AutomationCheckId "Running $Label"
+    if (-not [string]::IsNullOrWhiteSpace($AutomationCheckId)) {
+        Write-Host "[$AutomationCheckId] Step 2/3: Executing integration/unit test command..." -ForegroundColor DarkGray
+    }
     $env:GOCACHE = $GoCachePath
     & go test $Package -run $RunPattern -count=1
     if ($LASTEXITCODE -ne 0) {
@@ -370,6 +376,9 @@ function Invoke-GoTest([string]$Label, [string]$Package, [string]$RunPattern, [s
         Set-CheckSummary("FAILED. Command: go test $Package -run $RunPattern -count=1")
         Fail-AutomationCheck $AutomationCheckId "Failed $Label"
         throw "Automated check failed: $Label"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($AutomationCheckId)) {
+        Write-Host "[$AutomationCheckId] Step 3/3: Validation passed and status recorded." -ForegroundColor DarkGray
     }
     Write-Host "PASS: $Label" -ForegroundColor Green
     Add-ReportLine("- [PASS] $Label")
