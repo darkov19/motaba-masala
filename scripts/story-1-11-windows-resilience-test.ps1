@@ -583,6 +583,27 @@ function Run-ManualUiAll {
         $serverProc = Start-AppProcess $ServerPath "Server app"
         $clientProc = Start-AppProcess $ClientPath "Client app"
 
+        Write-Step "Preparing manual UI baseline"
+        Write-Host "Waiting for client to reach initial Connected state before manual checks..." -ForegroundColor DarkGray
+        $connectedBaseline = Wait-ForUiText "Connected" 30 $true $clientProc.Id
+        if (-not $connectedBaseline) {
+            Write-Warning "Client did not reach Connected state on first attempt. Restarting server once and retrying..."
+            Stop-AppProcess $serverProc "Server app"
+            $serverProc = Start-AppProcess $ServerPath "Server app (retry)"
+            $connectedBaseline = Wait-ForUiText "Connected" 30 $true $clientProc.Id
+        }
+        if (-not $connectedBaseline) {
+            $snapshot = Get-UiTextSnapshot -ProcessId $clientProc.Id
+            if (-not [string]::IsNullOrWhiteSpace($snapshot)) {
+                Add-ReportLine("- [FAIL] Manual UI baseline: client did not reach Connected state before scenarios.")
+                Add-ReportLine("- Debug snapshot (client window text):")
+                Add-ReportLine('```')
+                Add-ReportLine($snapshot)
+                Add-ReportLine('```')
+            }
+            throw "Manual UI baseline failed: client is not connected before scenario execution. Check server startup health and executable paths."
+        }
+
         Write-Step "Manual UI validation flow (AC1, AC2, AC5, AC3, AC4)"
         Write-Host "No go test commands are executed in this mode." -ForegroundColor Yellow
         Write-Host "Follow the terminal steps, perform actions in the running apps, then answer checklist prompts." -ForegroundColor DarkGray
