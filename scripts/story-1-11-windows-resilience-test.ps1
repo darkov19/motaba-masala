@@ -207,6 +207,12 @@ function Set-HeartbeatUnixTimestamp([int64]$UnixTs, [string]$Path) {
     [System.IO.File]::WriteAllBytes($Path, $bytes)
 }
 
+function Restore-HeartbeatToNow {
+    $heartbeatPath = Get-HeartbeatPath
+    $nowTs = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    Set-HeartbeatUnixTimestamp $nowTs $heartbeatPath
+}
+
 function Stop-ExistingByPath([string]$Path) {
     $name = Get-ExecutableName $Path
     Get-Process -Name $name -ErrorAction SilentlyContinue | ForEach-Object {
@@ -659,7 +665,14 @@ function Run-ManualUiAll {
     try {
         Stop-ExistingByPath $ServerPath
         Stop-ExistingByPath $ClientPath
-        $serverProc = Start-AppProcess $ServerPath "Server app"
+        try {
+            $serverProc = Start-AppProcess $ServerPath "Server app"
+        }
+        catch {
+            Write-Warning "Initial server start failed. Attempting one-time heartbeat recovery and retry..."
+            Restore-HeartbeatToNow
+            $serverProc = Start-AppProcess $ServerPath "Server app (retry after heartbeat restore)"
+        }
         $clientProc = Start-AppProcess $ClientPath "Client app"
 
         Write-Step "Preparing manual UI baseline"
