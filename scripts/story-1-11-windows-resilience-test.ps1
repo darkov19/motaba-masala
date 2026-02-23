@@ -406,9 +406,9 @@ function Run-AutoNetworkScenario {
             $snapshot = Get-UiTextSnapshot -ProcessId $clientProc.Id
             if (-not [string]::IsNullOrWhiteSpace($snapshot)) {
                 Add-ReportLine("- Debug snapshot (client window text):")
-                Add-ReportLine("```")
+                Add-ReportLine('```')
                 Add-ReportLine($snapshot)
-                Add-ReportLine("```")
+                Add-ReportLine('```')
             }
             throw "AC3 auto-check failed: reconnecting overlay not detected."
         }
@@ -420,9 +420,9 @@ function Run-AutoNetworkScenario {
             $snapshot = Get-UiTextSnapshot -ProcessId $clientProc.Id
             if (-not [string]::IsNullOrWhiteSpace($snapshot)) {
                 Add-ReportLine("- Debug snapshot (client window text):")
-                Add-ReportLine("```")
+                Add-ReportLine('```')
                 Add-ReportLine($snapshot)
-                Add-ReportLine("```")
+                Add-ReportLine('```')
             }
             throw "AC3 auto-check failed: connected status not detected."
         }
@@ -469,9 +469,9 @@ function Run-AutoRebootScenario {
             $snapshot = Get-UiTextSnapshot -ProcessId $clientProc.Id
             if (-not [string]::IsNullOrWhiteSpace($snapshot)) {
                 Add-ReportLine("- Debug snapshot (client window text):")
-                Add-ReportLine("```")
+                Add-ReportLine('```')
                 Add-ReportLine($snapshot)
-                Add-ReportLine("```")
+                Add-ReportLine('```')
             }
             throw "AC4 auto-check failed: resume prompt not detected."
         }
