@@ -32,11 +32,6 @@ func main() {
 			runtime.EventsOn(ctx, "app:request-minimize", func(optionalData ...interface{}) {
 				runtime.WindowMinimise(ctx)
 			})
-			runtime.EventsOn(ctx, "app:request-hide-to-tray", func(optionalData ...interface{}) {
-				// Client uses the same custom title bar event names as server, but on close
-				// it should follow the normal quit-confirm flow handled in the frontend.
-				runtime.EventsEmit(ctx, "app:before-close")
-			})
 		},
 		OnBeforeClose: func(ctx context.Context) (prevent bool) {
 			if application.IsForceQuit() {

@@ -4,6 +4,7 @@ import { useBlocker, useLocation, useNavigate } from "react-router-dom";
 import { EventsEmit, EventsOn, LogInfo, WindowMaximise, WindowShow, WindowUnminimise } from "../wailsjs/runtime/runtime";
 import logo from "./assets/images/icon.png";
 import { ConnectionProvider } from "./context/ConnectionContext";
+import { useConnection } from "./context/ConnectionContext";
 import { ConnectionStatus } from "./components/layout/ConnectionStatus";
 import { ReconnectionOverlay } from "./components/layout/ReconnectionOverlay";
 import { GRNForm } from "./components/forms/GRNForm";
@@ -59,6 +60,7 @@ const VIEW_TO_PATH: Record<ViewKey, string> = {
 };
 
 function WindowControls() {
+    const { appMode } = useConnection();
     const trace = (msg: string) => {
         console.info(msg);
         try {
@@ -78,9 +80,19 @@ function WindowControls() {
     };
 
     const onHideToTray = () => {
-        trace("[UI][WindowControls] Close clicked -> emit app:request-hide-to-tray");
+        if (appMode === "server") {
+            trace("[UI][WindowControls] Close clicked -> emit app:request-hide-to-tray");
+            try {
+                EventsEmit("app:request-hide-to-tray");
+            } catch {
+                // no-op outside Wails runtime
+            }
+            return;
+        }
+
+        trace("[UI][WindowControls] Close clicked -> emit app:before-close");
         try {
-            EventsEmit("app:request-hide-to-tray");
+            EventsEmit("app:before-close");
         } catch {
             // no-op outside Wails runtime
         }
