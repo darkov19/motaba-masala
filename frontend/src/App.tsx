@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Layout, Typography, Card, Segmented, Space, Alert, Button, message } from "antd";
+import { Layout, Typography, Card, Segmented, Space, Alert, Button, Tag, message } from "antd";
 import { useBlocker, useLocation, useNavigate } from "react-router-dom";
 import { EventsEmit, EventsOn, LogInfo, WindowShow, WindowUnminimise } from "../wailsjs/runtime/runtime";
 import logo from "./assets/images/icon.png";
@@ -137,6 +137,7 @@ type ResilienceWorkspaceProps = {
 };
 
 function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWorkspaceProps) {
+    const { appMode } = useConnection();
     const navigate = useNavigate();
     const location = useLocation();
     const [dirtyByView, setDirtyByView] = useState<Record<ViewKey, boolean>>({
@@ -248,6 +249,11 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                     <Title level={4} className="app-header__title">
                         Masala Inventory Management
                     </Title>
+                    {appMode === "server" ? (
+                        <Tag color="red">Server Mode</Tag>
+                    ) : (
+                        <Tag color="blue">Client Mode</Tag>
+                    )}
                 </Space>
                 <Space align="center" size={8}>
                     <ConnectionStatus />

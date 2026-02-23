@@ -181,6 +181,13 @@ function Stop-AppProcess([System.Diagnostics.Process]$Process, [string]$Label) {
     }
 }
 
+function Restart-AppProcess([ref]$ProcessRef, [string]$Path, [string]$Label) {
+    if ($null -ne $ProcessRef.Value) {
+        Stop-AppProcess $ProcessRef.Value $Label
+    }
+    $ProcessRef.Value = Start-AppProcess $Path $Label
+}
+
 function Stop-ExistingByPath([string]$Path) {
     $name = Get-ExecutableName $Path
     Get-Process -Name $name -ErrorAction SilentlyContinue | ForEach-Object {
@@ -463,7 +470,7 @@ function Run-ManualWalScenario {
         -Steps @(
             "Ensure server and client are running. Open GRN or Batch form in client.",
             "Enter sample values so there is visible in-memory state and recent activity.",
-            "Force-stop server process, then restart server process.",
+            "When prompted, press Enter and the script will restart the server automatically.",
             "Observe client and server recovery behavior, then continue to checklist confirmations."
         ) `
         -Checks @(
@@ -481,7 +488,7 @@ function Run-ManualUdpScenario {
         -CheckId "AC2" `
         -Steps @(
             "Keep server and client running on LAN.",
-            "Simulate discovery interruption (server restart or brief network disruption).",
+            "When prompted, the script will restart the server to simulate discovery interruption.",
             "Observe client transition to reconnect/disconnected symptoms, then recovery.",
             "Confirm client rediscovers server automatically and stabilizes."
         ) `
@@ -538,7 +545,7 @@ function Run-ManualRebootScenario {
         -CheckId "AC4" `
         -Steps @(
             "With server running, enter draft values in a client form and wait for autosave interval.",
-            "Restart only the client application.",
+            "When prompted, press Enter and the script will restart only the client application.",
             "Observe resume-discard draft prompt and test both paths if needed.",
             "Confirm client returns to connected/usable state after restart."
         ) `
@@ -608,14 +615,34 @@ function Run-ManualUiAll {
         Write-Host "No go test commands are executed in this mode." -ForegroundColor Yellow
         Write-Host "Follow the terminal steps, perform actions in the running apps, then answer checklist prompts." -ForegroundColor DarkGray
 
+        Write-Step "AC1 automation step"
+        Write-Host "Prepare sample values in client form now. Press Enter when ready for automatic server restart cycle." -ForegroundColor Yellow
+        Read-Host "Press Enter to restart server for AC1" | Out-Null
+        Restart-AppProcess ([ref]$serverProc) $ServerPath "Server app (AC1 restart)"
+        Start-Sleep -Seconds 3
+
         Run-ManualWalScenario
         Wait-ForNextCheck "Manual WAL Recovery (AC1)"
+
+        Write-Step "AC2 automation step"
+        Write-Host "Starting automatic server restart to simulate UDP rediscovery interruption..." -ForegroundColor Yellow
+        Restart-AppProcess ([ref]$serverProc) $ServerPath "Server app (AC2 restart)"
+        Start-Sleep -Seconds 3
+
         Run-ManualUdpScenario
         Wait-ForNextCheck "Manual UDP Re-Discovery (AC2)"
+
         Run-ManualClockTamperScenario
         Wait-ForNextCheck "Manual Clock Tamper Detection (AC5)"
         Run-ManualNetworkScenario
         Wait-ForNextCheck "Manual Network Failure Simulation (AC3)"
+
+        Write-Step "AC4 automation step"
+        Write-Host "Prepare draft values in client form and wait ~7 seconds for autosave. Press Enter when ready for client restart." -ForegroundColor Yellow
+        Read-Host "Press Enter to restart client for AC4" | Out-Null
+        Restart-AppProcess ([ref]$clientProc) $ClientPath "Client app (AC4 restart)"
+        Start-Sleep -Seconds 2
+
         Run-ManualRebootScenario
         Wait-ForNextCheck "Manual Client Reboot Recovery (AC4)"
     }
