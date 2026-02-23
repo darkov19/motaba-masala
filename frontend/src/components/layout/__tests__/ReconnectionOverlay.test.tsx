@@ -12,6 +12,7 @@ describe("ReconnectionOverlay", () => {
     it("renders overlay when disconnected and allows retry", () => {
         const retryNow = vi.fn();
         useConnectionMock.mockReturnValue({
+            appMode: "client",
             isConnected: false,
             isChecking: false,
             retryNow,
@@ -27,6 +28,19 @@ describe("ReconnectionOverlay", () => {
 
     it("hides overlay when connected", () => {
         useConnectionMock.mockReturnValue({
+            appMode: "client",
+            isConnected: true,
+            isChecking: false,
+            retryNow: vi.fn(),
+        });
+
+        const { container } = render(<ReconnectionOverlay />);
+        expect(container).toBeEmptyDOMElement();
+    });
+
+    it("hides overlay in server mode", () => {
+        useConnectionMock.mockReturnValue({
+            appMode: "server",
             isConnected: true,
             isChecking: false,
             retryNow: vi.fn(),

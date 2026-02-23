@@ -4,9 +4,9 @@ import { useConnection } from "../../context/ConnectionContext";
 const { Title, Text } = Typography;
 
 export function ReconnectionOverlay() {
-    const { isConnected, retryNow, isChecking } = useConnection();
+    const { appMode, isConnected, retryNow, isChecking } = useConnection();
 
-    if (isConnected) {
+    if (appMode === "server" || isConnected) {
         return null;
     }
 

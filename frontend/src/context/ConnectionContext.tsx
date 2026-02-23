@@ -8,6 +8,7 @@ import React, {
 } from "react";
 
 type ConnectionContextValue = {
+    appMode: "server" | "client";
     isConnected: boolean;
     isChecking: boolean;
     lastCheckedAt: number | null;
@@ -27,6 +28,7 @@ type WindowWithWailsBindings = Window & {
         app?: {
             App?: {
                 Greet?: (name: string) => Promise<string>;
+                IsServerMode?: () => Promise<boolean>;
             };
         };
     };
@@ -61,6 +63,20 @@ async function probeBackendConnection(): Promise<boolean> {
     return true;
 }
 
+async function detectAppMode(): Promise<"server" | "client"> {
+    const maybeIsServerMode = (window as WindowWithWailsBindings).go?.app?.App?.IsServerMode;
+    if (typeof maybeIsServerMode !== "function") {
+        return "client";
+    }
+
+    try {
+        const isServer = await maybeIsServerMode();
+        return isServer ? "server" : "client";
+    } catch {
+        return "client";
+    }
+}
+
 export function ConnectionProvider({
     children,
 }: {
@@ -69,20 +85,44 @@ export function ConnectionProvider({
     const [isConnected, setIsConnected] = useState(true);
     const [isChecking, setIsChecking] = useState(false);
     const [lastCheckedAt, setLastCheckedAt] = useState<number | null>(null);
+    const [appMode, setAppMode] = useState<"server" | "client">("client");
+
+    useEffect(() => {
+        void (async () => {
+            const mode = await detectAppMode();
+            setAppMode(mode);
+            if (mode === "server") {
+                setIsConnected(true);
+                setIsChecking(false);
+                setLastCheckedAt(Date.now());
+            }
+        })();
+    }, []);
 
     const checkConnection = useCallback(async () => {
+        if (appMode === "server") {
+            setIsConnected(true);
+            setIsChecking(false);
+            setLastCheckedAt(Date.now());
+            return;
+        }
+
         setIsChecking(true);
         const connected = await probeBackendConnection();
         setIsConnected(connected);
         setLastCheckedAt(Date.now());
         setIsChecking(false);
-    }, []);
+    }, [appMode]);
 
     useEffect(() => {
         void checkConnection();
     }, [checkConnection]);
 
     useEffect(() => {
+        if (appMode === "server") {
+            return;
+        }
+
         const intervalMs = isConnected
             ? CHECK_CONNECTED_MS
             : CHECK_RECONNECTING_MS;
@@ -93,9 +133,13 @@ export function ConnectionProvider({
         return () => {
             window.clearInterval(timer);
         };
-    }, [checkConnection, isConnected]);
+    }, [appMode, checkConnection, isConnected]);
 
     useEffect(() => {
+        if (appMode === "server") {
+            return;
+        }
+
         const onOnline = () => {
             void checkConnection();
         };
@@ -111,16 +155,17 @@ export function ConnectionProvider({
             window.removeEventListener("online", onOnline);
             window.removeEventListener("offline", onOffline);
         };
-    }, [checkConnection]);
+    }, [appMode, checkConnection]);
 
     const value = useMemo(
         () => ({
+            appMode,
             isConnected,
             isChecking,
             lastCheckedAt,
             retryNow: checkConnection,
         }),
-        [checkConnection, isChecking, isConnected, lastCheckedAt],
+        [appMode, checkConnection, isChecking, isConnected, lastCheckedAt],
     );
 
     return (

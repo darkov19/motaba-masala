@@ -3,6 +3,9 @@ package app
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"runtime"
+	"strings"
 )
 
 type RecoveryState struct {
@@ -35,12 +38,19 @@ type App struct {
 	restoreHandler        func(string) error
 	licenseStatusProvider func() (LicenseStatus, error)
 	lockoutState          LicenseLockoutState
+	connectivityProbe     func() error
 }
 
 // NewApp creates a new App application struct
 func NewApp(isServer bool) *App {
+	connectivityProbe := func() error { return nil }
+	if !isServer {
+		connectivityProbe = probeLocalServerProcess
+	}
+
 	return &App{
 		isServer: isServer,
+		connectivityProbe: connectivityProbe,
 		licenseStatusProvider: func() (LicenseStatus, error) {
 			return LicenseStatus{Status: "active", DaysRemaining: 0}, nil
 		},
@@ -58,9 +68,60 @@ func (a *App) Context() context.Context {
 	return a.ctx
 }
 
-// Greet returns a greeting for the given name
-func (a *App) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, It's show time!", name)
+func (a *App) IsServerMode() bool {
+	return a.isServer
+}
+
+// Greet also acts as a lightweight connectivity probe for client instances.
+// In client mode this method fails when the local server process is not reachable.
+func (a *App) Greet(name string) (string, error) {
+	if !a.isServer && a.connectivityProbe != nil {
+		if err := a.connectivityProbe(); err != nil {
+			return "", err
+		}
+	}
+	return fmt.Sprintf("Hello %s, It's show time!", name), nil
+}
+
+func probeLocalServerProcess() error {
+	candidates := []string{
+		"masala_inventory_server.exe",
+		"masala_inventory_server",
+		"server.exe",
+		"server",
+	}
+
+	for _, candidate := range candidates {
+		running, err := isProcessRunning(candidate)
+		if err != nil {
+			return err
+		}
+		if running {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("server process not reachable")
+}
+
+func isProcessRunning(processName string) (bool, error) {
+	switch runtime.GOOS {
+	case "windows":
+		out, err := exec.Command("tasklist", "/FI", "IMAGENAME eq "+processName).CombinedOutput()
+		if err != nil {
+			return false, fmt.Errorf("tasklist probe failed: %w", err)
+		}
+		return strings.Contains(strings.ToLower(string(out)), strings.ToLower(processName)), nil
+	default:
+		cmd := exec.Command("pgrep", "-f", processName)
+		if err := cmd.Run(); err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+				return false, nil
+			}
+			return false, fmt.Errorf("pgrep probe failed: %w", err)
+		}
+		return true, nil
+	}
 }
 
 // SetForceQuit allows bypassing the minimize-to-tray logic

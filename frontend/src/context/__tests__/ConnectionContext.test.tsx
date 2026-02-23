@@ -3,10 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConnectionProvider, useConnection } from "../ConnectionContext";
 
 function ProbeConnection() {
-    const { isConnected, retryNow } = useConnection();
+    const { appMode, isConnected, retryNow } = useConnection();
 
     return (
         <>
+            <span data-testid="mode">{appMode}</span>
             <span data-testid="connected">{String(isConnected)}</span>
             <button type="button" onClick={() => void retryNow()}>
                 Retry
@@ -60,6 +61,7 @@ describe("ConnectionProvider", () => {
         );
 
         await waitFor(() => {
+            expect(screen.getByTestId("mode")).toHaveTextContent("client");
             expect(screen.getByTestId("connected")).toHaveTextContent("false");
         });
 
@@ -73,6 +75,7 @@ describe("ConnectionProvider", () => {
         fireEvent.click(screen.getByRole("button", { name: "Retry" }));
 
         await waitFor(() => {
+            expect(screen.getByTestId("mode")).toHaveTextContent("client");
             expect(screen.getByTestId("connected")).toHaveTextContent("true");
         });
         expect(greetMock).toHaveBeenCalledTimes(2);
@@ -105,6 +108,7 @@ describe("ConnectionProvider", () => {
         );
 
         await waitFor(() => {
+            expect(screen.getByTestId("mode")).toHaveTextContent("client");
             expect(screen.getByTestId("connected")).toHaveTextContent("true");
         });
 

@@ -16,6 +16,7 @@ vi.mock("../components/forms/BatchForm", () => ({
 vi.mock("../context/ConnectionContext", () => ({
     ConnectionProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
     useConnection: () => ({
+        appMode: "client",
         isConnected: true,
         isChecking: false,
         lastCheckedAt: null,

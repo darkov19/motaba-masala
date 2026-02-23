@@ -1,6 +1,9 @@
 package app
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestRestoreBackup_RequiresRecoveryMode(t *testing.T) {
 	a := NewApp(true)
@@ -57,5 +60,29 @@ func TestGetLicenseLockoutState_ReturnsConfiguredState(t *testing.T) {
 	}
 	if lockout.HardwareID != "machine-123" {
 		t.Fatalf("expected hardware id to match, got %q", lockout.HardwareID)
+	}
+}
+
+func TestGreet_ClientModeReturnsErrorWhenProbeFails(t *testing.T) {
+	a := NewApp(false)
+	a.connectivityProbe = func() error {
+		return errors.New("server process not reachable")
+	}
+
+	if _, err := a.Greet("ping"); err == nil {
+		t.Fatal("expected greet probe to fail in client mode when server is unreachable")
+	}
+}
+
+func TestGreet_ClientModeSucceedsWhenProbePasses(t *testing.T) {
+	a := NewApp(false)
+	a.connectivityProbe = func() error { return nil }
+
+	msg, err := a.Greet("ping")
+	if err != nil {
+		t.Fatalf("expected greet to succeed, got error: %v", err)
+	}
+	if msg == "" {
+		t.Fatal("expected non-empty greet message")
 	}
 }

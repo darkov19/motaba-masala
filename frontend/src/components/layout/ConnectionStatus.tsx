@@ -5,8 +5,12 @@ import { useConnection } from "../../context/ConnectionContext";
 const { Text } = Typography;
 
 export function ConnectionStatus() {
-    const { isConnected, isChecking, lastCheckedAt } = useConnection();
-    const statusLabel = isConnected ? "Connected" : "Disconnected";
+    const { appMode, isConnected, isChecking, lastCheckedAt } = useConnection();
+    const statusLabel = appMode === "server"
+        ? "Server Running"
+        : isConnected
+            ? "Connected"
+            : "Disconnected";
     const [now, setNow] = useState(() => Date.now());
 
     useEffect(() => {
@@ -31,12 +35,12 @@ export function ConnectionStatus() {
 
     return (
         <Space size={8}>
-            <Badge status={isConnected ? "success" : "error"} />
+            <Badge status={appMode === "server" ? "processing" : isConnected ? "success" : "error"} />
             <Text style={{ color: "#fff", margin: 0 }}>{statusLabel}</Text>
-            {isChecking ? (
+            {appMode !== "server" && isChecking ? (
                 <Text style={{ color: "#f5f5f5" }}>Checking...</Text>
             ) : null}
-            {lastCheckedLabel ? (
+            {appMode !== "server" && lastCheckedLabel ? (
                 <Text style={{ color: "#f5f5f5" }}>Retrying: {lastCheckedLabel}</Text>
             ) : null}
         </Space>
