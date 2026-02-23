@@ -601,10 +601,9 @@ func run() error {
 										slog.Info("Tray action", "action", "exit-server")
 										runtime.WindowShow(ctx)
 										runtime.WindowUnminimise(ctx)
-										runtime.WindowMaximise(ctx)
 										slog.Info("Tray action", "action", "emit-custom-quit-confirm")
 										runtime.EventsEmit(ctx, "app:request-quit-confirm")
-								}
+									}
 							}
 						}()
 					}, func() {
@@ -637,10 +636,9 @@ func run() error {
 							_ = os.Remove(pingFile)
 							runtime.WindowShow(ctx)
 							runtime.WindowUnminimise(ctx)
-							runtime.WindowMaximise(ctx)
 							runtime.WindowSetAlwaysOnTop(ctx, true)
-						go func() {
-							time.Sleep(500 * time.Millisecond)
+							go func() {
+								time.Sleep(500 * time.Millisecond)
 							runtime.WindowSetAlwaysOnTop(ctx, false)
 						}()
 					}
@@ -679,16 +677,12 @@ func run() error {
 							initialized = true
 							continue
 						}
-						if minimized && !lastMinimized {
-							notifiedWhileMinimized = true
-						}
-						if !minimized && lastMinimized {
-							// Restore to a normal maximized window when opened from taskbar.
-							runtime.WindowMaximise(ctx)
-						}
-						if !minimized {
-							notifiedWhileMinimized = false
-						}
+							if minimized && !lastMinimized {
+								notifiedWhileMinimized = true
+							}
+							if !minimized {
+								notifiedWhileMinimized = false
+							}
 						lastMinimized = minimized
 					}
 				}
