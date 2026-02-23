@@ -161,11 +161,15 @@ function Resolve-AppPaths {
     }
 }
 
-function Start-AppProcess([string]$Path, [string]$Label) {
+function Start-AppProcess([string]$Path, [string]$Label, [switch]$AllowImmediateExit) {
     Write-Step "Starting $Label"
     $proc = Start-Process -FilePath $Path -WorkingDirectory $RepoRoot -PassThru
     Start-Sleep -Seconds 4
     if ($proc.HasExited) {
+        if ($AllowImmediateExit) {
+            Write-Host "$Label exited immediately (allowed for this scenario)." -ForegroundColor Yellow
+            return $proc
+        }
         throw "$Label exited immediately. Path: $Path"
     }
     return $proc
@@ -186,11 +190,11 @@ function Stop-AppProcess([System.Diagnostics.Process]$Process, [string]$Label) {
     }
 }
 
-function Restart-AppProcess([ref]$ProcessRef, [string]$Path, [string]$Label) {
+function Restart-AppProcess([ref]$ProcessRef, [string]$Path, [string]$Label, [switch]$AllowImmediateExit) {
     if ($null -ne $ProcessRef.Value) {
         Stop-AppProcess $ProcessRef.Value $Label
     }
-    $ProcessRef.Value = Start-AppProcess $Path $Label
+    $ProcessRef.Value = Start-AppProcess $Path $Label -AllowImmediateExit:$AllowImmediateExit
 }
 
 function Get-HeartbeatPath {
@@ -547,7 +551,7 @@ function Run-AutoClockTamperScenario([ref]$ServerProcRef, [ref]$ClientProcRef) {
     Set-HeartbeatUnixTimestamp $tamperTs $heartbeatPath
 
     Write-Host "[AC5] Step 2/5: Restarting server to trigger startup license validation..." -ForegroundColor DarkGray
-    Restart-AppProcess $ServerProcRef $ServerPath "Server app (AC5 tamper restart)"
+    Restart-AppProcess $ServerProcRef $ServerPath "Server app (AC5 tamper restart)" -AllowImmediateExit
     Start-Sleep -Seconds 4
 
     Write-Host "[AC5] Step 3/5: Verifying tamper symptom (server startup failure or client disconnect state)..." -ForegroundColor DarkGray
