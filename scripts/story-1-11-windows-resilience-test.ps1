@@ -11,6 +11,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$ScriptVersion = "2026-02-24.3"
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $BuildScript = Join-Path $RepoRoot "scripts\windows-hard-sync-build-run.ps1"
@@ -56,6 +57,10 @@ $env:MASALA_AUTOMATION_STATUS_FILE = $script:AutomationStatusPath
 function Write-Step([string]$Message) {
     Write-Host ""
     Write-Host "==> $Message" -ForegroundColor Cyan
+}
+
+function Write-VersionBanner {
+    Write-Host "Story 1.11 script version: $ScriptVersion" -ForegroundColor DarkCyan
 }
 
 function Assert-PathExists([string]$Path, [string]$Label) {
@@ -676,24 +681,36 @@ function Run-ManualUiAll {
 
         Write-Step "Manual UI validation flow (AC1, AC2, AC5, AC3, AC4)"
         Write-Host "No go test commands are executed in this mode." -ForegroundColor Yellow
-        Write-Host "Follow the terminal steps, perform actions in the running apps, then answer checklist prompts." -ForegroundColor DarkGray
+        Write-Host "Flow is now fully automated for AC1/AC2/AC3/AC4/AC5; only observation pauses remain." -ForegroundColor DarkGray
 
         Write-Step "AC1 automation step"
-        Write-Host "Prepare sample values in client form now. Press Enter when ready for automatic server restart cycle." -ForegroundColor Yellow
-        Read-Host "Press Enter to restart server for AC1" | Out-Null
+        Write-Host "Restarting server automatically to validate recovery behavior..." -ForegroundColor Yellow
         Restart-AppProcess ([ref]$serverProc) $ServerPath "Server app (AC1 restart)"
-        Start-Sleep -Seconds 3
-
-        Run-ManualWalScenario
-        Wait-ForNextCheck "Manual WAL Recovery (AC1)"
+        $ac1Connected = Wait-ForUiText "Connected" 30 $true $clientProc.Id
+        if (-not $ac1Connected) {
+            Add-ReportLine("- [FAIL] AC1 auto-check: client did not stabilize to Connected after server restart.")
+            throw "AC1 auto-check failed: client did not stabilize."
+        }
+        Add-ReportLine("- [PASS] AC1 auto-check: client remained/recovered to Connected after server restart.")
+        Set-CheckSummary("PASS. AC1 automation: restarted server and verified Connected state.")
+        Complete-AutomationCheck "AC1" "Completed AC1 automated restart/recovery check"
+        Wait-ForNextCheck "Auto WAL Recovery Behavior Check (AC1)"
 
         Write-Step "AC2 automation step"
         Write-Host "Starting automatic server restart to simulate UDP rediscovery interruption..." -ForegroundColor Yellow
+        Start-AutomationCheck "AC2" "Running AC2 automated rediscovery simulation"
         Restart-AppProcess ([ref]$serverProc) $ServerPath "Server app (AC2 restart)"
-        Start-Sleep -Seconds 3
-
-        Run-ManualUdpScenario
-        Wait-ForNextCheck "Manual UDP Re-Discovery (AC2)"
+        $ac2Overlay = Wait-ForAnyUiText @("Attempting to reconnect", "Disconnected", "Retrying:") 30 $clientProc.Id
+        $ac2Recovered = Wait-ForUiText "Connected" 30 $true $clientProc.Id
+        if (-not $ac2Overlay -or -not $ac2Recovered) {
+            Add-ReportLine("- [FAIL] AC2 auto-check: rediscovery symptom/recovery sequence not fully observed.")
+            Fail-AutomationCheck "AC2" "Failed AC2 automated rediscovery simulation"
+            throw "AC2 auto-check failed: rediscovery sequence not observed."
+        }
+        Add-ReportLine("- [PASS] AC2 auto-check: reconnect symptom observed and client recovered to Connected.")
+        Set-CheckSummary("PASS. AC2 automation: server restart, reconnect symptom observed, recovered to Connected.")
+        Complete-AutomationCheck "AC2" "Completed AC2 automated rediscovery simulation"
+        Wait-ForNextCheck "Auto UDP Re-Discovery Behavior Check (AC2)"
 
         Run-AutoClockTamperScenario ([ref]$serverProc) ([ref]$clientProc)
         Wait-ForNextCheck "Auto Clock Tamper Detection (AC5)"
@@ -907,6 +924,7 @@ function Run-AutoApp {
 
 Push-Location $RepoRoot
 try {
+    Write-VersionBanner
     Assert-PathExists $ProtocolDoc "Protocol document"
     New-Item -ItemType Directory -Force -Path $ManualTestingDir | Out-Null
     New-Item -ItemType Directory -Force -Path $GoCachePath | Out-Null
