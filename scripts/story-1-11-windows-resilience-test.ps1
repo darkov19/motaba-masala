@@ -49,6 +49,9 @@ if ([string]::IsNullOrWhiteSpace($ReportPath)) {
 }
 
 $script:LastCheckSummary = ""
+$script:AutomationStatusPath = Join-Path $env:TEMP "masala-story-1-11-status.json"
+$script:AutomationChecks = @{}
+$env:MASALA_AUTOMATION_STATUS_FILE = $script:AutomationStatusPath
 
 function Write-Step([string]$Message) {
     Write-Host ""
@@ -87,6 +90,48 @@ function Add-ReportLine([string]$Line) {
 
 function Set-CheckSummary([string]$Summary) {
     $script:LastCheckSummary = $Summary
+}
+
+function Write-AutomationStatus([string]$CurrentCheck, [string]$LastEvent) {
+    $payload = [ordered]@{
+        enabled = $true
+        current_check = $CurrentCheck
+        last_event = $LastEvent
+        updated_at = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        checks = $script:AutomationChecks
+    }
+    $json = $payload | ConvertTo-Json -Depth 6
+    Set-Content -Path $script:AutomationStatusPath -Value $json -Encoding UTF8
+}
+
+function Start-AutomationCheck([string]$CheckId, [string]$StepMessage) {
+    if ([string]::IsNullOrWhiteSpace($CheckId)) {
+        return
+    }
+    $script:AutomationChecks[$CheckId] = "Running"
+    Write-AutomationStatus $CheckId $StepMessage
+}
+
+function Complete-AutomationCheck([string]$CheckId, [string]$StepMessage) {
+    if ([string]::IsNullOrWhiteSpace($CheckId)) {
+        return
+    }
+    $script:AutomationChecks[$CheckId] = "PASS"
+    Write-AutomationStatus $CheckId $StepMessage
+}
+
+function Fail-AutomationCheck([string]$CheckId, [string]$StepMessage) {
+    if ([string]::IsNullOrWhiteSpace($CheckId)) {
+        return
+    }
+    $script:AutomationChecks[$CheckId] = "FAIL"
+    Write-AutomationStatus $CheckId $StepMessage
+}
+
+function Clear-AutomationStatus {
+    if (Test-Path $script:AutomationStatusPath) {
+        Remove-Item -Force $script:AutomationStatusPath -ErrorAction SilentlyContinue
+    }
 }
 
 function Wait-ForNextCheck([string]$CheckName) {
@@ -314,30 +359,34 @@ function Invoke-HardSyncBuild {
     }
 }
 
-function Invoke-GoTest([string]$Label, [string]$Package, [string]$RunPattern) {
+function Invoke-GoTest([string]$Label, [string]$Package, [string]$RunPattern, [string]$AutomationCheckId = "") {
     Write-Step "Automated check: $Label"
+    Write-Host "Running backend validation: go test $Package -run $RunPattern -count=1" -ForegroundColor DarkGray
+    Start-AutomationCheck $AutomationCheckId "Running $Label"
     $env:GOCACHE = $GoCachePath
     & go test $Package -run $RunPattern -count=1
     if ($LASTEXITCODE -ne 0) {
         Add-ReportLine("- [FAIL] $Label")
         Set-CheckSummary("FAILED. Command: go test $Package -run $RunPattern -count=1")
+        Fail-AutomationCheck $AutomationCheckId "Failed $Label"
         throw "Automated check failed: $Label"
     }
     Write-Host "PASS: $Label" -ForegroundColor Green
     Add-ReportLine("- [PASS] $Label")
     Set-CheckSummary("PASS. Command: go test $Package -run $RunPattern -count=1")
+    Complete-AutomationCheck $AutomationCheckId "Completed $Label"
 }
 
 function Run-WalTest {
-    Invoke-GoTest "WAL Recovery Integration Test (AC1)" "./test/integration" "TestWALRecoveryIntegration"
+    Invoke-GoTest "WAL Recovery Integration Test (AC1)" "./test/integration" "TestWALRecoveryIntegration" "AC1"
 }
 
 function Run-UdpTest {
-    Invoke-GoTest "UDP Re-Discovery Integration Test (AC2)" "./test/integration" "TestUDPRediscoveryIntegration"
+    Invoke-GoTest "UDP Re-Discovery Integration Test (AC2)" "./test/integration" "TestUDPRediscoveryIntegration" "AC2"
 }
 
 function Run-ClockTamperTest {
-    Invoke-GoTest "Clock Tamper Test via ValidateLicense (AC5)" "./internal/infrastructure/license" "TestValidateLicense_ClockTamperDetectedWithInjectedClock"
+    Invoke-GoTest "Clock Tamper Test via ValidateLicense (AC5)" "./internal/infrastructure/license" "TestValidateLicense_ClockTamperDetectedWithInjectedClock" "AC5"
 }
 
 function Prompt-ManualChecklist(
@@ -439,6 +488,7 @@ function Run-AutoNetworkScenario {
         $clientProc = Start-AppProcess $ClientPath "Client app"
 
         Write-Step "Auto network failure simulation"
+        Start-AutomationCheck "AC3" "Running AC3: simulating server stop and client reconnect"
         Stop-AppProcess $serverProc "Server app"
         # Give the connection loop one normal probe cycle to transition from connected->reconnecting.
         Start-Sleep -Seconds 12
@@ -459,6 +509,7 @@ function Run-AutoNetworkScenario {
                 Add-ReportLine($snapshot)
                 Add-ReportLine('```')
             }
+            Fail-AutomationCheck "AC3" "Failed AC3: reconnecting overlay not detected"
             throw "AC3 auto-check failed: reconnecting overlay not detected."
         }
 
@@ -475,12 +526,14 @@ function Run-AutoNetworkScenario {
                 Add-ReportLine($snapshot)
                 Add-ReportLine('```')
             }
+            Fail-AutomationCheck "AC3" "Failed AC3: connected status not detected after restart"
             throw "AC3 auto-check failed: connected status not detected."
         }
 
         Add-ReportLine("- [PASS] AC3 auto-check: reconnect overlay detected and connection recovered.")
         Write-Host "PASS: Auto network scenario (AC3)" -ForegroundColor Green
         Set-CheckSummary("PASS. Actions: started server+client, stopped server, detected 'Attempting to reconnect...', restarted server, detected 'Connected'.")
+        Complete-AutomationCheck "AC3" "Completed AC3: reconnect symptom detected and client recovered"
     }
     finally {
         Stop-AppProcess $clientProc "Client app"
@@ -503,9 +556,11 @@ function Run-AutoRebootScenario {
         $clientProc = Start-AppProcess $ClientPath "Client app"
 
         Write-Step "Auto draft+relaunch simulation"
+        Start-AutomationCheck "AC4" "Running AC4: seeding draft and restarting client"
         $uiReady = Wait-ForAnyUiText @("Supplier Name", "GRN Form", "Batch Form") 25 $clientProc.Id
         if (-not $uiReady) {
             Add-ReportLine("- [FAIL] AC4 auto-check: client form UI did not become ready before seeding.")
+            Fail-AutomationCheck "AC4" "Failed AC4: client form UI not ready"
             throw "AC4 auto-check failed: client form UI not ready."
         }
 
@@ -527,6 +582,7 @@ function Run-AutoRebootScenario {
                 Add-ReportLine($snapshot)
                 Add-ReportLine('```')
             }
+            Fail-AutomationCheck "AC4" "Failed AC4: unable to seed draft field"
             throw "AC4 auto-check failed: could not seed form field."
         }
 
@@ -544,12 +600,14 @@ function Run-AutoRebootScenario {
                 Add-ReportLine($snapshot)
                 Add-ReportLine('```')
             }
+            Fail-AutomationCheck "AC4" "Failed AC4: resume prompt not detected"
             throw "AC4 auto-check failed: resume prompt not detected."
         }
 
         Add-ReportLine("- [PASS] AC4 auto-check: resume draft prompt detected after restart.")
         Write-Host "PASS: Auto reboot scenario (AC4)" -ForegroundColor Green
         Set-CheckSummary("PASS. Actions: started server+client, seeded draft field, waited for autosave, restarted client, detected 'Resume draft' prompt.")
+        Complete-AutomationCheck "AC4" "Completed AC4: draft recovery prompt detected"
     }
     finally {
         Stop-AppProcess $clientProc "Client app"
@@ -558,6 +616,14 @@ function Run-AutoRebootScenario {
 }
 
 function Run-AutoApp {
+    Write-Step "Auto end-to-end flow (AC1, AC2, AC5, AC3, AC4)"
+    Write-Host "Client UI will show live symptom/status updates while backend checks run." -ForegroundColor DarkGray
+    Run-WalTest
+    Wait-ForNextCheck "WAL Recovery Integration Test (AC1)"
+    Run-UdpTest
+    Wait-ForNextCheck "UDP Re-Discovery Integration Test (AC2)"
+    Run-ClockTamperTest
+    Wait-ForNextCheck "Clock Tamper Test (AC5)"
     Run-AutoNetworkScenario
     Wait-ForNextCheck "Auto Network Failure Simulation (AC3)"
     Run-AutoRebootScenario
@@ -569,6 +635,7 @@ try {
     Assert-PathExists $ProtocolDoc "Protocol document"
     New-Item -ItemType Directory -Force -Path $ManualTestingDir | Out-Null
     New-Item -ItemType Directory -Force -Path $GoCachePath | Out-Null
+    Write-AutomationStatus "Idle" "Story 1.11 validation script started"
 
     if ($Rebuild -or $Mode -eq "build") {
         Invoke-HardSyncBuild
@@ -613,5 +680,7 @@ try {
     }
 }
 finally {
+    Clear-AutomationStatus
+    Remove-Item Env:MASALA_AUTOMATION_STATUS_FILE -ErrorAction SilentlyContinue
     Pop-Location
 }

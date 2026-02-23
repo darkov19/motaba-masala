@@ -36,6 +36,14 @@ type LicenseLockoutState = {
     hardware_id?: string;
 };
 
+type AutomationStatus = {
+    enabled: boolean;
+    current_check: string;
+    last_event: string;
+    updated_at: string;
+    checks: Record<string, string>;
+};
+
 type WindowWithAppBindings = Window & {
     go?: {
         app?: {
@@ -44,6 +52,7 @@ type WindowWithAppBindings = Window & {
                 RestoreBackup?: (backupPath: string) => Promise<void>;
                 GetLicenseStatus?: () => Promise<LicenseStatus>;
                 GetLicenseLockoutState?: () => Promise<LicenseLockoutState>;
+                GetAutomationStatus?: () => Promise<AutomationStatus>;
             };
         };
     };
@@ -124,9 +133,10 @@ function WindowTitleBar() {
 
 type ResilienceWorkspaceProps = {
     licenseStatus: LicenseStatus;
+    automationStatus: AutomationStatus | null;
 };
 
-function ResilienceWorkspace({ licenseStatus }: ResilienceWorkspaceProps) {
+function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWorkspaceProps) {
     const navigate = useNavigate();
     const location = useLocation();
     const [dirtyByView, setDirtyByView] = useState<Record<ViewKey, boolean>>({
@@ -245,6 +255,26 @@ function ResilienceWorkspace({ licenseStatus }: ResilienceWorkspaceProps) {
             <Content className="app-content">
                 <Card className="app-card" variant="borderless">
                     <Space orientation="vertical" size={20} style={{ width: "100%" }}>
+                        {automationStatus?.enabled ? (
+                            <Card size="small">
+                                <Space direction="vertical" size={6} style={{ width: "100%" }}>
+                                    <Text strong>Automation Status</Text>
+                                    <Text>Current: {automationStatus.current_check || "Idle"}</Text>
+                                    <Text type="secondary">{automationStatus.last_event || "Waiting..."}</Text>
+                                    <Text type="secondary">Updated: {automationStatus.updated_at || "-"}</Text>
+                                    {Object.keys(automationStatus.checks || {}).length > 0 ? (
+                                        <Space direction="vertical" size={2} style={{ width: "100%" }}>
+                                            {Object.entries(automationStatus.checks).map(([check, status]) => (
+                                                <Text key={check}>
+                                                    {check}: {status}
+                                                </Text>
+                                            ))}
+                                        </Space>
+                                    ) : null}
+                                </Space>
+                            </Card>
+                        ) : null}
+
                         <Title level={2} style={{ marginBottom: 0 }}>
                             Client Resilience & Recovery
                         </Title>
@@ -319,6 +349,7 @@ function App() {
     const [recoveryState, setRecoveryState] = useState<RecoveryState | null>(null);
     const [licenseStatus, setLicenseStatus] = useState<LicenseStatus>(defaultLicenseStatus);
     const [lockoutState, setLockoutState] = useState<LicenseLockoutState | null>(null);
+    const [automationStatus, setAutomationStatus] = useState<AutomationStatus | null>(null);
     const [isLoadingRecovery, setIsLoadingRecovery] = useState(true);
     const [restoringBackup, setRestoringBackup] = useState<string | null>(null);
 
@@ -424,6 +455,36 @@ function App() {
 
         return () => {
             unsubscribe?.();
+        };
+    }, []);
+
+    useEffect(() => {
+        let mounted = true;
+        const pollAutomationStatus = async () => {
+            const binding = (window as WindowWithAppBindings).go?.app?.App?.GetAutomationStatus;
+            if (typeof binding !== "function") {
+                return;
+            }
+            try {
+                const status = await binding();
+                if (mounted) {
+                    setAutomationStatus(status.enabled ? status : null);
+                }
+            } catch {
+                if (mounted) {
+                    setAutomationStatus(null);
+                }
+            }
+        };
+
+        void pollAutomationStatus();
+        const timer = window.setInterval(() => {
+            void pollAutomationStatus();
+        }, 1000);
+
+        return () => {
+            mounted = false;
+            window.clearInterval(timer);
         };
     }, []);
 
@@ -607,7 +668,7 @@ function App() {
 
     return (
         <ConnectionProvider>
-            <ResilienceWorkspace licenseStatus={licenseStatus} />
+            <ResilienceWorkspace licenseStatus={licenseStatus} automationStatus={automationStatus} />
         </ConnectionProvider>
     );
 }
