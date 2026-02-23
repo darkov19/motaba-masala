@@ -14,38 +14,47 @@
 
 ## Completed Changes
 
+- Primary implementation commit: `3386f691`
+- Source audit doc commit context: `docs/audits/2026-02-23-client-connectivity-probe-audit.md`
+
 ### 1) Backend API and behavior
 
 - `internal/app/app.go`
-  - Added `CheckServerReachability() (bool, error)`:
-    - network-first TCP probe (default target `127.0.0.1:8090`)
-    - optional local-dev fallback probe only when `MASALA_LOCAL_SINGLE_MACHINE_MODE=1`
-  - `Greet` no longer performs connectivity probing.
-  - Added helpers:
-    - `resolveProbeAddress`
-    - `probeTCPAddress`
-    - `isLocalSingleMachineModeEnabled`
-  - Added env knobs:
-    - `MASALA_SERVER_PROBE_ADDR` (e.g., `10.0.0.25:8090`)
-    - `MASALA_LOCAL_SINGLE_MACHINE_MODE` (`1/true/yes` to enable fallback)
+    - Added `CheckServerReachability() (bool, error)`:
+        - network-first TCP probe (default target `127.0.0.1:8090`)
+        - optional local-dev fallback probe only when `MASALA_LOCAL_SINGLE_MACHINE_MODE=1`
+    - `Greet` no longer performs connectivity probing.
+    - Added helpers:
+        - `resolveProbeAddress`
+        - `probeTCPAddress`
+        - `isLocalSingleMachineModeEnabled`
+    - Added env knobs:
+        - `MASALA_SERVER_PROBE_ADDR` (e.g., `10.0.0.25:8090`)
+        - `MASALA_LOCAL_SINGLE_MACHINE_MODE` (`1/true/yes` to enable fallback)
 
 ### 2) Frontend connection source-of-truth
 
 - `frontend/src/context/ConnectionContext.tsx`
-  - Replaced `Greet("ping")` connectivity probe with `CheckServerReachability()`.
-  - Preserved existing reconnect cadence and browser online/offline handling.
+    - Replaced `Greet("ping")` connectivity probe with `CheckServerReachability()`.
+    - Preserved existing reconnect cadence and browser online/offline handling.
 
 ### 3) Tests updated
 
 - `internal/app/app_test.go`
-  - Removed assumption that `Greet` fails when local process is absent.
-  - Added coverage for:
-    - network probe false case
-    - local-dev fallback true case
-    - probe address parsing
-    - local-dev env parsing
+    - Removed assumption that `Greet` fails when local process is absent.
+    - Added coverage for:
+        - network probe true case (via local-dev fallback path and real dial path logic wiring)
+        - network probe false case
+        - local-dev fallback true case
+        - probe address parsing
+        - local-dev env parsing
 - `frontend/src/context/__tests__/ConnectionContext.test.tsx`
-  - Updated mocks from `Greet` to `CheckServerReachability`.
+    - Updated mocks from `Greet` to `CheckServerReachability`.
+
+### 3.1) Remaining Test Gaps (from audit plan)
+
+1. Add deterministic unit/integration test for explicit network reachable case using a temporary TCP listener and `MASALA_SERVER_PROBE_ADDR`.
+2. Add deterministic test for endpoint change/recovery scenario (or document why covered by Story 1.11 AC2 operational test only).
 
 ### 4) Validation run status (local CI/dev)
 
@@ -57,22 +66,51 @@
 
 Run on Windows:
 
-1. Rebuild apps:
-   - `.\scripts\windows-hard-sync-build-run.ps1`
-2. Run Story 1.11 manual UI flow (default mode):
-   - `.\scripts\story-1-11-windows-resilience-test.ps1`
-3. Verify expected behavior:
-   - No immediate false reconnect overlay at startup when server is reachable.
-   - Baseline reaches `Connected` before AC1 starts.
-   - AC3: server-stop transition shows reconnect symptoms then recovers to `Connected`.
-   - AC4: resume draft prompt appears and client returns to `Connected`.
-4. Confirm report output:
-   - `docs/manual_testing/story-1-11-resilience-validation-YYYY-MM-DD.md`
+1. Configure probe target for LAN deployments (required if server is on another machine):
+    - `setx MASALA_SERVER_PROBE_ADDR "<server-ip>:8090"`
+    - Open a new terminal after `setx`, or set for current shell:
+      - `$env:MASALA_SERVER_PROBE_ADDR = "<server-ip>:8090"`
+2. Ensure local-dev fallback is disabled for production-like validation:
+    - `Remove-Item Env:MASALA_LOCAL_SINGLE_MACHINE_MODE -ErrorAction SilentlyContinue`
+3. Rebuild apps:
+    - `.\scripts\windows-hard-sync-build-run.ps1`
+4. Run Story 1.11 manual UI flow (default mode):
+    - `.\scripts\story-1-11-windows-resilience-test.ps1`
+5. Verify expected behavior:
+    - No immediate false reconnect overlay at startup when server is reachable.
+    - Baseline reaches `Connected` before AC1 starts.
+    - AC3: server-stop transition shows reconnect symptoms then recovers to `Connected`.
+    - AC4: resume draft prompt appears and client returns to `Connected`.
+6. Confirm report output:
+    - `docs/manual_testing/story-1-11-resilience-validation-YYYY-MM-DD.md`
+
+## Compensation Lifecycle (Track/Decide)
+
+These were introduced as compensations while connectivity source-of-truth was wrong. Keep/remove decisions should be explicit:
+
+1. Overlay suppression during AC1/AC2/AC5 (`frontend/src/App.tsx`, `frontend/src/components/layout/ReconnectionOverlay.tsx`)
+    - Status: Keep for test UX clarity unless replaced by separate non-blocking test banner.
+2. Automation status bridge (`internal/app/automation_status.go`, script + UI panel)
+    - Status: Keep (useful operator telemetry), but mark as test-only behavior in docs.
+3. Manual baseline gate in Story 1.11 script
+    - Status: Keep (prevents invalid scenario starts).
+4. AC4 retry/fallback seeding logic
+    - Status: Keep (UIA reliability hardening).
+5. Process-probe wrappers (`internal/app/command_windows.go`, `internal/app/command_nonwindows.go`)
+    - Status: Keep only while local-dev fallback remains supported.
+
+## Commit Traceability
+
+1. Core reachability remediation: `3386f691`
+2. Baseline gate for manual flow: `f1af6c09`
+3. AC4 connected-post-restart requirement: `2e35d5aa`
+4. AC1/2/5 status panel visibility tweak: `9c1d0c1c`
+5. Process-probe Windows UX mitigation: `a687cfc5`
 
 ## Notes for Deployment Topologies
 
 1. LAN deployment (client/server different machines):
-   - Set `MASALA_SERVER_PROBE_ADDR=<server-ip>:8090` on client machine.
-   - Keep `MASALA_LOCAL_SINGLE_MACHINE_MODE` unset (default off).
+    - Set `MASALA_SERVER_PROBE_ADDR=<server-ip>:8090` on client machine.
+    - Keep `MASALA_LOCAL_SINGLE_MACHINE_MODE` unset (default off).
 2. Local single-machine developer mode:
-   - Optional: set `MASALA_LOCAL_SINGLE_MACHINE_MODE=1` for process fallback when needed.
+    - Optional: set `MASALA_LOCAL_SINGLE_MACHINE_MODE=1` for process fallback when needed.
