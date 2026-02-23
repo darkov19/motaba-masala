@@ -700,14 +700,10 @@ function Run-ManualUiAll {
         Run-ManualNetworkScenario
         Wait-ForNextCheck "Manual Network Failure Simulation (AC3)"
 
-        Write-Step "AC4 automation step"
-        Write-Host "Prepare draft values in client form and wait ~7 seconds for autosave. Press Enter when ready for client restart." -ForegroundColor Yellow
-        Read-Host "Press Enter to restart client for AC4" | Out-Null
-        Restart-AppProcess ([ref]$clientProc) $ClientPath "Client app (AC4 restart)"
-        Start-Sleep -Seconds 2
-
-        Run-ManualRebootScenario
-        Wait-ForNextCheck "Manual Client Reboot Recovery (AC4)"
+        Write-Step "AC4 automated validation"
+        Write-Host "Running automated AC4 reboot recovery check (no manual confirmations required)." -ForegroundColor Yellow
+        Run-AutoRebootScenario
+        Wait-ForNextCheck "Auto Client Reboot Recovery (AC4)"
     }
     finally {
         Stop-AppProcess $clientProc "Client app"
