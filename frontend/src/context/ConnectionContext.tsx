@@ -27,7 +27,7 @@ type WindowWithWailsBindings = Window & {
     go?: {
         app?: {
             App?: {
-                Greet?: (name: string) => Promise<string>;
+                CheckServerReachability?: () => Promise<boolean>;
                 IsServerMode?: () => Promise<boolean>;
             };
         };
@@ -46,14 +46,14 @@ async function probeBackendConnection(): Promise<boolean> {
     }
 
     // Wails exposes backend bindings under window.go when running packaged app.
-    const maybeGreet = (window as WindowWithWailsBindings).go?.app?.App?.Greet;
-    if (typeof maybeGreet === "function") {
+    const maybeCheckReachability = (window as WindowWithWailsBindings).go?.app?.App?.CheckServerReachability;
+    if (typeof maybeCheckReachability === "function") {
         try {
-            await Promise.race([
-                maybeGreet("ping"),
+            const connected = await Promise.race([
+                maybeCheckReachability(),
                 timeoutAfter(REQUEST_TIMEOUT_MS),
             ]);
-            return true;
+            return connected === true;
         } catch {
             return false;
         }

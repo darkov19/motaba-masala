@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"os"
 	"testing"
 )
 
@@ -63,20 +64,8 @@ func TestGetLicenseLockoutState_ReturnsConfiguredState(t *testing.T) {
 	}
 }
 
-func TestGreet_ClientModeReturnsErrorWhenProbeFails(t *testing.T) {
+func TestGreet_ClientModeSucceedsWithoutConnectivityProbe(t *testing.T) {
 	a := NewApp(false)
-	a.connectivityProbe = func() error {
-		return errors.New("server process not reachable")
-	}
-
-	if _, err := a.Greet("ping"); err == nil {
-		t.Fatal("expected greet probe to fail in client mode when server is unreachable")
-	}
-}
-
-func TestGreet_ClientModeSucceedsWhenProbePasses(t *testing.T) {
-	a := NewApp(false)
-	a.connectivityProbe = func() error { return nil }
 
 	msg, err := a.Greet("ping")
 	if err != nil {
@@ -85,4 +74,69 @@ func TestGreet_ClientModeSucceedsWhenProbePasses(t *testing.T) {
 	if msg == "" {
 		t.Fatal("expected non-empty greet message")
 	}
+}
+
+func TestCheckServerReachability_ReturnsFalseWhenNetworkAndProbeFail(t *testing.T) {
+	t.Setenv(envServerProbeAddr, "127.0.0.1:1")
+	t.Setenv(envLocalSingleMachine, "0")
+
+	a := NewApp(false)
+	a.connectivityProbe = func() error {
+		return errors.New("server process not reachable")
+	}
+
+	connected, err := a.CheckServerReachability()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if connected {
+		t.Fatal("expected reachability to be false")
+	}
+}
+
+func TestCheckServerReachability_UsesLocalDevFallbackProbe(t *testing.T) {
+	t.Setenv(envServerProbeAddr, "127.0.0.1:1")
+	t.Setenv(envLocalSingleMachine, "1")
+
+	a := NewApp(false)
+	a.connectivityProbe = func() error { return nil }
+
+	connected, err := a.CheckServerReachability()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !connected {
+		t.Fatal("expected reachability true via local-dev process fallback")
+	}
+}
+
+func TestResolveProbeAddress(t *testing.T) {
+	if got := resolveProbeAddress(""); got != defaultServerProbeAddr {
+		t.Fatalf("expected default addr %q, got %q", defaultServerProbeAddr, got)
+	}
+	if got := resolveProbeAddress("http://10.0.0.5:8090/health"); got != "10.0.0.5:8090" {
+		t.Fatalf("expected parsed host:port, got %q", got)
+	}
+	if got := resolveProbeAddress("10.0.0.7:9000"); got != "10.0.0.7:9000" {
+		t.Fatalf("expected raw host:port passthrough, got %q", got)
+	}
+}
+
+func TestIsLocalSingleMachineModeEnabled(t *testing.T) {
+	t.Setenv(envLocalSingleMachine, "true")
+	if !isLocalSingleMachineModeEnabled() {
+		t.Fatal("expected local single machine mode to be enabled")
+	}
+
+	t.Setenv(envLocalSingleMachine, "0")
+	if isLocalSingleMachineModeEnabled() {
+		t.Fatal("expected local single machine mode to be disabled")
+	}
+}
+
+func TestMain(m *testing.M) {
+	// Ensure tests don't inherit machine-specific probe settings.
+	_ = os.Unsetenv(envServerProbeAddr)
+	_ = os.Unsetenv(envLocalSingleMachine)
+	os.Exit(m.Run())
 }

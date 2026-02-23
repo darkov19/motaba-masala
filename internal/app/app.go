@@ -5,9 +5,13 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"net"
+	"net/url"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 )
 
 type RecoveryState struct {
@@ -43,6 +47,13 @@ type App struct {
 	connectivityProbe     func() error
 }
 
+const (
+	defaultServerProbeAddr = "127.0.0.1:8090"
+	envServerProbeAddr     = "MASALA_SERVER_PROBE_ADDR"
+	envLocalSingleMachine  = "MASALA_LOCAL_SINGLE_MACHINE_MODE"
+	serverProbeTimeout     = 1500 * time.Millisecond
+)
+
 // NewApp creates a new App application struct
 func NewApp(isServer bool) *App {
 	connectivityProbe := func() error { return nil }
@@ -74,15 +85,30 @@ func (a *App) IsServerMode() bool {
 	return a.isServer
 }
 
-// Greet also acts as a lightweight connectivity probe for client instances.
-// In client mode this method fails when the local server process is not reachable.
 func (a *App) Greet(name string) (string, error) {
-	if !a.isServer && a.connectivityProbe != nil {
-		if err := a.connectivityProbe(); err != nil {
-			return "", err
+	return fmt.Sprintf("Hello %s, It's show time!", name), nil
+}
+
+// CheckServerReachability probes server reachability for client-mode connectivity status.
+// Default behavior is network-level probing. Optional local-dev fallback can be enabled
+// via MASALA_LOCAL_SINGLE_MACHINE_MODE=1 to use process probing when network probe fails.
+func (a *App) CheckServerReachability() (bool, error) {
+	if a.isServer {
+		return true, nil
+	}
+
+	probeAddr := resolveProbeAddress(os.Getenv(envServerProbeAddr))
+	if err := probeTCPAddress(probeAddr); err == nil {
+		return true, nil
+	}
+
+	if isLocalSingleMachineModeEnabled() && a.connectivityProbe != nil {
+		if err := a.connectivityProbe(); err == nil {
+			return true, nil
 		}
 	}
-	return fmt.Sprintf("Hello %s, It's show time!", name), nil
+
+	return false, nil
 }
 
 func probeLocalServerProcess() error {
@@ -106,6 +132,38 @@ func probeLocalServerProcess() error {
 	}
 
 	return fmt.Errorf("server process not reachable")
+}
+
+func resolveProbeAddress(raw string) string {
+	probe := strings.TrimSpace(raw)
+	if probe == "" {
+		return defaultServerProbeAddr
+	}
+
+	if strings.Contains(probe, "://") {
+		if parsed, err := url.Parse(probe); err == nil {
+			host := strings.TrimSpace(parsed.Host)
+			if host != "" {
+				return host
+			}
+		}
+	}
+
+	return probe
+}
+
+func probeTCPAddress(address string) error {
+	conn, err := net.DialTimeout("tcp", address, serverProbeTimeout)
+	if err != nil {
+		return err
+	}
+	_ = conn.Close()
+	return nil
+}
+
+func isLocalSingleMachineModeEnabled() bool {
+	raw := strings.TrimSpace(strings.ToLower(os.Getenv(envLocalSingleMachine)))
+	return raw == "1" || raw == "true" || raw == "yes"
 }
 
 func isProcessRunning(processName string) (bool, error) {

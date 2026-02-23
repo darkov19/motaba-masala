@@ -30,10 +30,10 @@ describe("ConnectionProvider", () => {
     });
 
     it("switches reconnect cadence and recovers state after retry", async () => {
-        const greetMock = vi
+        const reachabilityMock = vi
             .fn()
             .mockRejectedValueOnce(new Error("offline"))
-            .mockResolvedValueOnce("ok");
+            .mockResolvedValueOnce(true);
         const setIntervalSpy = vi.spyOn(window, "setInterval");
 
         (
@@ -41,7 +41,7 @@ describe("ConnectionProvider", () => {
                 go?: {
                     app?: {
                         App?: {
-                            Greet?: (value: string) => Promise<string>;
+                            CheckServerReachability?: () => Promise<boolean>;
                         };
                     };
                 };
@@ -49,7 +49,7 @@ describe("ConnectionProvider", () => {
         ).go = {
             app: {
                 App: {
-                    Greet: greetMock,
+                    CheckServerReachability: reachabilityMock,
                 },
             },
         };
@@ -78,17 +78,17 @@ describe("ConnectionProvider", () => {
             expect(screen.getByTestId("mode")).toHaveTextContent("client");
             expect(screen.getByTestId("connected")).toHaveTextContent("true");
         });
-        expect(greetMock).toHaveBeenCalledTimes(2);
+        expect(reachabilityMock).toHaveBeenCalledTimes(2);
     });
 
     it("updates state from browser online/offline events", async () => {
-        const greetMock = vi.fn().mockResolvedValue("ok");
+        const reachabilityMock = vi.fn().mockResolvedValue(true);
         (
             window as {
                 go?: {
                     app?: {
                         App?: {
-                            Greet?: (value: string) => Promise<string>;
+                            CheckServerReachability?: () => Promise<boolean>;
                         };
                     };
                 };
@@ -96,7 +96,7 @@ describe("ConnectionProvider", () => {
         ).go = {
             app: {
                 App: {
-                    Greet: greetMock,
+                    CheckServerReachability: reachabilityMock,
                 },
             },
         };
