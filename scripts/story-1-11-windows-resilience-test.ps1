@@ -188,6 +188,16 @@ function Restart-AppProcess([ref]$ProcessRef, [string]$Path, [string]$Label) {
     $ProcessRef.Value = Start-AppProcess $Path $Label
 }
 
+function Get-HeartbeatPath {
+    return Join-Path $RepoRoot ".hw_hb"
+}
+
+function Set-HeartbeatUnixTimestamp([int64]$UnixTs, [string]$Path) {
+    $bytes = [System.BitConverter]::GetBytes([UInt64]$UnixTs)
+    [System.Array]::Reverse($bytes) # heartbeat uses big-endian uint64
+    [System.IO.File]::WriteAllBytes($Path, $bytes)
+}
+
 function Stop-ExistingByPath([string]$Path) {
     $name = Get-ExecutableName $Path
     Get-Process -Name $name -ErrorAction SilentlyContinue | ForEach-Object {
@@ -519,6 +529,59 @@ function Run-ManualClockTamperScenario {
         )
 }
 
+function Run-AutoClockTamperScenario([ref]$ServerProcRef, [ref]$ClientProcRef) {
+    Ensure-ReportHeader
+    Write-Step "Auto clock tamper simulation (AC5)"
+    Start-AutomationCheck "AC5" "Running AC5: simulate heartbeat-based clock tamper"
+
+    $heartbeatPath = Get-HeartbeatPath
+    $nowTs = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $tamperTs = $nowTs + 86400
+
+    Write-Host "[AC5] Step 1/5: Writing future heartbeat timestamp to simulate clock tampering..." -ForegroundColor DarkGray
+    Set-HeartbeatUnixTimestamp $tamperTs $heartbeatPath
+
+    Write-Host "[AC5] Step 2/5: Restarting server to trigger startup license validation..." -ForegroundColor DarkGray
+    Restart-AppProcess $ServerProcRef $ServerPath "Server app (AC5 tamper restart)"
+    Start-Sleep -Seconds 4
+
+    Write-Host "[AC5] Step 3/5: Verifying tamper symptom (server startup failure or client disconnect state)..." -ForegroundColor DarkGray
+    $serverStopped = $ServerProcRef.Value.HasExited
+    $clientDisconnected = $false
+    if ($null -ne $ClientProcRef.Value -and -not $ClientProcRef.Value.HasExited) {
+        $clientDisconnected = Wait-ForAnyUiText @(
+            "Attempting to reconnect",
+            "Disconnected",
+            "Retrying:"
+        ) 25 $ClientProcRef.Value.Id
+    }
+    if (-not $serverStopped -and -not $clientDisconnected) {
+        Add-ReportLine("- [FAIL] AC5 auto-check: expected tamper symptom not detected (server stayed up and client did not disconnect).")
+        Fail-AutomationCheck "AC5" "Failed AC5: tamper symptom not detected"
+        throw "AC5 auto-check failed: expected tamper symptom not detected."
+    }
+
+    Write-Host "[AC5] Step 4/5: Restoring heartbeat to current timestamp and restarting server..." -ForegroundColor DarkGray
+    $restoreTs = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    Set-HeartbeatUnixTimestamp $restoreTs $heartbeatPath
+    Restart-AppProcess $ServerProcRef $ServerPath "Server app (AC5 recovery restart)"
+    if ($null -eq $ClientProcRef.Value -or $ClientProcRef.Value.HasExited) {
+        Restart-AppProcess $ClientProcRef $ClientPath "Client app (AC5 recovery restart)"
+    }
+
+    Write-Host "[AC5] Step 5/5: Waiting for client to return to Connected..." -ForegroundColor DarkGray
+    $connected = Wait-ForUiText "Connected" 30 $true $ClientProcRef.Value.Id
+    if (-not $connected) {
+        Add-ReportLine("- [FAIL] AC5 auto-check: client did not return to Connected after heartbeat restoration.")
+        Fail-AutomationCheck "AC5" "Failed AC5: client did not reconnect after restoration"
+        throw "AC5 auto-check failed: client did not reconnect after restoration."
+    }
+
+    Add-ReportLine("- [PASS] AC5 auto-check: tamper symptom detected and environment recovered to Connected.")
+    Complete-AutomationCheck "AC5" "Completed AC5: tamper detected, restored, and reconnected"
+    Set-CheckSummary("PASS. Actions: wrote future heartbeat, restarted server, observed tamper symptom, restored heartbeat, restarted server, verified client Connected.")
+}
+
 function Run-ManualNetworkScenario {
     Assert-PathExists $ProtocolDoc "Protocol document"
     Prompt-ManualChecklist `
@@ -632,8 +695,8 @@ function Run-ManualUiAll {
         Run-ManualUdpScenario
         Wait-ForNextCheck "Manual UDP Re-Discovery (AC2)"
 
-        Run-ManualClockTamperScenario
-        Wait-ForNextCheck "Manual Clock Tamper Detection (AC5)"
+        Run-AutoClockTamperScenario ([ref]$serverProc) ([ref]$clientProc)
+        Wait-ForNextCheck "Auto Clock Tamper Detection (AC5)"
         Run-ManualNetworkScenario
         Wait-ForNextCheck "Manual Network Failure Simulation (AC3)"
 

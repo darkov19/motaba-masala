@@ -120,11 +120,13 @@ function WindowControls() {
 }
 
 function WindowTitleBar() {
+    const { appMode } = useConnection();
+    const appTitle = appMode === "server" ? "Masala Inventory Server" : "Masala Inventory Client";
     return (
         <div className="window-titlebar">
             <div className="window-titlebar__brand">
                 <img src={logo} className="window-titlebar__logo" alt="logo" />
-                <span className="window-titlebar__text">Masala Inventory Management</span>
+                <span className="window-titlebar__text">{appTitle}</span>
             </div>
             <WindowControls />
         </div>
@@ -247,7 +249,7 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                 <Space align="center" size={16}>
                     <img src={logo} className="app-header__logo" alt="logo" />
                     <Title level={4} className="app-header__title">
-                        Masala Inventory Management
+                        {appMode === "server" ? "Masala Inventory Server" : "Masala Inventory Client"}
                     </Title>
                     {appMode === "server" ? (
                         <Tag color="red">Server Mode</Tag>
