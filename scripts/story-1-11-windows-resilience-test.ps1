@@ -697,8 +697,10 @@ function Run-ManualUiAll {
 
         Run-AutoClockTamperScenario ([ref]$serverProc) ([ref]$clientProc)
         Wait-ForNextCheck "Auto Clock Tamper Detection (AC5)"
-        Run-ManualNetworkScenario
-        Wait-ForNextCheck "Manual Network Failure Simulation (AC3)"
+        Write-Step "AC3 automated validation"
+        Write-Host "Running automated AC3 network failure simulation (no manual confirmations required)." -ForegroundColor Yellow
+        Run-AutoNetworkScenario
+        Wait-ForNextCheck "Auto Network Failure Simulation (AC3)"
 
         Write-Step "AC4 automated validation"
         Write-Host "Running automated AC4 reboot recovery check (no manual confirmations required)." -ForegroundColor Yellow
