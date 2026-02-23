@@ -622,10 +622,24 @@ function Run-AutoRebootScenario {
             throw "AC4 auto-check failed: resume prompt not detected."
         }
 
-        Add-ReportLine("- [PASS] AC4 auto-check: resume draft prompt detected after restart.")
+        $connectedAfterRestart = Wait-ForUiText "Connected" 20 $true $clientProc.Id
+        if (-not $connectedAfterRestart) {
+            Add-ReportLine("- [FAIL] AC4 auto-check: client did not return to Connected state after restart.")
+            $snapshot = Get-UiTextSnapshot -ProcessId $clientProc.Id
+            if (-not [string]::IsNullOrWhiteSpace($snapshot)) {
+                Add-ReportLine("- Debug snapshot (client window text):")
+                Add-ReportLine('```')
+                Add-ReportLine($snapshot)
+                Add-ReportLine('```')
+            }
+            Fail-AutomationCheck "AC4" "Failed AC4: client did not return to Connected after restart"
+            throw "AC4 auto-check failed: client not connected after restart."
+        }
+
+        Add-ReportLine("- [PASS] AC4 auto-check: resume draft prompt detected and client returned to Connected after restart.")
         Write-Host "PASS: Auto reboot scenario (AC4)" -ForegroundColor Green
-        Set-CheckSummary("PASS. Actions: started server+client, seeded draft field, waited for autosave, restarted client, detected 'Resume draft' prompt.")
-        Complete-AutomationCheck "AC4" "Completed AC4: draft recovery prompt detected"
+        Set-CheckSummary("PASS. Actions: started server+client, seeded draft field, waited for autosave, restarted client, detected 'Resume draft' prompt, verified 'Connected' state.")
+        Complete-AutomationCheck "AC4" "Completed AC4: draft prompt shown and connection recovered"
     }
     finally {
         Stop-AppProcess $clientProc "Client app"
