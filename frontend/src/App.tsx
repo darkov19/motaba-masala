@@ -560,7 +560,7 @@ function App() {
     };
 
     const onCopySupportMessage = async () => {
-        const hardwareID = effectiveLockoutState?.hardware_id || "Unavailable";
+        const machineID = effectiveLockoutState?.hardware_id || "Unavailable";
         const issue = effectiveLockoutState?.reason === "license-expired"
             ? "License expired (grace period ended)"
             : effectiveLockoutState?.reason === "clock-tamper"
@@ -570,7 +570,7 @@ function App() {
             "Lockout Diagnostics",
             `Issue: ${issue}`,
             `Details: ${effectiveLockoutState?.message || "Unavailable"}`,
-            `Hardware ID: ${hardwareID}`,
+            `Machine ID: ${machineID}`,
             `Date: ${new Date().toISOString()}`,
         ].join("\n");
 
@@ -619,7 +619,7 @@ function App() {
         const guidance = effectiveLockoutState.reason === "license-expired"
             ? "Your grace period has ended. Contact support with this Hardware ID to renew your license."
             : effectiveLockoutState.reason === "clock-tamper"
-                ? "Set system time correctly, then use Retry Validation. Restart app after validation succeeds."
+                ? "Set system time correctly, then use Retry Validation. After validation passes, restart the app."
                 : "Contact support with this Hardware ID to request a new license.";
 
         return (
@@ -650,7 +650,10 @@ function App() {
                                 </Text>
                                 <Card size="small">
                                     <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
-                                        <Text code>{effectiveLockoutState.hardware_id || "Unavailable"}</Text>
+                                        <Text>
+                                            <Text type="secondary">Machine ID: </Text>
+                                            <Text code>{effectiveLockoutState.hardware_id || "Unavailable"}</Text>
+                                        </Text>
                                         <Space>
                                             <Button onClick={() => void onRetryLockoutValidation()}>
                                                 Retry Validation

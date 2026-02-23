@@ -560,18 +560,29 @@ function Run-AutoClockTamperScenario([ref]$ServerProcRef, [ref]$ClientProcRef) {
     Restart-AppProcess $ServerProcRef $ServerPath "Server app (AC5 tamper restart)" -AllowImmediateExit
     Start-Sleep -Seconds 4
 
-    Write-Host "[AC5] Step 3/5: Verifying tamper symptom (server startup failure or client disconnect state)..." -ForegroundColor DarkGray
+    Write-Host "[AC5] Step 3/5: Verifying tamper symptom (lockout UI, server startup failure, or client disconnect state)..." -ForegroundColor DarkGray
     $serverStopped = $ServerProcRef.Value.HasExited
     $clientDisconnected = $false
+    $lockoutPatterns = @(
+        "Clock Tampering Detected",
+        "Clock tampering detected",
+        "Application is locked"
+    )
+    $serverLockoutVisible = $false
+    $clientLockoutVisible = $false
     if ($null -ne $ClientProcRef.Value -and -not $ClientProcRef.Value.HasExited) {
         $clientDisconnected = Wait-ForAnyUiText @(
             "Attempting to reconnect",
             "Disconnected",
             "Retrying:"
         ) 25 $ClientProcRef.Value.Id
+        $clientLockoutVisible = Wait-ForAnyUiText $lockoutPatterns 5 $ClientProcRef.Value.Id
     }
-    if (-not $serverStopped -and -not $clientDisconnected) {
-        Add-ReportLine("- [FAIL] AC5 auto-check: expected tamper symptom not detected (server stayed up and client did not disconnect).")
+    if ($null -ne $ServerProcRef.Value -and -not $ServerProcRef.Value.HasExited) {
+        $serverLockoutVisible = Wait-ForAnyUiText $lockoutPatterns 10 $ServerProcRef.Value.Id
+    }
+    if (-not $serverStopped -and -not $clientDisconnected -and -not $serverLockoutVisible -and -not $clientLockoutVisible) {
+        Add-ReportLine("- [FAIL] AC5 auto-check: expected tamper symptom not detected (no lockout UI, server stayed up, and client did not disconnect).")
         Fail-AutomationCheck "AC5" "Failed AC5: tamper symptom not detected"
         throw "AC5 auto-check failed: expected tamper symptom not detected."
     }

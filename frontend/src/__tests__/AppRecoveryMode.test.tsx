@@ -154,7 +154,7 @@ describe("App recovery and license states", () => {
         fireEvent.click(screen.getByRole("button", { name: "Copy Diagnostics" }));
         await waitFor(() => {
             expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
-            expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining("Hardware ID: new-hw-123"));
+            expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining("Machine ID: new-hw-123"));
         });
 
         router.dispose();

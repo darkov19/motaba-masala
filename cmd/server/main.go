@@ -83,12 +83,18 @@ func formatClockTamperLockoutMessage(err error) string {
 		return "Clock tampering detected. Set system time correctly and restart."
 	}
 
-	last := time.Unix(lastHeartbeat, 0).Local().Format(time.RFC3339)
-	now := time.Unix(current, 0).Local().Format(time.RFC3339)
+	lastTime := time.Unix(lastHeartbeat, 0).Local()
+	currentTime := time.Unix(current, 0).Local()
+	lastHuman := lastTime.Format("Monday, January 2, 2006 3:04:05 PM")
+	currentHuman := currentTime.Format("Monday, January 2, 2006 3:04:05 PM")
+	lastISO := lastTime.Format(time.RFC3339)
+	currentISO := currentTime.Format(time.RFC3339)
 	return fmt.Sprintf(
-		"Clock tampering detected. Last heartbeat: %s, current time: %s. Correct system time and retry validation or restart.",
-		last,
-		now,
+		"Clock tampering detected. Last heartbeat: %s (%s). Current system time: %s (%s). Correct system time, then retry validation or restart.",
+		lastHuman,
+		lastISO,
+		currentHuman,
+		currentISO,
 	)
 }
 
@@ -109,6 +115,7 @@ func evaluateStartupLicenseState(licenseSvc startupLicenseService) (bool, string
 		} else if errors.Is(err, license.ErrClockTampering) {
 			lockoutMode = true
 			lockoutReason = "clock-tamper"
+			lockoutHardwareID = initialSnapshot.HardwareID
 			lockoutMessage = formatClockTamperLockoutMessage(err)
 			slog.Error("Starting in clock tamper lockout mode", "error", err)
 		} else {
@@ -136,6 +143,7 @@ func evaluateStartupLicenseState(licenseSvc startupLicenseService) (bool, string
 			} else if errors.Is(err, license.ErrClockTampering) {
 				lockoutMode = true
 				lockoutReason = "clock-tamper"
+				lockoutHardwareID = initialSnapshot.HardwareID
 				lockoutMessage = formatClockTamperLockoutMessage(err)
 			} else {
 				return false, "", "", "", fmt.Errorf("licensing validation failed: %w", err)

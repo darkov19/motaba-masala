@@ -103,7 +103,7 @@ func TestEvaluateStartupLicenseState_ClockTamperFailureBlocksStartup(t *testing.
 		validateErr: tamperErr,
 	}
 
-	lockoutMode, lockoutReason, lockoutMessage, _, err := evaluateStartupLicenseState(svc)
+	lockoutMode, lockoutReason, lockoutMessage, lockoutHardwareID, err := evaluateStartupLicenseState(svc)
 	if err != nil {
 		t.Fatalf("expected lockout mode for clock tampering, got startup error: %v", err)
 	}
@@ -112,6 +112,9 @@ func TestEvaluateStartupLicenseState_ClockTamperFailureBlocksStartup(t *testing.
 	}
 	if lockoutReason != "clock-tamper" {
 		t.Fatalf("expected clock-tamper lockout reason, got %q", lockoutReason)
+	}
+	if lockoutHardwareID != "hw-test" {
+		t.Fatalf("expected hardware id in clock-tamper lockout, got %q", lockoutHardwareID)
 	}
 	if !strings.Contains(strings.ToLower(lockoutMessage), "clock tampering detected") {
 		t.Fatalf("expected tamper lockout message, got: %s", lockoutMessage)
