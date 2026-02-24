@@ -156,8 +156,8 @@ function Resolve-InstallerPath([string]$Kind) {
         $matches += @(Get-ChildItem -Path $DistDir -Filter $pattern -File -ErrorAction SilentlyContinue)
     }
     $matches = @($matches | Sort-Object LastWriteTime -Descending -Unique)
-    if ($matches.Count -gt 0) {
-        return $matches[0].FullName
+    if (@($matches).Length -gt 0) {
+        return @($matches)[0].FullName
     }
 
     $found = @(Get-ChildItem -Path $DistDir -Filter *.exe -File -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name)

@@ -157,6 +157,9 @@ function Run-Auto {
         try {
             # Stop primary instance first to avoid single-instance short-circuit.
             Stop-AppProcess $primary "Server app (primary)"
+            if ($null -ne $primary -and -not $primary.HasExited) {
+                throw "Primary server process is still running; cannot start isolated watchdog scenario."
+            }
             $primary = $null
 
             $env:MASALA_WATCHDOG_INTERVAL_SECONDS = "2"
