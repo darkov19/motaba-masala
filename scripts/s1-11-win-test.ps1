@@ -16,7 +16,25 @@ if (-not (Test-Path $target)) {
 }
 
 function Invoke-Inner([string]$InnerMode) {
-    & powershell -ExecutionPolicy Bypass -File $target -Mode $InnerMode -GoCachePath $GoCachePath -ReportPath $ReportPath -ServerPath $ServerPath -ClientPath $ClientPath
+    $args = @(
+        "-ExecutionPolicy", "Bypass",
+        "-File", $target,
+        "-Mode", $InnerMode
+    )
+    if (-not [string]::IsNullOrWhiteSpace($GoCachePath)) {
+        $args += @("-GoCachePath", $GoCachePath)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ReportPath)) {
+        $args += @("-ReportPath", $ReportPath)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ServerPath)) {
+        $args += @("-ServerPath", $ServerPath)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ClientPath)) {
+        $args += @("-ClientPath", $ClientPath)
+    }
+
+    & powershell @args
     if ($LASTEXITCODE -ne 0) {
         throw "Story 1.11 inner mode '$InnerMode' failed with exit code $LASTEXITCODE"
     }

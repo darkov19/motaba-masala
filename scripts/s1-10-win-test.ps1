@@ -13,5 +13,15 @@ if (-not (Test-Path $target)) {
     throw "Target script not found: $target"
 }
 
-& powershell -ExecutionPolicy Bypass -File $target -Mode $Mode -UncheckedKind $UncheckedKind -Rebuild:$Rebuild
+$args = @(
+    "-ExecutionPolicy", "Bypass",
+    "-File", $target,
+    "-Mode", $Mode,
+    "-UncheckedKind", $UncheckedKind
+)
+if ($Rebuild) {
+    $args += "-Rebuild"
+}
+
+& powershell @args
 exit $LASTEXITCODE

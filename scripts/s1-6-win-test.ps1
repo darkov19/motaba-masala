@@ -62,36 +62,50 @@ function Start-AppProcessWithLogs([string]$Path, [string]$Label, [string]$StdOut
     return $proc
 }
 
-function Close-WindowViaAltF4([int]$ProcessId) {
-    Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
-    Add-Type -AssemblyName System.Windows.Forms
+function Send-CloseToProcessMainWindow([int]$ProcessId) {
+    Add-Type @"
+using System;
+using System.Runtime.InteropServices;
 
-    $root = [System.Windows.Automation.AutomationElement]::RootElement
-    $windows = $root.FindAll(
-        [System.Windows.Automation.TreeScope]::Children,
-        [System.Windows.Automation.Condition]::TrueCondition
-    )
+public static class Win32Close {
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
-    foreach ($window in $windows) {
-        if ($window.Current.ProcessId -ne $ProcessId) {
-            continue
-        }
-        if ([string]::IsNullOrWhiteSpace($window.Current.Name)) {
-            continue
-        }
+    [DllImport("user32.dll")]
+    public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
 
-        try {
-            $window.SetFocus()
-            Start-Sleep -Milliseconds 200
-            [System.Windows.Forms.SendKeys]::SendWait("%{F4}")
-            Start-Sleep -Seconds 2
-            return $true
-        } catch {
-            return $false
+    [DllImport("user32.dll")]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [DllImport("user32.dll")]
+    public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+}
+"@ -ErrorAction SilentlyContinue
+
+    $targets = New-Object System.Collections.Generic.List[IntPtr]
+    $callback = [Win32Close+EnumWindowsProc]{
+        param($hWnd, $lParam)
+        $pid = 0
+        [void][Win32Close]::GetWindowThreadProcessId($hWnd, [ref]$pid)
+        if ($pid -eq $ProcessId -and [Win32Close]::IsWindowVisible($hWnd)) {
+            [void]$targets.Add($hWnd)
         }
+        return $true
     }
 
-    return $false
+    [void][Win32Close]::EnumWindows($callback, [IntPtr]::Zero)
+    if ($targets.Count -eq 0) {
+        return $false
+    }
+
+    # WM_CLOSE = 0x0010
+    foreach ($hWnd in $targets) {
+        [void][Win32Close]::PostMessage($hWnd, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
+    }
+    Start-Sleep -Seconds 2
+    return $true
 }
 
 function Run-Auto {
@@ -107,11 +121,10 @@ function Run-Auto {
         }
 
         Write-Step "Close-to-tray resilience check"
-        $closeTriggered = Close-WindowViaAltF4 $primary.Id
+        $closeTriggered = Send-CloseToProcessMainWindow $primary.Id
         if (-not $closeTriggered) {
-            throw "Failed to trigger window close (Alt+F4) on primary instance."
+            throw "Could not locate a visible server window to send close signal."
         }
-        Start-Sleep -Seconds 2
         if ($primary.HasExited) {
             throw "Server exited after close action. Expected minimize/hide-to-tray behavior."
         }
