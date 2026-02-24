@@ -13,9 +13,9 @@ if (-not $PSBoundParameters.ContainsKey("DebugFrontend")) {
     $DebugFrontend = $true
 }
 
-# Default to skipping installer generation unless explicitly enabled with -SkipInstallers:$false.
+# Default to building installers unless explicitly disabled with -SkipInstallers.
 if (-not $PSBoundParameters.ContainsKey("SkipInstallers")) {
-    $SkipInstallers = $true
+    $SkipInstallers = $false
 }
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
