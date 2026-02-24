@@ -155,7 +155,7 @@ function Resolve-InstallerPath([string]$Kind) {
     foreach ($pattern in $patterns) {
         $matches += @(Get-ChildItem -Path $DistDir -Filter $pattern -File -ErrorAction SilentlyContinue)
     }
-    $matches = $matches | Sort-Object LastWriteTime -Descending -Unique
+    $matches = @($matches | Sort-Object LastWriteTime -Descending -Unique)
     if ($matches.Count -gt 0) {
         return $matches[0].FullName
     }

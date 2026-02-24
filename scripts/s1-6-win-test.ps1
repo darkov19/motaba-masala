@@ -35,6 +35,11 @@ function Stop-AppProcess([System.Diagnostics.Process]$Process, [string]$Label) {
     if (-not $Process.HasExited) {
         try {
             Stop-Process -Id $Process.Id -Force -ErrorAction Stop
+            try {
+                Wait-Process -Id $Process.Id -Timeout 5 -ErrorAction SilentlyContinue
+            } catch {
+                # best effort; keep cleanup resilient
+            }
             Start-Sleep -Milliseconds 400
         } catch {
             Write-Warning "Failed to stop $Label process $($Process.Id): $($_.Exception.Message)"
@@ -150,11 +155,15 @@ function Run-Auto {
         $prevDisablePings = $env:MASALA_TEST_DISABLE_MONITOR_WATCHDOG_PINGS
         $prevDisableRelaunch = $env:MASALA_TEST_DISABLE_WATCHDOG_RELAUNCH
         try {
+            # Stop primary instance first to avoid single-instance short-circuit.
+            Stop-AppProcess $primary "Server app (primary)"
+            $primary = $null
+
             $env:MASALA_WATCHDOG_INTERVAL_SECONDS = "2"
             $env:MASALA_TEST_DISABLE_MONITOR_WATCHDOG_PINGS = "1"
             $env:MASALA_TEST_DISABLE_WATCHDOG_RELAUNCH = "1"
 
-            $watchdogProc = Start-AppProcess $ServerPath "Server app (watchdog scenario)"
+            $watchdogProc = Start-AppProcess $ServerPath "Server app (watchdog scenario)" -AllowImmediateExit
             $deadline = (Get-Date).AddSeconds(20)
             $watchdogFired = $false
             while ((Get-Date) -lt $deadline) {
@@ -191,12 +200,12 @@ function Run-Auto {
             $deadline = (Get-Date).AddSeconds(20)
             $detected = $false
             while ((Get-Date) -lt $deadline) {
-                if (Test-Path $stderrLog) {
-                    $content = Get-Content $stderrLog -Raw -ErrorAction SilentlyContinue
-                    if ($content -match "Low disk space alert") {
-                        $detected = $true
-                        break
-                    }
+                $stderrContent = if (Test-Path $stderrLog) { Get-Content $stderrLog -Raw -ErrorAction SilentlyContinue } else { "" }
+                $stdoutContent = if (Test-Path $stdoutLog) { Get-Content $stdoutLog -Raw -ErrorAction SilentlyContinue } else { "" }
+                $combined = "$stderrContent`n$stdoutContent"
+                if ($combined -match "Low disk space alert") {
+                    $detected = $true
+                    break
                 }
                 Start-Sleep -Seconds 1
             }
