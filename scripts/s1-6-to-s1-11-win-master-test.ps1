@@ -133,8 +133,8 @@ try {
     Add-Content -Path $ReportPath -Value ""
     Add-Content -Path $ReportPath -Value "## Summary"
 
-    $passCount = ($script:Results | Where-Object { $_.Result -eq "PASS" }).Count
-    $failCount = ($script:Results | Where-Object { $_.Result -eq "FAIL" }).Count
+    $passCount = @($script:Results | Where-Object { $_.Result -eq "PASS" }).Count
+    $failCount = @($script:Results | Where-Object { $_.Result -eq "FAIL" }).Count
     Add-Content -Path $ReportPath -Value ""
     Add-Content -Path $ReportPath -Value "- PASS: $passCount"
     Add-Content -Path $ReportPath -Value "- FAIL: $failCount"
