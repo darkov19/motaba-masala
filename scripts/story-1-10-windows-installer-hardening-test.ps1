@@ -131,15 +131,38 @@ function Show-FirewallRuleSummary {
 }
 
 function Run-InstallerInteractive([string]$Kind) {
-    $installerPath = if ($Kind -eq "server") { $ServerInstallerPath } else { $ClientInstallerPath }
-    if (-not (Test-Path $installerPath)) {
-        throw "Installer executable not found: $installerPath"
-    }
+    $installerPath = Resolve-InstallerPath $Kind
 
     Write-Step "Launching $Kind installer"
     Write-Host "Installer: $installerPath" -ForegroundColor Yellow
     Write-Host "Use default settings unless this scenario says otherwise." -ForegroundColor Yellow
     Start-Process -FilePath $installerPath -Wait
+}
+
+function Resolve-InstallerPath([string]$Kind) {
+    $expected = if ($Kind -eq "server") { $ServerInstallerPath } else { $ClientInstallerPath }
+    if (Test-Path $expected) {
+        return $expected
+    }
+
+    $patterns = if ($Kind -eq "server") {
+        @("*Server*Setup*.exe", "*server*setup*.exe")
+    } else {
+        @("*Client*Setup*.exe", "*client*setup*.exe")
+    }
+
+    $matches = @()
+    foreach ($pattern in $patterns) {
+        $matches += @(Get-ChildItem -Path $DistDir -Filter $pattern -File -ErrorAction SilentlyContinue)
+    }
+    $matches = $matches | Sort-Object LastWriteTime -Descending -Unique
+    if ($matches.Count -gt 0) {
+        return $matches[0].FullName
+    }
+
+    $found = @(Get-ChildItem -Path $DistDir -Filter *.exe -File -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name)
+    $foundText = if ($found.Count -gt 0) { ($found -join ", ") } else { "<none>" }
+    throw "Installer executable not found for kind '$Kind'. Expected: $expected. Dist EXEs: $foundText"
 }
 
 function Run-ScenarioServerChecked {

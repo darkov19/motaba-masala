@@ -87,9 +87,9 @@ public static class Win32Close {
     $targets = New-Object System.Collections.Generic.List[IntPtr]
     $callback = [Win32Close+EnumWindowsProc]{
         param($hWnd, $lParam)
-        $pid = 0
-        [void][Win32Close]::GetWindowThreadProcessId($hWnd, [ref]$pid)
-        if ($pid -eq $ProcessId -and [Win32Close]::IsWindowVisible($hWnd)) {
+        $windowPid = 0
+        [void][Win32Close]::GetWindowThreadProcessId($hWnd, [ref]$windowPid)
+        if ($windowPid -eq $ProcessId -and [Win32Close]::IsWindowVisible($hWnd)) {
             [void]$targets.Add($hWnd)
         }
         return $true
