@@ -40,8 +40,8 @@ function Start-Report {
     $header = @(
         "# Stories 1.6 to 1.11 Validation Report"
         ""
-        "- Date: $(Get-Date -Format \"yyyy-MM-dd HH:mm:ss\")"
-        "- Script: `scripts/s1-6-to-s1-11-win-master-test.ps1`"
+        "- Date: $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))"
+        "- Script: scripts/s1-6-to-s1-11-win-master-test.ps1"
         "- Rebuild requested: $Rebuild"
         "- Skip installers during rebuild: $SkipInstallers"
         ""
