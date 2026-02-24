@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -62,6 +63,8 @@ const (
 	relaunchHelperArg            = "--relaunch-helper"
 	relaunchAttempts             = 12
 	envRelaunchWorkingDir        = "MASALA_RELAUNCH_WORKDIR"
+	envWatchdogIntervalSeconds   = "MASALA_WATCHDOG_INTERVAL_SECONDS"
+	envDisableWatchdogRelaunch   = "MASALA_TEST_DISABLE_WATCHDOG_RELAUNCH"
 	backgroundNotificationTitle  = "Masala Inventory is still running"
 	backgroundNotificationBody   = "The server is now in the background. Use the tray icon to reopen or exit."
 )
@@ -175,6 +178,23 @@ func resolveJWTSecret() (string, error) {
 	}
 
 	return "", fmt.Errorf("%s must be set in non-development environments", envJWTSecret)
+}
+
+func envBool(name string) bool {
+	raw := strings.ToLower(strings.TrimSpace(os.Getenv(name)))
+	return raw == "1" || raw == "true" || raw == "yes"
+}
+
+func resolveWatchdogIntervalSeconds() uint32 {
+	raw := strings.TrimSpace(os.Getenv(envWatchdogIntervalSeconds))
+	if raw == "" {
+		return 30
+	}
+	parsed, err := strconv.ParseUint(raw, 10, 32)
+	if err != nil || parsed == 0 {
+		return 30
+	}
+	return uint32(parsed)
 }
 
 func resolveLicensePublicKey() string {
@@ -369,13 +389,17 @@ func run() error {
 	application := app.NewApp(true) // Server instance
 
 	// Task 3: Watchdog Service
-	watchdog := infraSys.NewWatchdog(30)
+	watchdog := infraSys.NewWatchdog(resolveWatchdogIntervalSeconds())
 
 	// Task 4 & 5: Monitor Service (Refactored)
 	monitorSvc := appSys.NewMonitorService(sysMonitor, watchdog)
 
 	watchdog.Start(context.Background(), func() {
 		monitorSvc.HandleWatchdogFailure()
+		if envBool(envDisableWatchdogRelaunch) {
+			slog.Warn("Watchdog relaunch disabled by environment; exiting for test harness")
+			os.Exit(90)
+		}
 		slog.Info("Attempting self-restart...")
 
 		if err := startRelaunchHelper(); err != nil {
@@ -660,16 +684,16 @@ func run() error {
 								select {
 								case <-ctx.Done():
 									return
-									case <-mOpen.ClickedCh:
-										slog.Info("Tray action", "action", "open-dashboard")
-										runtime.EventsEmit(ctx, "app:request-open-dashboard")
-									case <-mQuit.ClickedCh:
-										slog.Info("Tray action", "action", "exit-server")
-										runtime.WindowShow(ctx)
-										runtime.WindowUnminimise(ctx)
-										slog.Info("Tray action", "action", "emit-custom-quit-confirm")
-										runtime.EventsEmit(ctx, "app:request-quit-confirm")
-									}
+								case <-mOpen.ClickedCh:
+									slog.Info("Tray action", "action", "open-dashboard")
+									runtime.EventsEmit(ctx, "app:request-open-dashboard")
+								case <-mQuit.ClickedCh:
+									slog.Info("Tray action", "action", "exit-server")
+									runtime.WindowShow(ctx)
+									runtime.WindowUnminimise(ctx)
+									slog.Info("Tray action", "action", "emit-custom-quit-confirm")
+									runtime.EventsEmit(ctx, "app:request-quit-confirm")
+								}
 							}
 						}()
 					}, func() {
@@ -698,13 +722,13 @@ func run() error {
 			go func() {
 				pingFile := filepath.Join(os.TempDir(), "MasalaServerMutex.ping")
 				for {
-						if _, err := os.Stat(pingFile); err == nil {
-							_ = os.Remove(pingFile)
-							runtime.WindowShow(ctx)
-							runtime.WindowUnminimise(ctx)
-							runtime.WindowSetAlwaysOnTop(ctx, true)
-							go func() {
-								time.Sleep(500 * time.Millisecond)
+					if _, err := os.Stat(pingFile); err == nil {
+						_ = os.Remove(pingFile)
+						runtime.WindowShow(ctx)
+						runtime.WindowUnminimise(ctx)
+						runtime.WindowSetAlwaysOnTop(ctx, true)
+						go func() {
+							time.Sleep(500 * time.Millisecond)
 							runtime.WindowSetAlwaysOnTop(ctx, false)
 						}()
 					}
@@ -743,12 +767,12 @@ func run() error {
 							initialized = true
 							continue
 						}
-							if minimized && !lastMinimized {
-								notifiedWhileMinimized = true
-							}
-							if !minimized {
-								notifiedWhileMinimized = false
-							}
+						if minimized && !lastMinimized {
+							notifiedWhileMinimized = true
+						}
+						if !minimized {
+							notifiedWhileMinimized = false
+						}
 						lastMinimized = minimized
 					}
 				}

@@ -6,6 +6,9 @@ import (
 	"log/slog"
 	domainSys "masala_inventory_managment/internal/domain/system"
 	infraSys "masala_inventory_managment/internal/infrastructure/system"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -17,21 +20,45 @@ type MonitorService struct {
 	sysMonitor    domainSys.SysMonitor
 	watchdog      *infraSys.Watchdog
 	diskThreshold uint64
+	forcedDisk    uint64
+	disablePings  bool
 }
+
+const (
+	envForceLowDiskBytes          = "MASALA_TEST_FORCE_LOW_DISK_BYTES"
+	envDisableMonitorWatchdogPing = "MASALA_TEST_DISABLE_MONITOR_WATCHDOG_PINGS"
+)
 
 // NewMonitorService creates a new instance of the monitoring service
 func NewMonitorService(sysMonitor domainSys.SysMonitor, watchdog *infraSys.Watchdog) *MonitorService {
+	forcedDisk := uint64(0)
+	if raw := strings.TrimSpace(os.Getenv(envForceLowDiskBytes)); raw != "" {
+		if parsed, err := strconv.ParseUint(raw, 10, 64); err == nil {
+			forcedDisk = parsed
+		}
+	}
+
+	disablePings := false
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(envDisableMonitorWatchdogPing))) {
+	case "1", "true", "yes":
+		disablePings = true
+	}
+
 	return &MonitorService{
 		sysMonitor:    sysMonitor,
 		watchdog:      watchdog,
 		diskThreshold: 500 * 1024 * 1024, // 500MB threshold (AC #3)
+		forcedDisk:    forcedDisk,
+		disablePings:  disablePings,
 	}
 }
 
 // Start initiates the background monitoring loops
 func (s *MonitorService) Start(ctx context.Context) {
 	s.ctx = ctx
-	s.watchdog.Ping() // Initial ping
+	if !s.disablePings {
+		s.watchdog.Ping() // Initial ping
+	}
 
 	// Start Disk Monitor Loop
 	go s.runDiskMonitor()
@@ -52,7 +79,9 @@ func (s *MonitorService) runDiskMonitor() {
 		case <-diskTicker.C:
 			s.checkDiskSpace()
 		case <-pingTicker.C:
-			s.watchdog.Ping() // Show that background monitor is alive
+			if !s.disablePings {
+				s.watchdog.Ping() // Show that background monitor is alive
+			}
 		case <-s.ctx.Done():
 			slog.Info("MonitorService: Context cancelled, stopping loop")
 			return
@@ -65,6 +94,9 @@ func (s *MonitorService) checkDiskSpace() {
 	if err != nil {
 		slog.Error("Failed to check disk space", "error", err)
 		return
+	}
+	if s.forcedDisk > 0 {
+		space = s.forcedDisk
 	}
 
 	if space < s.diskThreshold {
