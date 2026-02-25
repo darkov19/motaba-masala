@@ -19,6 +19,15 @@ so that {{benefit}}.
 - [ ] Task 2 (AC: #)
   - [ ] Subtask 2.1
 
+## Windows Validation (WSL2 -> Windows Required)
+
+- Script Path: `scripts/s{{epic_num}}-{{story_num}}-win-test.ps1`
+- Minimum Coverage:
+  - Build the relevant application target(s)
+  - Launch and validate runtime behavior for this story
+  - Return non-zero exit code on failure
+  - Print explicit PASS/FAIL summary
+
 ## Dev Notes
 
 - Relevant architecture patterns and constraints
@@ -49,3 +58,13 @@ so that {{benefit}}.
 ### Completion Notes List
 
 ### File List
+
+### Windows Validation Script
+
+`scripts/s{{epic_num}}-{{story_num}}-win-test.ps1`
+
+### Windows Validation Evidence
+
+- Command:
+- Result:
+- Notes:

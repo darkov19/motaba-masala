@@ -25,6 +25,13 @@ validation-rules:
 - [ ] All tests pass locally (no regressions introduced)
 - [ ] Linting and static checks (if configured) pass
 
+## Windows Validation (Required for WSL2 -> Windows Workflow)
+
+- [ ] Story-specific script exists at `scripts/sX-Y-win-test.ps1` (matching current story ID)
+- [ ] Script performs build and runtime execution for relevant app target(s)
+- [ ] Script returns non-zero exit code on failures and prints explicit PASS/FAIL summary
+- [ ] Script executed on Windows and result captured in story Dev Agent Record → Windows Validation Evidence
+
 ## Story File Updates
 
 - [ ] File List section includes every new/modified/deleted file (paths relative to repo root)
