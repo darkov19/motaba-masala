@@ -8,7 +8,7 @@ import React, {
 } from "react";
 
 type ConnectionContextValue = {
-    appMode: "server" | "client";
+    appMode: AppMode;
     isConnected: boolean;
     isChecking: boolean;
     lastCheckedAt: number | null;
@@ -22,6 +22,8 @@ const ConnectionContext = createContext<ConnectionContextValue | undefined>(
 const CHECK_CONNECTED_MS = 10000;
 const CHECK_RECONNECTING_MS = 3000;
 const REQUEST_TIMEOUT_MS = 1500;
+
+export type AppMode = "server" | "client";
 
 type WindowWithWailsBindings = Window & {
     go?: {

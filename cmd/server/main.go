@@ -581,9 +581,16 @@ func run() error {
 				return err
 			}
 			tokenService := infraAuth.NewTokenService(jwtSecret)
-			authService = appAuth.NewService(userRepo, bcryptService, tokenService)
-			reportService = appReport.NewAppService(authService)
-			adminService = appAdmin.NewService(authService, backupService, licenseSvc, logError)
+				authService = appAuth.NewService(userRepo, bcryptService, tokenService)
+				application.SetSessionRoleResolver(func(authToken string) (string, error) {
+					user, err := authService.CurrentUser(authToken)
+					if err != nil {
+						return "", err
+					}
+					return string(user.Role), nil
+				})
+				reportService = appReport.NewAppService(authService)
+				adminService = appAdmin.NewService(authService, backupService, licenseSvc, logError)
 			inventoryRepo := db.NewSqliteInventoryRepository(dbManager.GetDB())
 			inventoryService := appInventory.NewService(inventoryRepo, func(authToken string) (domainAuth.Role, error) {
 				user, err := authService.CurrentUser(authToken)

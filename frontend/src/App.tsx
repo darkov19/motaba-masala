@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Layout, Typography, Card, Segmented, Space, Alert, Button, Tag, message } from "antd";
+import { Layout, Typography, Card, Segmented, Space, Alert, Button, message } from "antd";
 import { useBlocker, useLocation, useNavigate } from "react-router-dom";
 import { EventsEmit, EventsOn, LogInfo, WindowShow, WindowUnminimise } from "../wailsjs/runtime/runtime";
 import logo from "./assets/images/icon.png";
@@ -12,9 +12,20 @@ import { BatchForm } from "./components/forms/BatchForm";
 import { ItemMasterForm } from "./components/forms/ItemMasterForm";
 import { PackagingProfileForm } from "./components/forms/PackagingProfileForm";
 import { useUnsavedChanges } from "./hooks/useUnsavedChanges";
+import { AppShell } from "./shell/AppShell";
+import {
+    canAccessRoute,
+    canPerformAction,
+    getDefaultRouteForRole,
+    getRouteById,
+    resolveRouteByPath,
+    resolveUserRole,
+    type UserRole,
+    type ViewKey,
+} from "./shell/rbac";
 import "./App.css";
 
-const { Header, Content, Footer } = Layout;
+const { Header, Content } = Layout;
 const { Title, Text } = Typography;
 
 type RecoveryState = {
@@ -61,23 +72,32 @@ type WindowWithAppBindings = Window & {
                 GetLicenseLockoutState?: () => Promise<LicenseLockoutState>;
                 GetAutomationStatus?: () => Promise<AutomationStatus>;
                 RetryLockoutValidation?: () => Promise<LockoutRetryResult>;
+                GetSessionRole?: (authToken: string) => Promise<string>;
             };
         };
     };
 };
 
-type ViewKey = "grn" | "batch" | "item-master" | "packaging-profile";
-const PATH_TO_VIEW: Record<string, ViewKey> = {
-    "/grn": "grn",
-    "/batch": "batch",
-    "/item-master": "item-master",
-    "/packaging-profile": "packaging-profile",
-};
-const VIEW_TO_PATH: Record<ViewKey, string> = {
-    grn: "/grn",
-    batch: "/batch",
-    "item-master": "/item-master",
-    "packaging-profile": "/packaging-profile",
+function resolveAuthToken(): string | undefined {
+    try {
+        return (
+            window.localStorage.getItem("auth_token")
+            || window.localStorage.getItem("token")
+            || window.sessionStorage.getItem("auth_token")
+            || window.sessionStorage.getItem("token")
+            || undefined
+        );
+    } catch {
+        return undefined;
+    }
+}
+
+const VIEW_TO_ROUTE_ID: Record<Exclude<ViewKey, "placeholder">, string> = {
+    dashboard: "dashboard.home",
+    grn: "procurement.grn",
+    batch: "production.batches",
+    "item-master": "masters.items",
+    "packaging-profile": "packing.materials",
 };
 
 function WindowControls() {
@@ -154,30 +174,92 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
     const { appMode } = useConnection();
     const navigate = useNavigate();
     const location = useLocation();
+    const [trustedSessionRole, setTrustedSessionRole] = useState<string | null>(null);
+    const role = useMemo<UserRole>(() => resolveUserRole(appMode, trustedSessionRole), [appMode, trustedSessionRole]);
+    const [unauthorizedMessage, setUnauthorizedMessage] = useState<string | null>(null);
     const [dirtyByView, setDirtyByView] = useState<Record<ViewKey, boolean>>({
+        dashboard: false,
+        placeholder: false,
+        "item-master": false,
         grn: false,
         batch: false,
-        "item-master": false,
         "packaging-profile": false,
     });
-    const activeView = PATH_TO_VIEW[location.pathname] ?? "grn";
+    const activeRoute = resolveRouteByPath(location.pathname) ?? getDefaultRouteForRole(role);
+    const activeView = activeRoute.viewKey;
     const writeDisabled = licenseStatus.status === "grace-period" || licenseStatus.status === "expired";
     const suppressReconnectionOverlay = automationStatus?.enabled
         && (automationStatus.current_check === "AC1"
             || automationStatus.current_check === "AC2"
             || automationStatus.current_check === "AC5");
+    const activeViewDirty = dirtyByView[activeView];
 
     useEffect(() => {
-        if (!PATH_TO_VIEW[location.pathname]) {
-            navigate("/grn", { replace: true });
+        let mounted = true;
+        const maybeGetSessionRole = (window as WindowWithAppBindings).go?.app?.App?.GetSessionRole;
+
+        const loadTrustedRole = async () => {
+            if (typeof maybeGetSessionRole !== "function") {
+                if (mounted) {
+                    setTrustedSessionRole(null);
+                }
+                return;
+            }
+            const authToken = resolveAuthToken();
+            if (!authToken) {
+                if (mounted) {
+                    setTrustedSessionRole(null);
+                }
+                return;
+            }
+            try {
+                const nextRole = await maybeGetSessionRole(authToken);
+                if (mounted) {
+                    setTrustedSessionRole(nextRole || null);
+                }
+            } catch {
+                if (mounted) {
+                    setTrustedSessionRole(null);
+                }
+            }
+        };
+
+        void loadTrustedRole();
+        const onStorage = () => {
+            void loadTrustedRole();
+        };
+        window.addEventListener("storage", onStorage);
+
+        return () => {
+            mounted = false;
+            window.removeEventListener("storage", onStorage);
+        };
+    }, [appMode]);
+
+    useEffect(() => {
+        const route = resolveRouteByPath(location.pathname);
+        if (!route) {
+            navigate(getDefaultRouteForRole(role).path, { replace: true });
+            return;
         }
-    }, [location.pathname, navigate]);
+
+        if (!canAccessRoute(role, route)) {
+            setUnauthorizedMessage(`Route ${route.id} is not available for your role.`);
+            navigate(getDefaultRouteForRole(role).path, { replace: true });
+            return;
+        }
+    }, [location.pathname, navigate, role]);
 
     const hasUnsaved = useMemo(
-        () => dirtyByView.grn || dirtyByView.batch || dirtyByView["item-master"] || dirtyByView["packaging-profile"],
+        () =>
+            dirtyByView.dashboard
+            || dirtyByView.grn
+            || dirtyByView.batch
+            || dirtyByView["item-master"]
+            || dirtyByView["packaging-profile"]
+            || dirtyByView.placeholder,
         [dirtyByView],
     );
-    const activeViewDirty = dirtyByView[activeView];
     const blocker = useBlocker(
         ({ currentLocation, nextLocation }) =>
             activeViewDirty && currentLocation.pathname !== nextLocation.pathname,
@@ -217,13 +299,27 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         setDirtyFor("packaging-profile", isDirty);
     }, [setDirtyFor]);
 
+    const guardedNavigate = useCallback((routeId: string, action: "view" | "create" = "view") => {
+        const route = getRouteById(routeId);
+        if (!route) {
+            return;
+        }
+        if (!canAccessRoute(role, route) || !canPerformAction(role, route.module, action)) {
+            setUnauthorizedMessage(`Role ${role} is not allowed to ${action} in ${route.module}.`);
+            return;
+        }
+        setUnauthorizedMessage(null);
+        navigate(route.path);
+    }, [navigate, role]);
+
     const onViewChange = (value: string | number) => {
         const nextView = String(value) as ViewKey;
         if (nextView === activeView) {
             return;
         }
 
-        navigate(VIEW_TO_PATH[nextView]);
+        const routeId = VIEW_TO_ROUTE_ID[nextView as Exclude<ViewKey, "placeholder">];
+        guardedNavigate(routeId, "view");
     };
 
     const renderLicenseBanner = () => {
@@ -264,133 +360,138 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         return null;
     };
 
-    return (
-        <Layout className="app-shell" style={{ minHeight: "100vh" }}>
-            <WindowTitleBar />
-            <Header className="app-header">
-                <Space align="center" size={16}>
-                    <img src={logo} className="app-header__logo" alt="logo" />
-                    <Title level={4} className="app-header__title">
-                        {appMode === "server" ? "Masala Inventory Server" : "Masala Inventory Client"}
-                    </Title>
-                    {appMode === "server" ? (
-                        <Tag color="red">Server Mode</Tag>
-                    ) : (
-                        <Tag color="blue">Client Mode</Tag>
-                    )}
-                </Space>
-                <Space align="center" size={8}>
-                    <ConnectionStatus />
-                </Space>
-            </Header>
+    const renderAutomationCard = () => {
+        if (!automationStatus?.enabled) {
+            return null;
+        }
 
-            {renderLicenseBanner()}
-
-            <Content className="app-content">
-                <Card className="app-card" variant="borderless">
-                    <Space orientation="vertical" size={20} style={{ width: "100%" }}>
-                        {automationStatus?.enabled ? (
-                            <Card size="small">
-                                <Space direction="vertical" size={6} style={{ width: "100%" }}>
-                                    <Text strong>Automation Status</Text>
-                                    <Text>Current: {automationStatus.current_check || "Idle"}</Text>
-                                    <Text type="secondary">{automationStatus.last_event || "Waiting..."}</Text>
-                                    <Text type="secondary">Updated: {automationStatus.updated_at || "-"}</Text>
-                                    {Object.keys(automationStatus.checks || {}).length > 0 ? (
-                                        <Space direction="vertical" size={2} style={{ width: "100%" }}>
-                                            {Object.entries(automationStatus.checks).map(([check, status]) => (
-                                                <Text key={check}>
-                                                    {check}: {status}
-                                                </Text>
-                                            ))}
-                                        </Space>
-                                    ) : null}
-                                </Space>
-                            </Card>
-                        ) : null}
-
-                        <Title level={2} style={{ marginBottom: 0 }}>
-                            Client Resilience & Recovery
-                        </Title>
-                        <Text type="secondary">
-                            Auto-save drafts every 5 seconds, recover on restart, and
-                            guard against data loss.
-                        </Text>
-
-                        <Space>
-                            <Button
-                                onClick={() => navigate("/grn")}
-                                disabled={writeDisabled}
-                            >
-                                New GRN
-                            </Button>
-                            <Button
-                                onClick={() => navigate("/batch")}
-                                disabled={writeDisabled}
-                            >
-                                New Batch
-                            </Button>
-                            <Button
-                                onClick={() => navigate("/item-master")}
-                                disabled={writeDisabled}
-                            >
-                                Item Master
-                            </Button>
-                            <Button
-                                onClick={() => navigate("/packaging-profile")}
-                                disabled={writeDisabled}
-                            >
-                                Packaging Profiles
-                            </Button>
+        return (
+            <Card size="small">
+                <Space orientation="vertical" size={6} style={{ width: "100%" }}>
+                    <Text strong>Automation Status</Text>
+                    <Text>Current: {automationStatus.current_check || "Idle"}</Text>
+                    <Text type="secondary">{automationStatus.last_event || "Waiting..."}</Text>
+                    <Text type="secondary">Updated: {automationStatus.updated_at || "-"}</Text>
+                    {Object.keys(automationStatus.checks || {}).length > 0 ? (
+                        <Space orientation="vertical" size={2} style={{ width: "100%" }}>
+                            {Object.entries(automationStatus.checks).map(([check, status]) => (
+                                <Text key={check}>
+                                    {check}: {status}
+                                </Text>
+                            ))}
                         </Space>
+                    ) : null}
+                </Space>
+            </Card>
+        );
+    };
 
-                        <Segmented
-                            block
-                            options={[
-                                { label: "GRN Form", value: "grn" },
-                                { label: "Batch Form", value: "batch" },
-                                { label: "Item Master", value: "item-master" },
-                                { label: "Packaging Profiles", value: "packaging-profile" },
-                            ]}
-                            value={activeView}
-                            onChange={onViewChange}
-                        />
+    const appTitle = appMode === "server" ? "Masala Inventory Server" : "Masala Inventory Client";
+    const activeRouteId = activeRoute.id;
 
-                        <div style={{ display: activeView === "grn" ? "block" : "none" }}>
-                            <GRNForm
-                                userKey="operator"
-                                writeDisabled={writeDisabled}
-                                onDirtyChange={onGRNDirtyChange}
-                            />
-                        </div>
-                        <div style={{ display: activeView === "batch" ? "block" : "none" }}>
-                            <BatchForm
-                                userKey="operator"
-                                writeDisabled={writeDisabled}
-                                onDirtyChange={onBatchDirtyChange}
-                            />
-                        </div>
-                        <div style={{ display: activeView === "item-master" ? "block" : "none" }}>
-                            <ItemMasterForm
-                                writeDisabled={writeDisabled}
-                                onDirtyChange={onItemMasterDirtyChange}
-                            />
-                        </div>
-                        <div style={{ display: activeView === "packaging-profile" ? "block" : "none" }}>
-                            <PackagingProfileForm
-                                writeDisabled={writeDisabled}
-                                onDirtyChange={onPackagingProfileDirtyChange}
-                            />
-                        </div>
-                    </Space>
-                </Card>
-            </Content>
+    return (
+        <AppShell
+            titleBar={<WindowTitleBar />}
+            appTitle={appTitle}
+            appMode={appMode}
+            role={role}
+            activeRouteId={activeRouteId}
+            onNavigate={(routeId: string) => guardedNavigate(routeId, "view")}
+            statusNode={<ConnectionStatus />}
+            licenseBanner={renderLicenseBanner()}
+            automationNode={renderAutomationCard()}
+            unauthorizedMessage={unauthorizedMessage}
+        >
+            <Title level={2} style={{ marginBottom: 0 }}>
+                Shared AppShell Workspace
+            </Title>
+            <Text type="secondary">
+                Role-aware shell navigation with backend-authoritative access controls.
+            </Text>
 
-            <Footer style={{ textAlign: "center" }}>
-                Masala Inventory Management ©2026
-            </Footer>
+            <Space>
+                <Button
+                    onClick={() => guardedNavigate("procurement.grn", "create")}
+                    disabled={writeDisabled}
+                >
+                    New GRN
+                </Button>
+                <Button
+                    onClick={() => guardedNavigate("production.batches", "create")}
+                    disabled={writeDisabled}
+                >
+                    New Batch
+                </Button>
+                <Button
+                    onClick={() => guardedNavigate("masters.items", "view")}
+                    disabled={!canPerformAction(role, "masters", "view")}
+                >
+                    Item Master
+                </Button>
+                <Button
+                    onClick={() => guardedNavigate("packing.materials", "view")}
+                    disabled={!canPerformAction(role, "packing", "view")}
+                >
+                    Packaging Profiles
+                </Button>
+            </Space>
+
+            <Segmented
+                block
+                options={[
+                    { label: "GRN Form", value: "grn" },
+                    { label: "Batch Form", value: "batch" },
+                    { label: "Item Master", value: "item-master" },
+                    { label: "Packaging Profiles", value: "packaging-profile" },
+                ]}
+                value={activeView === "dashboard" || activeView === "placeholder" ? "grn" : activeView}
+                onChange={onViewChange}
+            />
+
+            <div style={{ display: activeView === "grn" ? "block" : "none" }}>
+                <GRNForm
+                    userKey={role}
+                    writeDisabled={writeDisabled}
+                    onDirtyChange={onGRNDirtyChange}
+                />
+            </div>
+            <div style={{ display: activeView === "batch" ? "block" : "none" }}>
+                <BatchForm
+                    userKey={role}
+                    writeDisabled={writeDisabled}
+                    onDirtyChange={onBatchDirtyChange}
+                />
+            </div>
+            <div style={{ display: activeView === "item-master" ? "block" : "none" }}>
+                <ItemMasterForm
+                    writeDisabled={writeDisabled || !canPerformAction(role, "masters", "create")}
+                    onDirtyChange={onItemMasterDirtyChange}
+                />
+            </div>
+            <div style={{ display: activeView === "packaging-profile" ? "block" : "none" }}>
+                <PackagingProfileForm
+                    writeDisabled={writeDisabled || !canPerformAction(role, "packing", "create")}
+                    onDirtyChange={onPackagingProfileDirtyChange}
+                />
+            </div>
+            <div style={{ display: activeView === "dashboard" ? "block" : "none" }}>
+                <Alert
+                    type="info"
+                    showIcon
+                    title="Dashboard route active"
+                    description="Select a module from the role-specific shell menu."
+                />
+            </div>
+            <div style={{ display: activeView === "placeholder" ? "block" : "none" }}>
+                <Alert
+                    type="info"
+                    showIcon
+                    title={`Route ${activeRoute.id}`}
+                    description="This route is part of the approved contract and is reserved for upcoming stories."
+                />
+            </div>
             <ReconnectionOverlay suppress={Boolean(suppressReconnectionOverlay)} />
-        </Layout>
+        </AppShell>
     );
 }
 

@@ -228,3 +228,49 @@ func TestService_CreateItemMaster_ForgedActorRolePayloadIgnored(t *testing.T) {
 		t.Fatalf("expected unauthorized, got %s", typed.Code)
 	}
 }
+
+func TestService_CreateItemMaster_OperatorDeniedByBackend(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+
+	_, err := svc.CreateItemMaster(CreateItemInput{
+		Name:      "Operator Attempt",
+		ItemType:  "RAW",
+		BaseUnit:  "kg",
+		AuthToken: "operator-token",
+	})
+	if err == nil {
+		t.Fatalf("expected forbidden error")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok {
+		t.Fatalf("expected ServiceError, got %T", err)
+	}
+	if typed.Code != "forbidden" {
+		t.Fatalf("expected forbidden, got %s", typed.Code)
+	}
+}
+
+func TestService_CreatePackagingProfile_OperatorDeniedByBackend(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+
+	_, err := svc.CreatePackagingProfile(CreatePackagingProfileInput{
+		Name:      "Operator Pack",
+		PackMode:  "JAR_200G",
+		AuthToken: "operator-token",
+		Components: []PackagingProfileComponentInput{
+			{PackingMaterialItemID: 10, QtyPerUnit: 1},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected forbidden error")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok {
+		t.Fatalf("expected ServiceError, got %T", err)
+	}
+	if typed.Code != "forbidden" {
+		t.Fatalf("expected forbidden, got %s", typed.Code)
+	}
+}

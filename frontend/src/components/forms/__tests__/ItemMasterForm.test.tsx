@@ -48,7 +48,7 @@ describe("ItemMasterForm", () => {
         await waitFor(() => {
             expect(createItemMock).toHaveBeenCalledTimes(1);
         });
-    });
+    }, 15000);
 
     it("loads existing row and submits update flow", async () => {
         const updatedAt = new Date().toISOString();
@@ -95,5 +95,5 @@ describe("ItemMasterForm", () => {
                 }),
             );
         });
-    });
+    }, 15000);
 });

@@ -139,6 +139,20 @@ func (s *Service) requireWriteAccess(authToken string) error {
 	return appLicenseMode.RequireWriteAccess()
 }
 
+func (s *Service) requireMasterWriteAccess(authToken string) error {
+	role, err := s.resolveRole(authToken)
+	if err != nil {
+		return err
+	}
+	if role != domainAuth.RoleAdmin {
+		return &ServiceError{
+			Code:    "forbidden",
+			Message: "role is not allowed to modify master data",
+		}
+	}
+	return appLicenseMode.RequireWriteAccess()
+}
+
 func mapValidationError(err error) error {
 	switch {
 	case errors.Is(err, domainInventory.ErrItemNameRequired):
@@ -165,7 +179,7 @@ func mapValidationError(err error) error {
 }
 
 func (s *Service) CreateItemMaster(input CreateItemInput) (*domainInventory.Item, error) {
-	if err := s.requireWriteAccess(input.AuthToken); err != nil {
+	if err := s.requireMasterWriteAccess(input.AuthToken); err != nil {
 		return nil, err
 	}
 	item := &domainInventory.Item{
@@ -199,7 +213,7 @@ func parseUpdatedAt(value string) (time.Time, error) {
 }
 
 func (s *Service) UpdateItemMaster(input UpdateItemInput) (*domainInventory.Item, error) {
-	if err := s.requireWriteAccess(input.AuthToken); err != nil {
+	if err := s.requireMasterWriteAccess(input.AuthToken); err != nil {
 		return nil, err
 	}
 	updatedAt, err := parseUpdatedAt(input.UpdatedAt)
@@ -243,7 +257,7 @@ func (s *Service) ListItems(input ListItemsInput) ([]domainInventory.Item, error
 }
 
 func (s *Service) CreatePackagingProfile(input CreatePackagingProfileInput) (*domainInventory.PackagingProfile, error) {
-	if err := s.requireWriteAccess(input.AuthToken); err != nil {
+	if err := s.requireMasterWriteAccess(input.AuthToken); err != nil {
 		return nil, err
 	}
 	profile := &domainInventory.PackagingProfile{

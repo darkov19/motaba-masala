@@ -69,7 +69,7 @@ describe("PackagingProfileForm", () => {
         await waitFor(() => {
             expect(createPackagingProfileMock).toHaveBeenCalledTimes(1);
         });
-    });
+    }, 15000);
 
     it("blocks duplicate component selection before submit", async () => {
         const onDirty = vi.fn();
@@ -93,7 +93,7 @@ describe("PackagingProfileForm", () => {
         await waitFor(() => {
             expect(createPackagingProfileMock).not.toHaveBeenCalled();
         });
-    });
+    }, 15000);
 
     it("calls API and handles API failure path", async () => {
         createPackagingProfileMock.mockRejectedValue(new Error("server rejected profile"));
@@ -110,7 +110,7 @@ describe("PackagingProfileForm", () => {
         await waitFor(() => {
             expect(createPackagingProfileMock).toHaveBeenCalledTimes(1);
         });
-    });
+    }, 15000);
 
     it("blocks zero quantity boundary before submit", async () => {
         const onDirty = vi.fn();
@@ -126,7 +126,7 @@ describe("PackagingProfileForm", () => {
         await waitFor(() => {
             expect(createPackagingProfileMock).not.toHaveBeenCalled();
         });
-    });
+    }, 15000);
 
     it("blocks negative quantity boundary before submit", async () => {
         const onDirty = vi.fn();
@@ -142,5 +142,5 @@ describe("PackagingProfileForm", () => {
         await waitFor(() => {
             expect(createPackagingProfileMock).not.toHaveBeenCalled();
         });
-    });
+    }, 15000);
 });

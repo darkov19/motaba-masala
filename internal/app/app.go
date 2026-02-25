@@ -54,6 +54,7 @@ type App struct {
 	connectivityProbe     func() error
 	lockoutRetryHandler   func() (LockoutRetryResult, error)
 	inventoryService      *appInventory.Service
+	sessionRoleResolver   func(string) (string, error)
 }
 
 const (
@@ -320,6 +321,21 @@ func (a *App) RetryLockoutValidation() (LockoutRetryResult, error) {
 		}, nil
 	}
 	return a.lockoutRetryHandler()
+}
+
+func (a *App) SetSessionRoleResolver(resolver func(string) (string, error)) {
+	a.sessionRoleResolver = resolver
+}
+
+func (a *App) GetSessionRole(authToken string) (string, error) {
+	token := strings.TrimSpace(authToken)
+	if token == "" {
+		return "", fmt.Errorf("auth token is required")
+	}
+	if a.sessionRoleResolver == nil {
+		return "", fmt.Errorf("session role resolver is not configured")
+	}
+	return a.sessionRoleResolver(token)
 }
 
 func (a *App) SetInventoryService(service *appInventory.Service) {

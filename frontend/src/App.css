@@ -88,9 +88,19 @@
     justify-content: center;
 }
 
+.app-shell__body {
+    min-height: 0;
+}
+
+.app-shell__sider.ant-layout-sider {
+    background: linear-gradient(180deg, #faf5f2 0%, #f4eee9 100%);
+    border-right: 1px solid #e8ddd6;
+    padding: 18px 10px;
+}
+
 .app-card {
     width: 100%;
-    max-width: 840px;
+    max-width: 980px;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
 }
 
@@ -139,5 +149,15 @@
 
     .app-header__title.ant-typography {
         font-size: 16px;
+    }
+
+    .app-shell__sider.ant-layout-sider {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 100% !important;
+    }
+
+    .app-shell__body {
+        flex-direction: column;
     }
 }
