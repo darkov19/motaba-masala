@@ -23,15 +23,15 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 
 ### 2. Master Data & Configuration
 
-**Goal:** Create the "Digital Twin" configuration layer (Items, Recipes, Suppliers).
+**Goal:** Create the "Digital Twin" configuration layer (Items, Recipes, Packaging Profiles, Suppliers).
 
-- **Scope:** CRUD for all masters, Unit Conversion logic (KG <-> Grams), and Recipe BOM definition.
+- **Scope:** CRUD for all masters, Unit Conversion logic (KG <-> Grams), Recipe BOM definition, and reusable Packaging Profile setup for composite packing-material consumption.
 
 ### 3. Procurement & Inventory (Inbound)
 
-**Goal:** Manage the intake of Raw Materials and Packing Materials with cost tracking.
+**Goal:** Manage the intake of Raw Materials and Packing Materials with cost tracking and subtype-aware stock identity.
 
-- **Scope:** GRN, Lot Tracking, Stock Levels, and Re-order alerts. Includes Third-Party Bulk procurement flow.
+- **Scope:** GRN, Lot Tracking, Stock Levels, and Re-order alerts. Includes Third-Party Bulk procurement flow and separate procurement of packing-material components (for profile-based packing).
 
 ### 4. Production & Processing (The Core)
 
@@ -41,9 +41,9 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 
 ### 5. Packing & Finished Goods
 
-**Goal:** Manage conversion of Bulk Powder into Retail SKUs with full traceability.
+**Goal:** Manage conversion of Bulk Powder into Retail SKUs with full traceability and profile-driven packing-material deduction.
 
-- **Scope:** Packing material consumption, FG Stock creation, and linking FG Batches back to Source Bulk Batches.
+- **Scope:** Packing material consumption (including composite profiles), FG Stock creation, and linking FG Batches back to Source Bulk Batches.
 
 ### 6. Sales & Dispatch
 
@@ -241,7 +241,7 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 
 ## Epic 2: Master Data & Configuration
 
-**Goal:** Create the "Digital Twin" configuration layer (Items, Recipes, Suppliers).
+**Goal:** Create the "Digital Twin" configuration layer (Items, Recipes, Packaging Profiles, Suppliers).
 
 ### Story 2.1: Item Master Management
 
@@ -254,6 +254,8 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 - **Given** the Item Master screen
 - **When** I create a new Raw Material "Coriander Seeds" with Base Unit "KG"
 - **Then** it is saved to the database
+- **And** when I create Packing Material items, I can assign a subtype (e.g., `JAR_BODY`, `JAR_LID`, `CUP_STICKER`) for operational grouping
+- **And** I can define a reusable Packaging Profile (e.g., `Jar Pack`) that maps one packing selection to multiple packing-material components and per-unit quantities
 
 ### Story 2.2: Unit Conversion Engine
 
@@ -321,8 +323,9 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 - **Then** the stock of "Chili (Raw)" increases by 100 KG
 - **And** the "Last Purchase Price" and "Weighted Average Cost" of the item are updated
 - **And** I can enter the Invoice Number for reference
+- **And** for packing materials, I can procure profile components (e.g., Jar Body, Jar Lid, Cup Sticker) as separate line items with independent stock balances
 
-**Technical Notes:** Validation: Input Quantity > 0.
+**Technical Notes:** Validation: Input Quantity > 0. Packing profile components remain separately stocked at procurement time and are only grouped during packing execution.
 
 ### Story 3.2: Lot Tracking System
 
@@ -447,7 +450,7 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 
 ## Epic 5: Packing & Finished Goods
 
-**Goal:** Manage conversion of Bulk Powder into Retail SKUs with full traceability.
+**Goal:** Manage conversion of Bulk Powder into Retail SKUs with full traceability and profile-driven packing-material deduction.
 
 ### Story 5.1: Packing Run Creation
 
@@ -461,13 +464,15 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 - **When** I start a Packing Run for "Chili Powder 50g Pouch"
 - **And** I select the Source Bulk Batch `#BATCH-1001`
 - **Then** the system validates that sufficient bulk quantity exists
+- **And** when I select a profile-based pack type (e.g., Jar Pack), the run preloads all mapped packing-material components and required per-unit quantities
+- **And** the run validation checks both bulk quantity and all mapped packing-material component availability before allowing completion
 
-**Technical Notes:** Parent-Child relationship: One Bulk Batch -> Many Packing Batches.
+**Technical Notes:** Parent-Child relationship: One Bulk Batch -> Many Packing Batches. Packing profiles define the component set consumed per output unit.
 
 ### Story 5.2: Packing Material Consumption
 
 **As a** Data Entry Operator,
-**I want** to track the consumption of pouches, boxes, and labels during packing,
+**I want** to track the consumption of pouches, boxes, labels, and other profile components during packing,
 **So that** packing material inventory is accurate.
 
 **Acceptance Criteria:**
@@ -478,8 +483,12 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
     - 2000 Units of "Pouch Material"
     - 100KG of "Bulk Powder" (2000 \* 50g)
 - **And** alerts if stock is insufficient
+- **Given** a Packing Run uses a profile-based pack type (e.g., Jar)
+- **When** I complete the run for 1000 units
+- **Then** the system deducts all mapped components together (e.g., 1000 Jar Bodies + 1000 Lids + 1000 Cup Stickers)
+- **And** blocks commit if any one component is short
 
-**Technical Notes:** Handle "Over-packing" (packing slightly more than standard weight) if required, or stick to standard theoretical consumption for MVP.
+**Technical Notes:** Handle "Over-packing" (packing slightly more than standard weight) if required, or stick to standard theoretical consumption for MVP. For profile-based packs, use atomic component deduction and block completion on any component shortfall.
 
 ### Story 5.3: Finished Goods Stock Entry
 
@@ -493,8 +502,9 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 - **When** I confirm the output Quantity (e.g., 100 Boxes of 20 Pouches each)
 - **Then** "Chili Powder 50g Pouch" Finished Goods stock increases
 - **And** the "Cost Price" of the FG is calculated (Bulk Cost + Packing Material Cost + Overheads)
+- **And** when a packaging profile is used, FG cost includes all consumed profile components (e.g., Jar Body + Lid + Cup Sticker) based on their effective item costs
 
-**Technical Notes:** Roll up costs: (Bulk Cost/g \* Pack Weight) + Packing Cost.
+**Technical Notes:** Roll up costs: (Bulk Cost/g * Pack Weight) + Packing Cost. For profile-based packs, `Packing Cost` is the sum of all mapped component costs at consumed quantities.
 
 ---
 

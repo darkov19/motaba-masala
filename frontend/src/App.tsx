@@ -9,6 +9,8 @@ import { ConnectionStatus } from "./components/layout/ConnectionStatus";
 import { ReconnectionOverlay } from "./components/layout/ReconnectionOverlay";
 import { GRNForm } from "./components/forms/GRNForm";
 import { BatchForm } from "./components/forms/BatchForm";
+import { ItemMasterForm } from "./components/forms/ItemMasterForm";
+import { PackagingProfileForm } from "./components/forms/PackagingProfileForm";
 import { useUnsavedChanges } from "./hooks/useUnsavedChanges";
 import "./App.css";
 
@@ -64,14 +66,18 @@ type WindowWithAppBindings = Window & {
     };
 };
 
-type ViewKey = "grn" | "batch";
+type ViewKey = "grn" | "batch" | "item-master" | "packaging-profile";
 const PATH_TO_VIEW: Record<string, ViewKey> = {
     "/grn": "grn",
     "/batch": "batch",
+    "/item-master": "item-master",
+    "/packaging-profile": "packaging-profile",
 };
 const VIEW_TO_PATH: Record<ViewKey, string> = {
     grn: "/grn",
     batch: "/batch",
+    "item-master": "/item-master",
+    "packaging-profile": "/packaging-profile",
 };
 
 function WindowControls() {
@@ -151,6 +157,8 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
     const [dirtyByView, setDirtyByView] = useState<Record<ViewKey, boolean>>({
         grn: false,
         batch: false,
+        "item-master": false,
+        "packaging-profile": false,
     });
     const activeView = PATH_TO_VIEW[location.pathname] ?? "grn";
     const writeDisabled = licenseStatus.status === "grace-period" || licenseStatus.status === "expired";
@@ -166,8 +174,8 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
     }, [location.pathname, navigate]);
 
     const hasUnsaved = useMemo(
-        () => dirtyByView.grn || dirtyByView.batch,
-        [dirtyByView.batch, dirtyByView.grn],
+        () => dirtyByView.grn || dirtyByView.batch || dirtyByView["item-master"] || dirtyByView["packaging-profile"],
+        [dirtyByView],
     );
     const activeViewDirty = dirtyByView[activeView];
     const blocker = useBlocker(
@@ -199,6 +207,14 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
 
     const onBatchDirtyChange = useCallback((isDirty: boolean) => {
         setDirtyFor("batch", isDirty);
+    }, [setDirtyFor]);
+
+    const onItemMasterDirtyChange = useCallback((isDirty: boolean) => {
+        setDirtyFor("item-master", isDirty);
+    }, [setDirtyFor]);
+
+    const onPackagingProfileDirtyChange = useCallback((isDirty: boolean) => {
+        setDirtyFor("packaging-profile", isDirty);
     }, [setDirtyFor]);
 
     const onViewChange = (value: string | number) => {
@@ -314,6 +330,18 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                             >
                                 New Batch
                             </Button>
+                            <Button
+                                onClick={() => navigate("/item-master")}
+                                disabled={writeDisabled}
+                            >
+                                Item Master
+                            </Button>
+                            <Button
+                                onClick={() => navigate("/packaging-profile")}
+                                disabled={writeDisabled}
+                            >
+                                Packaging Profiles
+                            </Button>
                         </Space>
 
                         <Segmented
@@ -321,6 +349,8 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                             options={[
                                 { label: "GRN Form", value: "grn" },
                                 { label: "Batch Form", value: "batch" },
+                                { label: "Item Master", value: "item-master" },
+                                { label: "Packaging Profiles", value: "packaging-profile" },
                             ]}
                             value={activeView}
                             onChange={onViewChange}
@@ -338,6 +368,18 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                                 userKey="operator"
                                 writeDisabled={writeDisabled}
                                 onDirtyChange={onBatchDirtyChange}
+                            />
+                        </div>
+                        <div style={{ display: activeView === "item-master" ? "block" : "none" }}>
+                            <ItemMasterForm
+                                writeDisabled={writeDisabled}
+                                onDirtyChange={onItemMasterDirtyChange}
+                            />
+                        </div>
+                        <div style={{ display: activeView === "packaging-profile" ? "block" : "none" }}>
+                            <PackagingProfileForm
+                                writeDisabled={writeDisabled}
+                                onDirtyChange={onPackagingProfileDirtyChange}
                             />
                         </div>
                     </Space>

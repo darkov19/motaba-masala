@@ -57,6 +57,7 @@ The system operates in a **Food Manufacturing** context, specifically Spices.
 **Core Modules (All Essential Flows Included):**
 
 1.  **Masters Management:** Items (Raw, Bulk, Pack, FG), Suppliers, Customers, Recipes (BOM).
+    - Packing material master supports subtype classification (e.g., Jar Body, Lid, Seal/Cup Sticker) and reusable packaging consumption profiles.
 2.  **Procurement:** Purchase Orders & GRN for Raw Spices, Packing Material, and **Third-Party Bulk**.
 3.  **Production (In-House):**
     - Batch Management (Process Inputs -> Bulk Output).
@@ -195,6 +196,10 @@ Unlike standard inventory apps that just count stock, this system models the _tr
     - Reduces _Bulk Powder Stock_ (in KG).
     - Reduces _Packing Material Stock_ (Boxes, Pouches in Pcs).
     - Increases _Finished Goods Stock_ (in Pcs/Boxes).
+- **FR-009A: Composite Packing Consumption Profiles:**
+    - System supports selecting one packing profile (for example `JAR_PACK_STD`) that maps to multiple packing-material components.
+    - _Example:_ `JAR_PACK_STD` consumes `1 Jar Body + 1 Lid + 1 Cup Sticker` per finished unit.
+    - On packing confirmation, all mapped components are deducted atomically; if any component is insufficient, the transaction is blocked with a clear shortage message.
 
 ### 4. Third-Party Bulk Flow
 

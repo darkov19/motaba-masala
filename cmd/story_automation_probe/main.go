@@ -9,6 +9,7 @@ import (
 
 	"masala_inventory_managment"
 	appInventory "masala_inventory_managment/internal/app/inventory"
+	domainAuth "masala_inventory_managment/internal/domain/auth"
 	domainInventory "masala_inventory_managment/internal/domain/inventory"
 	"masala_inventory_managment/internal/infrastructure/db"
 )
@@ -24,6 +25,12 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println("PASS: optimistic-lock")
+	case "item-master-packaging":
+		if err := runItemMasterPackagingScenario(); err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("PASS: item-master-packaging")
 	default:
 		fmt.Fprintf(os.Stderr, "unknown scenario: %s\n", *scenario)
 		os.Exit(2)
@@ -50,7 +57,7 @@ func runOptimisticLockScenario() error {
 	}
 
 	repo := db.NewSqliteInventoryRepository(manager.GetDB())
-	svc := appInventory.NewService(repo)
+	svc := appInventory.NewService(repo, nil)
 
 	item := &domainInventory.Item{
 		SKU:          "PROBE-SKU-1",
@@ -81,6 +88,94 @@ func runOptimisticLockScenario() error {
 	}
 	if err.Error() != appInventory.ErrRecordModified {
 		return fmt.Errorf("expected %q, got %q", appInventory.ErrRecordModified, err.Error())
+	}
+
+	return nil
+}
+
+func runItemMasterPackagingScenario() error {
+	tempDir, err := os.MkdirTemp("", "story-automation-probe")
+	if err != nil {
+		return fmt.Errorf("create temp dir: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	dbPath := filepath.Join(tempDir, "probe.db")
+	manager := db.NewDatabaseManager(dbPath)
+	if err := manager.Connect(); err != nil {
+		return fmt.Errorf("connect db: %w", err)
+	}
+	defer manager.Close()
+
+	migrator := db.NewMigrator(manager)
+	if err := migrator.RunMigrations(masala_inventory_managment.MigrationAssets, "internal/infrastructure/db/migrations"); err != nil {
+		return fmt.Errorf("run migrations: %w", err)
+	}
+
+	repo := db.NewSqliteInventoryRepository(manager.GetDB())
+	svc := appInventory.NewService(repo, func(_ string) (domainAuth.Role, error) {
+		return domainAuth.RoleAdmin, nil
+	})
+
+	jarBody, err := svc.CreateItemMaster(appInventory.CreateItemInput{
+		Name:        "Jar Body",
+		ItemType:    "PACKING_MATERIAL",
+		BaseUnit:    "pcs",
+		ItemSubtype: "JAR_BODY",
+		IsActive:    true,
+		AuthToken:   "probe-admin-token",
+	})
+	if err != nil {
+		return fmt.Errorf("create jar body: %w", err)
+	}
+	jarLid, err := svc.CreateItemMaster(appInventory.CreateItemInput{
+		Name:        "Jar Lid",
+		ItemType:    "PACKING_MATERIAL",
+		BaseUnit:    "pcs",
+		ItemSubtype: "JAR_LID",
+		IsActive:    true,
+		AuthToken:   "probe-admin-token",
+	})
+	if err != nil {
+		return fmt.Errorf("create jar lid: %w", err)
+	}
+
+	_, err = svc.CreatePackagingProfile(appInventory.CreatePackagingProfileInput{
+		Name:     "Jar Pack 200g",
+		PackMode: "JAR_200G",
+		Components: []appInventory.PackagingProfileComponentInput{
+			{PackingMaterialItemID: jarBody.ID, QtyPerUnit: 1},
+			{PackingMaterialItemID: jarLid.ID, QtyPerUnit: 1},
+		},
+		AuthToken: "probe-admin-token",
+	})
+	if err != nil {
+		return fmt.Errorf("create packaging profile: %w", err)
+	}
+
+	items, err := svc.ListItems(appInventory.ListItemsInput{
+		ActiveOnly: true,
+		ItemType:   "PACKING_MATERIAL",
+		AuthToken:  "probe-admin-token",
+	})
+	if err != nil {
+		return fmt.Errorf("list items: %w", err)
+	}
+	if len(items) < 2 {
+		return fmt.Errorf("expected at least 2 packing material items, got %d", len(items))
+	}
+	profiles, err := svc.ListPackagingProfiles(appInventory.ListPackagingProfilesInput{
+		ActiveOnly: true,
+		AuthToken:  "probe-admin-token",
+	})
+	if err != nil {
+		return fmt.Errorf("list profiles: %w", err)
+	}
+	if len(profiles) != 1 {
+		return fmt.Errorf("expected 1 packaging profile, got %d", len(profiles))
+	}
+	if len(profiles[0].Components) != 2 {
+		return fmt.Errorf("expected 2 profile components, got %d", len(profiles[0].Components))
 	}
 
 	return nil

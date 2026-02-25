@@ -14,6 +14,7 @@ import (
 	"masala_inventory_managment/internal/app"
 	appAdmin "masala_inventory_managment/internal/app/admin"
 	appAuth "masala_inventory_managment/internal/app/auth"
+	appInventory "masala_inventory_managment/internal/app/inventory"
 	appLicenseMode "masala_inventory_managment/internal/app/licensemode"
 	appReport "masala_inventory_managment/internal/app/report"
 	appSys "masala_inventory_managment/internal/app/system"
@@ -583,6 +584,15 @@ func run() error {
 			authService = appAuth.NewService(userRepo, bcryptService, tokenService)
 			reportService = appReport.NewAppService(authService)
 			adminService = appAdmin.NewService(authService, backupService, licenseSvc, logError)
+			inventoryRepo := db.NewSqliteInventoryRepository(dbManager.GetDB())
+			inventoryService := appInventory.NewService(inventoryRepo, func(authToken string) (domainAuth.Role, error) {
+				user, err := authService.CurrentUser(authToken)
+				if err != nil {
+					return "", err
+				}
+				return user.Role, nil
+			})
+			application.SetInventoryService(inventoryService)
 
 			userCount, err := userRepo.Count()
 			if err != nil {

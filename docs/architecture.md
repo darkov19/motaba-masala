@@ -69,7 +69,7 @@ masala_inventory_managment/
 | Epic                   | Architecture Component                                                                                                      |
 | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------- |
 | **1. Core Foundation** | `internal/infrastructure/db` (SQLite), `internal/infrastructure/license` (HW Binding), `frontend/src/wailsjs` (Auth Bridge) |
-| **2. Master Data**     | `internal/domain/models` (Item, Recipe), `internal/app/commands` (CreateItem)                                               |
+| **2. Master Data**     | `internal/domain/models` (Item, Recipe, PackagingProfile), `internal/app/commands` (CreateItem, CreatePackagingProfile)      |
 | **3. Procurement**     | `internal/app/commands` (CreateGRN), `internal/domain/services` (StockUpdator)                                              |
 | **4. Production**      | **Core Logic:** `internal/domain/services` (YieldCalculator, CostAverager). This is the "Brain".                            |
 | **5. Packing**         | `internal/app/commands` (ExecutePacking), `internal/domain/services` (UnitConverter)                                        |
@@ -137,6 +137,8 @@ export default function App() {
 - `Item`: Base entity (ID, Name, Type [RAW/BULK/FG], BaseUnit, AvgCost).
 - `Batch`: Traceability unit (ID, ItemID, Qty, Cost, SourceBatchID [Parent]).
 - `StockLedger`: Immutable transaction log (Date, Type [GRN/PROD/SALE], QtyChange, ValueChange).
+- `PackagingProfile`: Reusable pack mapping (ID, Code, OutputPackItemID, IsActive) that links one pack mode to multiple packing-material components.
+- `PackagingProfileComponent`: Child rows (ProfileID, PackingMaterialItemID, QtyPerUnit) consumed atomically during packing execution.
 
 ### Deployment Strategy (Thick Client)
 

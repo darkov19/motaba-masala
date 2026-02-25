@@ -38,6 +38,40 @@ vi.mock("../components/forms/BatchForm", () => ({
     ),
 }));
 
+vi.mock("../components/forms/ItemMasterForm", () => ({
+    ItemMasterForm: ({
+        onDirtyChange,
+    }: {
+        onDirtyChange: (value: boolean) => void;
+    }) => (
+        <div>
+            <label htmlFor="item-master-dirty">Item Master Dirty</label>
+            <input
+                id="item-master-dirty"
+                type="checkbox"
+                onChange={event => onDirtyChange(event.currentTarget.checked)}
+            />
+        </div>
+    ),
+}));
+
+vi.mock("../components/forms/PackagingProfileForm", () => ({
+    PackagingProfileForm: ({
+        onDirtyChange,
+    }: {
+        onDirtyChange: (value: boolean) => void;
+    }) => (
+        <div>
+            <label htmlFor="packaging-profile-dirty">Packaging Profile Dirty</label>
+            <input
+                id="packaging-profile-dirty"
+                type="checkbox"
+                onChange={event => onDirtyChange(event.currentTarget.checked)}
+            />
+        </div>
+    ),
+}));
+
 const confirmMock = vi.fn<(...args: unknown[]) => unknown>();
 
 describe("App route-level unsaved navigation blocking", () => {

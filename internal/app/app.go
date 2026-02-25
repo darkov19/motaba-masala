@@ -12,6 +12,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	appInventory "masala_inventory_managment/internal/app/inventory"
 )
 
 type RecoveryState struct {
@@ -51,6 +53,7 @@ type App struct {
 	lockoutState          LicenseLockoutState
 	connectivityProbe     func() error
 	lockoutRetryHandler   func() (LockoutRetryResult, error)
+	inventoryService      *appInventory.Service
 }
 
 const (
@@ -68,7 +71,7 @@ func NewApp(isServer bool) *App {
 	}
 
 	return &App{
-		isServer: isServer,
+		isServer:          isServer,
 		connectivityProbe: connectivityProbe,
 		licenseStatusProvider: func() (LicenseStatus, error) {
 			return LicenseStatus{Status: "active", DaysRemaining: 0}, nil
@@ -317,4 +320,152 @@ func (a *App) RetryLockoutValidation() (LockoutRetryResult, error) {
 		}, nil
 	}
 	return a.lockoutRetryHandler()
+}
+
+func (a *App) SetInventoryService(service *appInventory.Service) {
+	a.inventoryService = service
+}
+
+type ItemMasterResult struct {
+	ID           int64   `json:"id"`
+	SKU          string  `json:"sku"`
+	Name         string  `json:"name"`
+	ItemType     string  `json:"item_type"`
+	BaseUnit     string  `json:"base_unit"`
+	ItemSubtype  string  `json:"item_subtype"`
+	MinimumStock float64 `json:"minimum_stock"`
+	IsActive     bool    `json:"is_active"`
+	UpdatedAt    string  `json:"updated_at"`
+}
+
+type PackagingProfileResult struct {
+	ID         int64                                         `json:"id"`
+	Name       string                                        `json:"name"`
+	PackMode   string                                        `json:"pack_mode"`
+	IsActive   bool                                          `json:"is_active"`
+	UpdatedAt  string                                        `json:"updated_at"`
+	Components []appInventory.PackagingProfileComponentInput `json:"components"`
+}
+
+func (a *App) CreateItemMaster(input appInventory.CreateItemInput) (ItemMasterResult, error) {
+	if a.inventoryService == nil {
+		return ItemMasterResult{}, fmt.Errorf("inventory service is not configured")
+	}
+	item, err := a.inventoryService.CreateItemMaster(input)
+	if err != nil {
+		return ItemMasterResult{}, err
+	}
+	return ItemMasterResult{
+		ID:           item.ID,
+		SKU:          item.SKU,
+		Name:         item.Name,
+		ItemType:     string(item.ItemType),
+		BaseUnit:     item.BaseUnit,
+		ItemSubtype:  item.ItemSubtype,
+		MinimumStock: item.MinimumStock,
+		IsActive:     item.IsActive,
+		UpdatedAt:    item.UpdatedAt.Format(time.RFC3339Nano),
+	}, nil
+}
+
+func (a *App) UpdateItemMaster(input appInventory.UpdateItemInput) (ItemMasterResult, error) {
+	if a.inventoryService == nil {
+		return ItemMasterResult{}, fmt.Errorf("inventory service is not configured")
+	}
+	item, err := a.inventoryService.UpdateItemMaster(input)
+	if err != nil {
+		return ItemMasterResult{}, err
+	}
+	return ItemMasterResult{
+		ID:           item.ID,
+		SKU:          item.SKU,
+		Name:         item.Name,
+		ItemType:     string(item.ItemType),
+		BaseUnit:     item.BaseUnit,
+		ItemSubtype:  item.ItemSubtype,
+		MinimumStock: item.MinimumStock,
+		IsActive:     item.IsActive,
+		UpdatedAt:    item.UpdatedAt.Format(time.RFC3339Nano),
+	}, nil
+}
+
+func (a *App) ListItems(input appInventory.ListItemsInput) ([]ItemMasterResult, error) {
+	if a.inventoryService == nil {
+		return nil, fmt.Errorf("inventory service is not configured")
+	}
+	items, err := a.inventoryService.ListItems(input)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]ItemMasterResult, 0, len(items))
+	for _, item := range items {
+		result = append(result, ItemMasterResult{
+			ID:           item.ID,
+			SKU:          item.SKU,
+			Name:         item.Name,
+			ItemType:     string(item.ItemType),
+			BaseUnit:     item.BaseUnit,
+			ItemSubtype:  item.ItemSubtype,
+			MinimumStock: item.MinimumStock,
+			IsActive:     item.IsActive,
+			UpdatedAt:    item.UpdatedAt.Format(time.RFC3339Nano),
+		})
+	}
+	return result, nil
+}
+
+func (a *App) CreatePackagingProfile(input appInventory.CreatePackagingProfileInput) (PackagingProfileResult, error) {
+	if a.inventoryService == nil {
+		return PackagingProfileResult{}, fmt.Errorf("inventory service is not configured")
+	}
+	profile, err := a.inventoryService.CreatePackagingProfile(input)
+	if err != nil {
+		return PackagingProfileResult{}, err
+	}
+
+	components := make([]appInventory.PackagingProfileComponentInput, 0, len(profile.Components))
+	for _, component := range profile.Components {
+		components = append(components, appInventory.PackagingProfileComponentInput{
+			PackingMaterialItemID: component.PackingMaterialItemID,
+			QtyPerUnit:            component.QtyPerUnit,
+		})
+	}
+
+	return PackagingProfileResult{
+		ID:         profile.ID,
+		Name:       profile.Name,
+		PackMode:   profile.PackMode,
+		IsActive:   profile.IsActive,
+		UpdatedAt:  profile.UpdatedAt.Format(time.RFC3339Nano),
+		Components: components,
+	}, nil
+}
+
+func (a *App) ListPackagingProfiles(input appInventory.ListPackagingProfilesInput) ([]PackagingProfileResult, error) {
+	if a.inventoryService == nil {
+		return nil, fmt.Errorf("inventory service is not configured")
+	}
+	profiles, err := a.inventoryService.ListPackagingProfiles(input)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]PackagingProfileResult, 0, len(profiles))
+	for _, profile := range profiles {
+		components := make([]appInventory.PackagingProfileComponentInput, 0, len(profile.Components))
+		for _, component := range profile.Components {
+			components = append(components, appInventory.PackagingProfileComponentInput{
+				PackingMaterialItemID: component.PackingMaterialItemID,
+				QtyPerUnit:            component.QtyPerUnit,
+			})
+		}
+		result = append(result, PackagingProfileResult{
+			ID:         profile.ID,
+			Name:       profile.Name,
+			PackMode:   profile.PackMode,
+			IsActive:   profile.IsActive,
+			UpdatedAt:  profile.UpdatedAt.Format(time.RFC3339Nano),
+			Components: components,
+		})
+	}
+	return result, nil
 }

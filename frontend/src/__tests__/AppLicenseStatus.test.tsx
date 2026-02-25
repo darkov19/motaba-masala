@@ -11,6 +11,14 @@ vi.mock("../components/forms/BatchForm", () => ({
     BatchForm: () => <div>Mock Batch Form</div>,
 }));
 
+vi.mock("../components/forms/ItemMasterForm", () => ({
+    ItemMasterForm: () => <div>Mock Item Master Form</div>,
+}));
+
+vi.mock("../components/forms/PackagingProfileForm", () => ({
+    PackagingProfileForm: () => <div>Mock Packaging Profile Form</div>,
+}));
+
 describe("App license status banners", () => {
     it("shows grace-period banner and disables New action buttons", async () => {
         (window as unknown as {

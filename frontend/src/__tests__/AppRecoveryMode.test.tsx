@@ -13,6 +13,14 @@ vi.mock("../components/forms/BatchForm", () => ({
     BatchForm: () => <div>Mock Batch Form</div>,
 }));
 
+vi.mock("../components/forms/ItemMasterForm", () => ({
+    ItemMasterForm: () => <div>Mock Item Master Form</div>,
+}));
+
+vi.mock("../components/forms/PackagingProfileForm", () => ({
+    PackagingProfileForm: () => <div>Mock Packaging Profile Form</div>,
+}));
+
 vi.mock("../context/ConnectionContext", () => ({
     ConnectionProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
     useConnection: () => ({

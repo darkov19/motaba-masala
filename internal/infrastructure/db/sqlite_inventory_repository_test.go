@@ -137,3 +137,230 @@ func TestSqliteInventoryRepository_UpdateGRN_ConcurrencyConflict(t *testing.T) {
 		t.Fatalf("Expected ErrConcurrencyConflict, got %v", err)
 	}
 }
+
+func TestSqliteInventoryRepository_CreateItem_PersistsItemMasterFields(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	item := &domainInventory.Item{
+		SKU:         "SKU-MASTER-1",
+		Name:        "Jar Body",
+		ItemType:    domainInventory.ItemTypePackingMaterial,
+		BaseUnit:    "pcs",
+		ItemSubtype: "JAR_BODY",
+		IsActive:    true,
+	}
+	if err := repo.CreateItem(item); err != nil {
+		t.Fatalf("CreateItem failed: %v", err)
+	}
+
+	var itemType, baseUnit, itemSubtype, category, unit string
+	err := manager.GetDB().QueryRow(
+		"SELECT item_type, base_unit, item_subtype, category, unit FROM items WHERE id = ?",
+		item.ID,
+	).Scan(&itemType, &baseUnit, &itemSubtype, &category, &unit)
+	if err != nil {
+		t.Fatalf("Failed to read persisted item: %v", err)
+	}
+
+	if itemType != string(domainInventory.ItemTypePackingMaterial) {
+		t.Fatalf("expected item_type %q, got %q", domainInventory.ItemTypePackingMaterial, itemType)
+	}
+	if baseUnit != "pcs" {
+		t.Fatalf("expected base_unit pcs, got %q", baseUnit)
+	}
+	if itemSubtype != "JAR_BODY" {
+		t.Fatalf("expected item_subtype JAR_BODY, got %q", itemSubtype)
+	}
+	if category != string(domainInventory.ItemTypePackingMaterial) {
+		t.Fatalf("expected category alias %q, got %q", domainInventory.ItemTypePackingMaterial, category)
+	}
+	if unit != "pcs" {
+		t.Fatalf("expected unit alias pcs, got %q", unit)
+	}
+}
+
+func TestSqliteInventoryRepository_ListItems_FilterByTypeAndActive(t *testing.T) {
+	repo, _ := setupInventoryRepo(t)
+
+	activeRaw := &domainInventory.Item{
+		SKU:      "SKU-LIST-1",
+		Name:     "Raw Chili",
+		ItemType: domainInventory.ItemTypeRaw,
+		BaseUnit: "kg",
+		IsActive: true,
+	}
+	inactivePacking := &domainInventory.Item{
+		SKU:      "SKU-LIST-2",
+		Name:     "Jar Lid",
+		ItemType: domainInventory.ItemTypePackingMaterial,
+		BaseUnit: "pcs",
+		IsActive: false,
+	}
+	if err := repo.CreateItem(activeRaw); err != nil {
+		t.Fatalf("CreateItem activeRaw failed: %v", err)
+	}
+	if err := repo.CreateItem(inactivePacking); err != nil {
+		t.Fatalf("CreateItem inactivePacking failed: %v", err)
+	}
+
+	items, err := repo.ListItems(domainInventory.ItemListFilter{
+		ActiveOnly: true,
+		ItemType:   domainInventory.ItemTypeRaw,
+	})
+	if err != nil {
+		t.Fatalf("ListItems failed: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 active raw item, got %d", len(items))
+	}
+	if items[0].SKU != "SKU-LIST-1" {
+		t.Fatalf("expected SKU-LIST-1, got %s", items[0].SKU)
+	}
+}
+
+func TestSqliteInventoryRepository_CreatePackagingProfile_RejectsNonPackingMaterial(t *testing.T) {
+	repo, _ := setupInventoryRepo(t)
+
+	rawItem := &domainInventory.Item{
+		SKU:      "SKU-RAW-COMP",
+		Name:     "Raw Salt",
+		ItemType: domainInventory.ItemTypeRaw,
+		BaseUnit: "kg",
+		IsActive: true,
+	}
+	if err := repo.CreateItem(rawItem); err != nil {
+		t.Fatalf("CreateItem failed: %v", err)
+	}
+
+	profile := &domainInventory.PackagingProfile{
+		Name:     "Invalid Raw Component",
+		PackMode: "JAR_200G",
+		IsActive: true,
+		Components: []domainInventory.PackagingProfileComponent{
+			{
+				PackingMaterialItemID: rawItem.ID,
+				QtyPerUnit:            1,
+			},
+		},
+	}
+	if err := repo.CreatePackagingProfile(profile); err == nil {
+		t.Fatalf("expected error for non PACKING_MATERIAL component")
+	}
+}
+
+func TestSqliteInventoryRepository_CreatePackagingProfile_RejectsMissingComponentItem(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	profile := &domainInventory.PackagingProfile{
+		Name:     "Invalid Missing Component",
+		PackMode: "JAR_200G",
+		IsActive: true,
+		Components: []domainInventory.PackagingProfileComponent{
+			{
+				PackingMaterialItemID: 999999,
+				QtyPerUnit:            1,
+			},
+		},
+	}
+	if err := repo.CreatePackagingProfile(profile); err == nil {
+		t.Fatalf("expected error for missing PACKING_MATERIAL component id")
+	}
+
+	var count int
+	if err := manager.GetDB().QueryRow("SELECT COUNT(1) FROM packaging_profiles").Scan(&count); err != nil {
+		t.Fatalf("failed to query packaging_profiles count: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected transactional rollback with zero profiles, got %d", count)
+	}
+}
+
+func TestSqliteInventoryRepository_CreateAndListPackagingProfiles(t *testing.T) {
+	repo, _ := setupInventoryRepo(t)
+
+	jarBody := &domainInventory.Item{
+		SKU:         "SKU-PACK-1",
+		Name:        "Jar Body",
+		ItemType:    domainInventory.ItemTypePackingMaterial,
+		BaseUnit:    "pcs",
+		ItemSubtype: "JAR_BODY",
+		IsActive:    true,
+	}
+	jarLid := &domainInventory.Item{
+		SKU:         "SKU-PACK-2",
+		Name:        "Jar Lid",
+		ItemType:    domainInventory.ItemTypePackingMaterial,
+		BaseUnit:    "pcs",
+		ItemSubtype: "JAR_LID",
+		IsActive:    true,
+	}
+	if err := repo.CreateItem(jarBody); err != nil {
+		t.Fatalf("CreateItem jarBody failed: %v", err)
+	}
+	if err := repo.CreateItem(jarLid); err != nil {
+		t.Fatalf("CreateItem jarLid failed: %v", err)
+	}
+
+	profile := &domainInventory.PackagingProfile{
+		Name:     "Jar Pack 200g",
+		PackMode: "JAR_200G",
+		IsActive: true,
+		Components: []domainInventory.PackagingProfileComponent{
+			{PackingMaterialItemID: jarBody.ID, QtyPerUnit: 1},
+			{PackingMaterialItemID: jarLid.ID, QtyPerUnit: 1},
+		},
+	}
+	if err := repo.CreatePackagingProfile(profile); err != nil {
+		t.Fatalf("CreatePackagingProfile failed: %v", err)
+	}
+
+	profiles, err := repo.ListPackagingProfiles(domainInventory.PackagingProfileListFilter{
+		ActiveOnly: true,
+		Search:     "Jar Pack",
+	})
+	if err != nil {
+		t.Fatalf("ListPackagingProfiles failed: %v", err)
+	}
+	if len(profiles) != 1 {
+		t.Fatalf("expected 1 profile, got %d", len(profiles))
+	}
+	if len(profiles[0].Components) != 2 {
+		t.Fatalf("expected 2 components, got %d", len(profiles[0].Components))
+	}
+}
+
+func TestSqliteInventoryRepository_CreatePackagingProfile_RespectsInactiveFlag(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	jarBody := &domainInventory.Item{
+		SKU:         "SKU-PACK-INACTIVE-1",
+		Name:        "Jar Body",
+		ItemType:    domainInventory.ItemTypePackingMaterial,
+		BaseUnit:    "pcs",
+		ItemSubtype: "JAR_BODY",
+		IsActive:    true,
+	}
+	if err := repo.CreateItem(jarBody); err != nil {
+		t.Fatalf("CreateItem jarBody failed: %v", err)
+	}
+
+	profile := &domainInventory.PackagingProfile{
+		Name:     "Inactive Jar Pack",
+		PackMode: "JAR_200G",
+		IsActive: false,
+		Components: []domainInventory.PackagingProfileComponent{
+			{PackingMaterialItemID: jarBody.ID, QtyPerUnit: 1},
+		},
+	}
+	if err := repo.CreatePackagingProfile(profile); err != nil {
+		t.Fatalf("CreatePackagingProfile failed: %v", err)
+	}
+
+	var active bool
+	if err := manager.GetDB().QueryRow("SELECT is_active FROM packaging_profiles WHERE id = ?", profile.ID).Scan(&active); err != nil {
+		t.Fatalf("failed to query profile active flag: %v", err)
+	}
+	if active {
+		t.Fatalf("expected profile to persist as inactive, got active")
+	}
+}

@@ -1,0 +1,263 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>1</storyId>
+    <title>Item Master Management</title>
+    <status>drafted</status>
+    <generatedAt>2026-02-25</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-1-item-master-management.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Store Keeper</asA>
+    <iWant>to create and manage items with specific types, base units, and packing-material classifications</iWant>
+    <soThat>I can maintain a reliable inventory catalog that downstream procurement, production, and packing workflows can use.</soThat>
+    <tasks>- [ ] Implement Item Master domain and persistence contracts for required fields and supported type enums (AC: 1, 2)
+- [ ] Add create/update/list application service methods for item masters with validation-first flow and explicit error payloads (AC: 1, 2, 5)
+- [ ] Extend item model and storage for optional `item_subtype` used by packing-material classification (AC: 3)
+- [ ] Implement packaging profile domain/persistence model and create/list service paths with component mapping (`packing_material_item_id`, `qty_per_unit`) (AC: 4)
+- [ ] Enforce referential integrity and type constraints for packaging profile components so only active `PACKING_MATERIAL` items are assignable (AC: 4)
+- [ ] Implement list/query endpoints used by downstream workflows to fetch active items and packaging profiles (AC: 5)
+- [ ] Frontend: add/administer Item Master CRUD UI with keyboard-first form flow and inline validation for required fields, enum types, and subtype fields where relevant (AC: 1, 2, 3)
+- [ ] Frontend: add Packaging Profile UI to create and maintain multi-component mappings with per-unit quantities and clear validation feedback (AC: 4)
+- [ ] Tests: add backend unit tests for item type validation, required-field enforcement, subtype rules, and packaging profile component constraints (AC: 1, 2, 3, 4)
+- [ ] Tests: add integration tests for item/profile persistence, FK integrity, and list/query discoverability behavior (AC: 4, 5)
+- [ ] Tests: add frontend component tests for Item Master and Packaging Profile forms, including validation error states and successful submit flows (AC: 1, 2, 3, 4)</tasks>
+  </story>
+
+  <acceptanceCriteria>1. The system allows creation of item master records with required fields (`name`, `item_type`, `base_unit`) and persists them successfully.
+2. Item type assignment is restricted to supported categories (`RAW`, `BULK_POWDER`, `PACKING_MATERIAL`, `FINISHED_GOOD`) and rejects unsupported values.
+3. Packing-material item masters support subtype tags for operational grouping (for example `JAR_BODY`, `JAR_LID`, `CUP_STICKER`) without changing item-level stock ownership.
+4. Packaging consumption profiles can map one pack mode to multiple packing-material components and per-unit quantities for atomic deduction in packing workflows.
+5. Master data created in this story is discoverable by downstream modules through list/query interfaces.</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Acceptance Criteria (Authoritative)</section>
+        <snippet>The authoritative criteria include required item fields, strict item type enums, and downstream discoverability via list/query interfaces. It also defines packing-material subtype support and composite packaging consumption profiles for atomic deduction.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Services and Modules</section>
+        <snippet>The service model defines ItemMasterService for create/update/archive with type and base-unit constraints, plus PackagingProfileService for one-pack-mode-to-many-components mappings. A shared MasterValidationPolicy is required for mandatory fields, referential integrity, and normalized error payloads.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Data Models and Contracts</section>
+        <snippet>The `items` model requires enum-constrained `item_type`, required `base_unit`, and nullable `item_subtype` primarily for PACKING_MATERIAL classifications. Packaging profile components are defined as normalized per-unit mappings tied to packing-material item references.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>APIs and Interfaces</section>
+        <snippet>The API contract includes `CreateItem`, `UpdateItem`, and `ListItems` for master data lifecycle and discoverability. It also includes `CreatePackagingProfile` and `ListPackagingProfiles` with explicit error cases for invalid component type, duplicate lines, and missing components.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>FR-009A: Composite Packing Consumption Profiles</section>
+        <snippet>The PRD requires selection of one profile that maps to multiple packing-material components per finished unit. On packing confirmation, all mapped components must be deducted atomically, and shortages must block the transaction with a clear message.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Data Integrity &amp; Security - Role-Based Access Control (RBAC)</section>
+        <snippet>RBAC differentiates Admin/Owner full access from Data Entry Operator operational scope. This constrains Item Master and profile CRUD exposure and list/query access patterns for this story.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Story 2.1: Item Master Management</section>
+        <snippet>Story 2.1 defines store-keeper ownership, item type/unit management, and acceptance behavior for creating raw material records. It also requires subtype assignment for packing materials and reusable packaging profile definitions with per-unit component quantities.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>Project Structure</section>
+        <snippet>The backend is organized by `internal/domain`, `internal/app`, and `internal/infrastructure`, with frontend React components under `frontend/src/components`. This story must preserve that layering and keep business rules in backend domain/application layers.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>Epic to Architecture Mapping; Database Pattern: Repository &amp; embedded Migrations</section>
+        <snippet>Epic 2 maps master-data capabilities to domain models and app command/query services. The repository and embedded migration pattern is mandatory for schema evolution and persistence integrity.</snippet>
+      </doc>
+      <doc>
+        <path>docs/ux-design-specification.md</path>
+        <title>UX Design Specification</title>
+        <section>Design System Foundation; Core Experience Principles</section>
+        <snippet>The UX spec emphasizes keyboard-first, tab-driven form workflows and built-in inline validation for data-heavy operations. It also defines role-distinct interaction modes for Admin and Data Entry operators, which aligns with story requirements for operational CRUD screens.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>internal/domain/inventory/entities.go</path>
+        <kind>domain model</kind>
+        <symbol>type Item struct</symbol>
+        <lines>5-15</lines>
+        <reason>Current item aggregate shape (`SKU`, `Category`, `Unit`, `IsActive`) is the baseline that should evolve to support Epic 2 fields (`item_type`, `base_unit`, optional subtype) without bypassing domain layer modeling.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/domain/inventory/repository.go</path>
+        <kind>repository interface</kind>
+        <symbol>type Repository interface</symbol>
+        <lines>3-11</lines>
+        <reason>Defines backend persistence seam used by app services; Item Master and Packaging Profile persistence should extend this contract pattern for testability and adapter isolation.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/app/inventory/service.go</path>
+        <kind>application service</kind>
+        <symbol>func (s *Service) CreateItem / UpdateItem</symbol>
+        <lines>21-42</lines>
+        <reason>Implements validation gateway behavior via write-access enforcement and maps concurrency conflicts to user-safe errors; new master-data commands should preserve this application-layer mediation pattern.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/infrastructure/db/sqlite_inventory_repository.go</path>
+        <kind>repository adapter</kind>
+        <symbol>func (r *SqliteInventoryRepository) CreateItem / UpdateItem</symbol>
+        <lines>20-67</lines>
+        <reason>Provides concrete SQL persistence with optimistic locking (`updated_at` guard) and timestamp normalization, a reusable approach for item/profile update flows in this story.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/infrastructure/db/migrations/000001_initial_schema.up.sql</path>
+        <kind>database migration</kind>
+        <symbol>CREATE TABLE items</symbol>
+        <lines>21-32</lines>
+        <reason>Current `items` schema is authoritative starting point and must be evolved through new migrations for enum-constrained types, base-unit semantics, and subtype support.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/app/auth/middleware.go</path>
+        <kind>authorization policy</kind>
+        <symbol>func (s *Service) CheckPermission</symbol>
+        <lines>17-44</lines>
+        <reason>Role hierarchy (Admin > DataEntryOperator) already exists and should be reused when exposing Item Master and Packaging Profile create/update/list methods.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/components/forms/GRNForm.tsx</path>
+        <kind>frontend form pattern</kind>
+        <symbol>GRNForm component (Antd Form rules + submit/reset)</symbol>
+        <lines>59-93</lines>
+        <reason>Demonstrates keyboard-first Ant Design form workflow with inline validation and write-disable behavior, matching UX constraints for new Item Master and Packaging Profile forms.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/infrastructure/db/sqlite_inventory_repository_test.go</path>
+        <kind>integration test</kind>
+        <symbol>TestSqliteInventoryRepository_UpdateItem_ConcurrencyConflict</symbol>
+        <lines>38-68</lines>
+        <reason>Validates optimistic-concurrency behavior against SQLite; this test style should be mirrored for new item/profile persistence and referential-integrity scenarios.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/app/inventory/service_test.go</path>
+        <kind>application service test</kind>
+        <symbol>TestService_UpdateItem_MapsConcurrencyError</symbol>
+        <lines>29-37</lines>
+        <reason>Confirms app-layer translation of domain concurrency errors and should be extended for enum validation and packaging profile component constraints.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <go>
+        <package name="go" version="1.26" />
+        <package name="github.com/wailsapp/wails/v2" version="v2.11.0" />
+        <package name="github.com/mattn/go-sqlite3" version="v1.14.34" />
+        <package name="github.com/golang-migrate/migrate/v4" version="v4.18.2" />
+        <package name="github.com/golang-jwt/jwt/v5" version="v5.3.1" />
+        <package name="github.com/google/uuid" version="v1.6.0" />
+      </go>
+      <node path="frontend/package.json">
+        <package name="react" version="^19.0.0" />
+        <package name="react-dom" version="^19.0.0" />
+        <package name="antd" version="^6.2.1" />
+        <package name="@ant-design/icons" version="^5.6.1" />
+        <package name="@tanstack/react-query" version="^5.66.0" />
+        <package name="react-router-dom" version="^6.30.3" />
+        <package name="axios" version="^1.7.9" />
+        <package name="vitest" version="^4.0.18" />
+        <package name="@testing-library/react" version="^16.3.0" />
+      </node>
+      <frameworks>
+        <framework name="Wails" location="wails.json" />
+        <framework name="React + Vite + TypeScript" location="frontend/package.json" />
+        <framework name="Ant Design" location="frontend/package.json" />
+        <framework name="SQLite (Go adapter)" location="go.mod" />
+      </frameworks>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Implementation must remain aligned to project layering: domain entities and policies in `internal/domain`, use-case orchestration in `internal/app`, and SQLite/adapters in `internal/infrastructure`.</constraint>
+    <constraint>Backend validation is authoritative: required fields and allowed item-type categories must be enforced server-side; frontend validation mirrors UX feedback but cannot replace backend checks.</constraint>
+    <constraint>Schema evolution must use embedded migrations; do not mutate existing tables outside migration files.</constraint>
+    <constraint>Packaging profile components must reference only active packing-material items and persist per-unit normalized quantities for atomic deduction readiness.</constraint>
+    <constraint>Role boundaries must follow existing RBAC hierarchy (Admin full CRUD, Data Entry constrained operational access) when exposing new master-data operations.</constraint>
+    <constraint>Master data must be discoverable through list/query service paths for downstream modules; avoid direct UI-to-repository shortcuts that bypass app services.</constraint>
+    <constraint>Update paths should preserve optimistic concurrency semantics (stale-write detection via `updated_at` guards and consistent user-safe conflict errors).</constraint>
+    <constraint>Windows story validation script contract is mandatory for this story (`scripts/s2-1-win-test.ps1`) before review handoff.</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>inventory.Repository</name>
+      <kind>Go interface</kind>
+      <signature>CreateItem(item *Item) error; UpdateItem(item *Item) error</signature>
+      <path>internal/domain/inventory/repository.go</path>
+    </interface>
+    <interface>
+      <name>inventory.Service</name>
+      <kind>application service methods</kind>
+      <signature>CreateItem(item *domainInventory.Item) error; UpdateItem(item *domainInventory.Item) error</signature>
+      <path>internal/app/inventory/service.go</path>
+    </interface>
+    <interface>
+      <name>SqliteInventoryRepository</name>
+      <kind>repository adapter methods</kind>
+      <signature>CreateItem(item *domainInventory.Item) error; UpdateItem(item *domainInventory.Item) error</signature>
+      <path>internal/infrastructure/db/sqlite_inventory_repository.go</path>
+    </interface>
+    <interface>
+      <name>Auth CheckPermission</name>
+      <kind>authorization gate</kind>
+      <signature>CheckPermission(tokenString string, requiredRole domainAuth.Role) error</signature>
+      <path>internal/app/auth/middleware.go</path>
+    </interface>
+    <interface>
+      <name>Item Service API (target from spec)</name>
+      <kind>planned service contract</kind>
+      <signature>CreateItem(input); UpdateItem(id, patch); ListItems(filter)</signature>
+      <path>docs/tech-spec-epic-2.md</path>
+    </interface>
+    <interface>
+      <name>PackagingProfile Service API (target from spec)</name>
+      <kind>planned service contract</kind>
+      <signature>CreatePackagingProfile(input); ListPackagingProfiles(filter)</signature>
+      <path>docs/tech-spec-epic-2.md</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Use layered coverage aligned to Epic 2 test strategy: domain/app unit tests for required fields, item-type enum constraints, subtype rules, and profile-component validity; repository/integration tests for SQLite migrations, FK/integrity enforcement, and optimistic-concurrency updates; frontend component tests for keyboard-first form behavior and inline validation; and Windows runtime validation via `scripts/s2-1-win-test.ps1` before review.</standards>
+    <locations>
+      <location>internal/app/inventory/service_test.go</location>
+      <location>internal/infrastructure/db/sqlite_inventory_repository_test.go</location>
+      <location>internal/infrastructure/db/migrations_test.go</location>
+      <location>internal/domain/inventory/ (new unit tests for item/profile validation policy)</location>
+      <location>frontend/src/components/forms/ (new Item Master and Packaging Profile form tests)</location>
+      <location>frontend/src/test/setup.ts</location>
+      <location>scripts/s2-1-win-test.ps1</location>
+      <location>docs/manual_testing/ (story validation evidence report output)</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Create item with valid required fields (`name`, `item_type`, `base_unit`) and assert persistence plus response payload fields.</idea>
+      <idea ac="2">Attempt create/update with unsupported item type and assert normalized validation error (no DB write).</idea>
+      <idea ac="3">Create `PACKING_MATERIAL` items with subtype tags (`JAR_BODY`, `JAR_LID`, `CUP_STICKER`) and assert list/query returns subtype metadata unchanged.</idea>
+      <idea ac="4">Create packaging profile mapping one pack mode to multiple components with per-unit quantities; verify all components persist and validate atomic insufficiency blocking behavior contract.</idea>
+      <idea ac="4">Negative path: include inactive or non-`PACKING_MATERIAL` item in packaging profile component list and assert rejection with clear error payload.</idea>
+      <idea ac="5">List/query test: downstream-style fetch returns active items and packaging profiles with expected filters/search semantics.</idea>
+      <idea ac="1,2,3,4">Frontend form test: keyboard tab/enter flow and inline validation for required fields, enum selection, subtype visibility, and component quantity constraints.</idea>
+      <idea ac="1,4,5">Windows script scenario: build target app, execute story-critical create/list/profile flows, and emit PASS/FAIL with non-zero exit on failure.</idea>
+    </ideas>
+  </tests>
+</story-context>
