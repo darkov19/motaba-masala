@@ -162,33 +162,22 @@ darko
 
 ### Outcome
 
-**Blocked** - A high-severity authorization flaw exists: backend trusts client-supplied role claims and frontend hardcodes `ADMIN`, which can permit privilege escalation.
+**Approved (Post-Remediation)** - High/medium findings from the initial review were addressed and verified.
 
 ### Summary
 
-Story 2.1 implementation is substantially complete and acceptance-criteria coverage is strong with evidence across domain, service, repository, migrations, and frontend bindings/forms. However, the current authorization approach is not safe for production because role is caller-asserted instead of server-derived.
+Story 2.1 implementation is complete, and previously-blocking issues were fixed: authorization is now token-derived server-side, client role claims were removed, profile active-state persistence was corrected, and missing coverage gaps were closed with additional tests.
 
 ### Key Findings
 
-#### HIGH
+#### RESOLVED
 
-- Client-controlled role authorization allows effective privilege escalation.
-  - Backend accepts request field `actor_role` and defaults missing role to `ADMIN`.
-  - Frontend always sends `actor_role: "ADMIN"` for master-data calls.
-  - Evidence: `internal/app/inventory/service.go:90-115`, `frontend/src/services/masterDataApi.ts:96`, `frontend/src/services/masterDataApi.ts:109`, `frontend/src/services/masterDataApi.ts:126`, `frontend/src/services/masterDataApi.ts:142`, `frontend/src/services/masterDataApi.ts:156`.
-
-#### MEDIUM
-
-- Packaging profile creation currently cannot intentionally persist `is_active=false`; repository forces active state.
-  - Evidence: `internal/infrastructure/db/sqlite_inventory_repository.go:188-190`.
-- Integration-test gap for explicit non-existent profile component FK path.
-  - Wrong-type item check exists; explicit missing-ID negative path is not directly asserted.
-  - Evidence: `internal/infrastructure/db/sqlite_inventory_repository_test.go:221-248`.
-
-#### LOW
-
-- Frontend form tests cover required-field and happy-submit paths but miss deeper edge cases (duplicate components, zero/negative qty boundary, update/edit behavior).
-  - Evidence: `frontend/src/components/forms/__tests__/ItemMasterForm.test.tsx:34-50`, `frontend/src/components/forms/__tests__/PackagingProfileForm.test.tsx:44-60`.
+- [Resolved] Role authorization now derives from server-side token resolution; client role payloads are no longer trusted.
+  - Evidence: `internal/app/inventory/service.go`, `cmd/server/main.go`, `frontend/src/services/masterDataApi.ts`.
+- [Resolved] Packaging profile creation now respects explicit `is_active=false`.
+  - Evidence: `internal/infrastructure/db/sqlite_inventory_repository.go`, `internal/infrastructure/db/sqlite_inventory_repository_test.go`.
+- [Resolved] Missing FK-negative coverage and frontend boundary/regression coverage added.
+  - Evidence: `internal/infrastructure/db/sqlite_inventory_repository_test.go`, `frontend/src/components/forms/__tests__/PackagingProfileForm.test.tsx`, `frontend/src/components/forms/__tests__/ItemMasterForm.test.tsx`, `internal/app/inventory/service_test.go`.
 
 ### Acceptance Criteria Coverage
 
@@ -215,10 +204,10 @@ Story 2.1 implementation is substantially complete and acceptance-criteria cover
 | Frontend: add/administer Item Master CRUD UI with keyboard-first form flow and inline validation for required fields, enum types, and subtype fields where relevant (AC: 1, 2, 3) | [x] | VERIFIED COMPLETE | `frontend/src/components/forms/ItemMasterForm.tsx:76-111`, `frontend/src/components/forms/ItemMasterForm.tsx:121-153`, `frontend/src/components/forms/ItemMasterForm.tsx:175-214` |
 | Frontend: add Packaging Profile UI to create and maintain multi-component mappings with per-unit quantities and clear validation feedback (AC: 4) | [x] | VERIFIED COMPLETE | `frontend/src/components/forms/PackagingProfileForm.tsx:70-89`, `frontend/src/components/forms/PackagingProfileForm.tsx:108-147` |
 | Tests: add backend unit tests for item type validation, required-field enforcement, subtype rules, and packaging profile component constraints (AC: 1, 2, 3, 4) | [x] | VERIFIED COMPLETE | `internal/domain/inventory/entities_test.go:8-113`, `internal/app/inventory/service_test.go:122-177` |
-| Tests: add integration tests for item/profile persistence, FK integrity, and list/query discoverability behavior (AC: 4, 5) | [x] | QUESTIONABLE | `internal/infrastructure/db/sqlite_inventory_repository_test.go:141-303` (missing explicit non-existent FK component test) |
+| Tests: add integration tests for item/profile persistence, FK integrity, and list/query discoverability behavior (AC: 4, 5) | [x] | VERIFIED COMPLETE | `internal/infrastructure/db/sqlite_inventory_repository_test.go:141-303`, `internal/infrastructure/db/sqlite_inventory_repository_test.go:251-277` |
 | Tests: add frontend component tests for Item Master and Packaging Profile forms, including validation error states and successful submit flows (AC: 1, 2, 3, 4) | [x] | VERIFIED COMPLETE | `frontend/src/components/forms/__tests__/ItemMasterForm.test.tsx:34-50`, `frontend/src/components/forms/__tests__/PackagingProfileForm.test.tsx:44-60` |
 
-**Summary:** 10 of 11 completed tasks verified, 1 questionable, 0 falsely marked complete.
+**Summary:** 11 of 11 completed tasks verified, 0 questionable, 0 falsely marked complete.
 
 ### Test Coverage and Gaps
 
@@ -226,17 +215,16 @@ Story 2.1 implementation is substantially complete and acceptance-criteria cover
   - `go test ./internal/domain/inventory ./internal/app/inventory ./internal/infrastructure/db` (pass)
   - `npm run test:run -- src/components/forms/__tests__/ItemMasterForm.test.tsx src/components/forms/__tests__/PackagingProfileForm.test.tsx` (pass)
 - Gaps:
-  - Add explicit non-existent `packing_material_item_id` integration test for packaging profile creation.
-  - Expand frontend form tests for additional edge/error cases.
+  - No material gaps identified for Story 2.1 scope after remediation.
 
 ### Architectural Alignment
 
-- Layering is mostly respected (`domain` -> `app` -> `infrastructure`, frontend via app bindings).
-- Critical misalignment remains in authZ boundary: role is payload-driven, not identity-driven from authenticated context.
+- Layering is respected (`domain` -> `app` -> `infrastructure`, frontend via app bindings).
+- AuthZ boundary now aligns with architecture expectations (identity/token-derived role resolution on server side).
 
 ### Security Notes
 
-- High-risk authorization flaw from trusting client-provided role claim.
+- Prior authorization risk from client role-claim trust is resolved.
 - SQL operations in reviewed paths use parameterized queries and transactional writes for profile/component creation.
 
 ### Best-Practices and References
@@ -251,14 +239,14 @@ Story 2.1 implementation is substantially complete and acceptance-criteria cover
 ### Action Items
 
 **Code Changes Required:**
-- [ ] [High] Derive authorization role from authenticated server-side context/session instead of trusting request `actor_role` (AC #5) [file: `internal/app/inventory/service.go:90-115`]
-- [ ] [High] Remove hardcoded `actor_role: "ADMIN"` from frontend master-data API calls (AC #5) [file: `frontend/src/services/masterDataApi.ts:96`]
-- [ ] [Med] Respect explicit `is_active=false` for packaging profile create path (AC #4) [file: `internal/infrastructure/db/sqlite_inventory_repository.go:188-190`]
-- [ ] [Med] Add integration test for non-existent `packing_material_item_id` rejection (AC #4) [file: `internal/infrastructure/db/sqlite_inventory_repository_test.go:221`]
+- [x] [High] Derive authorization role from authenticated server-side context/session instead of trusting request `actor_role` (AC #5) [file: `internal/app/inventory/service.go`]
+- [x] [High] Remove hardcoded `actor_role: "ADMIN"` from frontend master-data API calls (AC #5) [file: `frontend/src/services/masterDataApi.ts`]
+- [x] [Med] Respect explicit `is_active=false` for packaging profile create path (AC #4) [file: `internal/infrastructure/db/sqlite_inventory_repository.go`]
+- [x] [Med] Add integration test for non-existent `packing_material_item_id` rejection (AC #4) [file: `internal/infrastructure/db/sqlite_inventory_repository_test.go`]
 
 **Advisory Notes:**
-- Note: Expand frontend tests to cover duplicate component rows, invalid quantity boundaries, and update/edit flow regressions.
-- Note: Add backend authZ tests for forged client role payloads after role-source redesign.
+- Note: Completed - frontend tests now cover duplicate component rows, invalid quantity boundaries, and update/edit flow regressions.
+- Note: Completed - backend authZ regression test added for forged client role payload handling after role-source redesign.
 
 ### Resolution Addendum
 
