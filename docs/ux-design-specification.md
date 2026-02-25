@@ -14,7 +14,7 @@ _Generated using BMad Method - Create UX Design Workflow v1.0_
 - **Admin/Owner** — Full system access, valuation reports, business decisions. Needs "Command Center" view.
 - **Data Entry Operator** — Focused execution. Enters GRNs, production batches, and dispatches. Needs "Task Focused" view.
 
-**Platform:** On-premise Windows server, browser-based access over LAN (desktop/laptop only, 4-5 concurrent users)
+**Platform:** On-premise Windows distributed desktop deployment over LAN (`Server.exe` + `Client.exe`, 4-5 concurrent users)
 
 **Core Experience:** Real-time stock levels and valuation — users should always know exactly where things stand at every stage of the production pipeline.
 
@@ -43,7 +43,7 @@ _Generated using BMad Method - Create UX Design Workflow v1.0_
 ### 1.1 Design System Choice
 
 **Selected:** Ant Design (antd)
-**Version:** Latest stable (5.x)
+**Version:** 6.2.1
 **Rationale:** Enterprise-grade component library purpose-built for data-heavy B2B applications
 
 **Why Ant Design:**
@@ -158,7 +158,7 @@ _No novel UX patterns required. Standard CRUD, dashboard, and form patterns appl
 
 **Strategy: Functional Hybrid**
 
-We will implement **two distinct landing experiences** based on user role.
+We will implement **one cohesive application shell** with **role-based variants** for entry experience and navigation behavior.
 
 **1. Admin View (Modern Command Center)**
 
@@ -184,6 +184,7 @@ We will implement **two distinct landing experiences** based on user role.
 
 - **Distinct Mental Models:** Admin needs a strategic overview (clean, calm); Data Entry needs a tactical tool (fast, robust).
 - **Scalability:** Both views use the same Ant Design components, just styled differently via tokens.
+- **Contract Consistency:** Both role variants are built on shared route IDs and module ownership defined in `docs/navigation-rbac-contract.md` (Story 2.2A), with shell behavior delivered in Story 2.2B.
 
 **Interactive Mockups:**
 
@@ -264,7 +265,7 @@ These components provide visual feedback and recovery options for system stabili
 
 ### 6.1 Component Strategy
 
-**Core Library:** Ant Design 5.x
+**Core Library:** Ant Design 6.2.1
 **Icons:** Ant Design Icons
 **Typography:** **Inter** (Google Fonts) for UI, **JetBrains Mono** for code/ID fields.
 
@@ -292,6 +293,7 @@ These components provide visual feedback and recovery options for system stabili
 
 - **Admin:** Collapsible Sidebar (Left) with full menu tree.
 - **Data Entry:** Simplified Sidebar (Icons only or limited menu) to reduce cognitive load.
+- **Shared Contract:** Both variants use the same underlying route IDs and RBAC checks; the difference is presentation density, not route ownership.
 
 **Data Display:**
 
@@ -349,7 +351,7 @@ This UX Design Specification defines a **high-efficiency, factory-first inventor
 2.  **Role-Based Interaction:** Distinct landing experiences for Admin (Modern Dashboard) vs. Data Entry (Speed Hub).
 3.  **Real-Time Value:** Focus on ₹ Value Pipeline (Raw → FG) distinguishes this from simple stock counting tools.
 4.  **Speed First:** Keyboard-driven forms, scanner-ready inputs, and compact tables prioritize operator efficiency.
-5.  **Scalable Foundation:** Built on Ant Design 5.x, ensuring robust components for future growth without design debt.
+5.  **Scalable Foundation:** Built on Ant Design 6.2.1, ensuring robust components for future growth without design debt.
 
 **Next Steps:**
 

@@ -18,11 +18,11 @@ Instant real-time visibility of **Stock Value** at every stage (Raw -> Bulk -> F
 
 ## Project Classification
 
-**Technical Type:** On-Premise B2B Web Application
+**Technical Type:** On-Premise B2B Distributed Desktop Application (Wails)
 **Domain:** Manufacturing & Supply Chain
 **Complexity:** Medium (Business Logic intensive)
 
-**Deployment:** On-Premise Windows Server with browser-based LAN clients
+**Deployment:** On-Premise Windows LAN using `Server.exe` + `Client.exe` desktop binaries
 **Users:** Factory Managers, Store Keepers, Admin/Owner (4-5 concurrent users)
 
 ### Domain Context
@@ -79,7 +79,7 @@ The system operates in a **Food Manufacturing** context, specifically Spices.
 
 - **Advanced Demand Forecasting:** AI-based prediction of raw material needs.
 - **Supplier Portal:** Allow suppliers to view requirements and submit quotes.
-- **Mobile App:** Dedicated native mobile app for floor staff (MVP is Mobile-Responsive Web on LAN).
+- **Mobile App:** Dedicated native mobile app for floor staff (MVP remains Windows desktop clients over LAN).
 
 ### Vision (Future)
 

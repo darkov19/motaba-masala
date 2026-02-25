@@ -78,6 +78,12 @@ masala_inventory_managment/
 
 ## Implementation Patterns
 
+### 0. Cohesive App Contract
+
+- **Route Ownership:** Route IDs and module ownership are defined by `docs/navigation-rbac-contract.md` (Story 2.2A) and are shared across roles.
+- **Role Shell Strategy:** The frontend uses one shared shell architecture with role-based variants (Admin vs Data Entry) from Story 2.2B; differences are in layout density and defaults, not route identity.
+- **Authorization Authority:** Backend services remain the source of truth for authorization decisions (RBAC). Frontend guards improve UX but never replace server-side enforcement.
+
 ### 1. IPC Pattern: Wails Bindings (Service Method)
 
 We utilize **Two Modes of Binding** depending on the executable:

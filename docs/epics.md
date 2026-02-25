@@ -25,6 +25,8 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 
 **Goal:** Create the "Digital Twin" configuration layer (Items, Recipes, Packaging Profiles, Suppliers).
 
+- **Contract-First Sequencing:** Story execution and references in this epic follow `2.2A -> 2.2B -> 2.2C -> 2.2` before proceeding with later feature stories.
+
 - **Scope:** CRUD for all masters, Unit Conversion logic (KG <-> Grams), Recipe BOM definition, and reusable Packaging Profile setup for composite packing-material consumption.
 
 ### 3. Procurement & Inventory (Inbound)
@@ -272,6 +274,7 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 
 **Technical Notes:** Store everything in Base Unit internally. UI handles display conversion.
 Must align route/module naming and role constraints with `docs/navigation-rbac-contract.md` (Story 2.2A baseline).
+This story is intentionally sequenced after Story 2.2C documentation alignment to ensure planning/design/architecture references are coherent before implementation.
 
 ### Story 2.3: Recipe (BOM) Management
 
