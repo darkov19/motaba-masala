@@ -84,8 +84,21 @@ function Start-StoryApp {
         $WorkingDirectory
     }
 
+    $safeArguments = @()
+    foreach ($arg in @($Arguments)) {
+        if ($null -eq $arg) { continue }
+        $text = [string]$arg
+        if ([string]::IsNullOrWhiteSpace($text)) { continue }
+        $safeArguments += $text
+    }
+
     Write-StoryStep "Starting app: $ExecutablePath"
-    $process = Start-Process -FilePath $ExecutablePath -ArgumentList $Arguments -WorkingDirectory $resolvedWorkingDirectory -PassThru
+    if ($safeArguments.Count -gt 0) {
+        $process = Start-Process -FilePath $ExecutablePath -ArgumentList $safeArguments -WorkingDirectory $resolvedWorkingDirectory -PassThru
+    }
+    else {
+        $process = Start-Process -FilePath $ExecutablePath -WorkingDirectory $resolvedWorkingDirectory -PassThru
+    }
     Start-Sleep -Seconds 3
     return $process
 }
