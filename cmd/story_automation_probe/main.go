@@ -14,6 +14,8 @@ import (
 	"masala_inventory_managment/internal/infrastructure/db"
 )
 
+const probeAdminToken = "probe-admin-token"
+
 func main() {
 	scenario := flag.String("scenario", "optimistic-lock", "scenario to run")
 	flag.Parse()
@@ -113,7 +115,10 @@ func runItemMasterPackagingScenario() error {
 	}
 
 	repo := db.NewSqliteInventoryRepository(manager.GetDB())
-	svc := appInventory.NewService(repo, func(_ string) (domainAuth.Role, error) {
+	svc := appInventory.NewService(repo, func(token string) (domainAuth.Role, error) {
+		if token != probeAdminToken {
+			return "", fmt.Errorf("invalid probe token")
+		}
 		return domainAuth.RoleAdmin, nil
 	})
 
@@ -124,7 +129,7 @@ func runItemMasterPackagingScenario() error {
 		BaseUnit:    "pcs",
 		ItemSubtype: "JAR_BODY",
 		IsActive:    true,
-		AuthToken:   "probe-admin-token",
+		AuthToken:   probeAdminToken,
 	})
 	if err != nil {
 		return fmt.Errorf("create jar body: %w", err)
@@ -136,7 +141,7 @@ func runItemMasterPackagingScenario() error {
 		BaseUnit:    "pcs",
 		ItemSubtype: "JAR_LID",
 		IsActive:    true,
-		AuthToken:   "probe-admin-token",
+		AuthToken:   probeAdminToken,
 	})
 	if err != nil {
 		return fmt.Errorf("create jar lid: %w", err)
@@ -145,11 +150,12 @@ func runItemMasterPackagingScenario() error {
 	_, err = svc.CreatePackagingProfile(appInventory.CreatePackagingProfileInput{
 		Name:     "Jar Pack 200g",
 		PackMode: "JAR_200G",
+		IsActive: true,
 		Components: []appInventory.PackagingProfileComponentInput{
 			{PackingMaterialItemID: jarBody.ID, QtyPerUnit: 1},
 			{PackingMaterialItemID: jarLid.ID, QtyPerUnit: 1},
 		},
-		AuthToken: "probe-admin-token",
+		AuthToken: probeAdminToken,
 	})
 	if err != nil {
 		return fmt.Errorf("create packaging profile: %w", err)
@@ -158,7 +164,7 @@ func runItemMasterPackagingScenario() error {
 	items, err := svc.ListItems(appInventory.ListItemsInput{
 		ActiveOnly: true,
 		ItemType:   "PACKING_MATERIAL",
-		AuthToken:  "probe-admin-token",
+		AuthToken:  probeAdminToken,
 	})
 	if err != nil {
 		return fmt.Errorf("list items: %w", err)
@@ -168,7 +174,7 @@ func runItemMasterPackagingScenario() error {
 	}
 	profiles, err := svc.ListPackagingProfiles(appInventory.ListPackagingProfilesInput{
 		ActiveOnly: true,
-		AuthToken:  "probe-admin-token",
+		AuthToken:  probeAdminToken,
 	})
 	if err != nil {
 		return fmt.Errorf("list profiles: %w", err)

@@ -35,6 +35,22 @@ function Invoke-StoryBuild {
         New-Item -ItemType Directory -Force -Path (Join-Path $RepoRoot "build\bin") | Out-Null
         $env:CGO_ENABLED = "1"
 
+        Write-StoryStep "Building frontend assets"
+        Push-Location (Join-Path $RepoRoot "frontend")
+        try {
+            if (-not (Test-Path (Join-Path (Get-Location) "node_modules"))) {
+                Write-StoryStep "Installing frontend dependencies"
+                & npm install
+                if ($LASTEXITCODE -ne 0) { throw "npm install failed with exit code $LASTEXITCODE" }
+            }
+
+            & npm run build
+            if ($LASTEXITCODE -ne 0) { throw "Frontend build failed with exit code $LASTEXITCODE" }
+        }
+        finally {
+            Pop-Location
+        }
+
         if ($Target -eq "server" -or $Target -eq "both") {
             Write-StoryStep "Building server binary"
             & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -ldflags "-H=windowsgui" -o (Get-StoryBuildPath -RepoRoot $RepoRoot -Target "server") .\cmd\server
