@@ -2,7 +2,8 @@ param(
     [string]$Remote = "origin",
     [string]$Branch = "main",
     [switch]$SkipClean,
-    [switch]$Force
+    [switch]$SkipBuildClean,
+    [switch]$Force = $true
 )
 
 Set-StrictMode -Version Latest
@@ -41,6 +42,12 @@ try {
         Write-Step "Remove untracked files/directories (git clean -fd)"
         & git clean -fd
         Assert-CommandSucceeded "git clean -fd"
+    }
+
+    if (-not $SkipBuildClean) {
+        Write-Step "Remove ignored build artifacts for fresh rebuilds"
+        & git clean -fdX -- build frontend/dist frontend/wailsjs bin .cache
+        Assert-CommandSucceeded "git clean -fdX (build artifacts)"
     }
 
     Write-Step "Final status"

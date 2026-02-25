@@ -118,6 +118,7 @@ func runItemMasterPackagingScenario() error {
 	})
 
 	jarBody, err := svc.CreateItemMaster(appInventory.CreateItemInput{
+		SKU:         "PROBE-PACK-1",
 		Name:        "Jar Body",
 		ItemType:    "PACKING_MATERIAL",
 		BaseUnit:    "pcs",
@@ -129,6 +130,7 @@ func runItemMasterPackagingScenario() error {
 		return fmt.Errorf("create jar body: %w", err)
 	}
 	jarLid, err := svc.CreateItemMaster(appInventory.CreateItemInput{
+		SKU:         "PROBE-PACK-2",
 		Name:        "Jar Lid",
 		ItemType:    "PACKING_MATERIAL",
 		BaseUnit:    "pcs",
