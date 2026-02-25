@@ -271,6 +271,7 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 - **And** verifies precision to avoid rounding errors
 
 **Technical Notes:** Store everything in Base Unit internally. UI handles display conversion.
+Must align route/module naming and role constraints with `docs/navigation-rbac-contract.md` (Story 2.2A baseline).
 
 ### Story 2.3: Recipe (BOM) Management
 
@@ -286,6 +287,7 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 - **And** define a standard "Expected Wastage %" for yield benchmarking
 
 **Technical Notes:** Recipe Header (Output Item) -> Recipe Details (Input Items + Qty).
+Navigation access and role capability assumptions must remain consistent with `docs/navigation-rbac-contract.md`.
 
 ### Story 2.4: Supplier & Customer Masters
 
@@ -301,6 +303,7 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 - **And** similarly for Customers/Channels (e.g., "Main Distributor", "Flipkart")
 
 **Technical Notes:** Standard CRUD.
+Role and module access assumptions must remain consistent with `docs/navigation-rbac-contract.md`.
 
 ---
 

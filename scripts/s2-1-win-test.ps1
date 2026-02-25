@@ -58,9 +58,26 @@ try {
         $env:MASALA_TEST_DISABLE_WATCHDOG_RELAUNCH = "1"
 
         $appProcess = Start-StoryApp -ExecutablePath $exePath
-        Assert-StoryCondition -Condition (-not $appProcess.HasExited) -FailureMessage "Server UI process exited too early."
+        $existing = Get-Process -Name "masala_inventory_server" -ErrorAction SilentlyContinue |
+            Where-Object { $_.Id -ne $appProcess.Id }
+        if ($null -ne $existing) {
+            $existing | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 1
+            if ($appProcess.HasExited) {
+                $appProcess = Start-StoryApp -ExecutablePath $exePath
+            }
+            $notes.Add("Stopped pre-existing server instance before UI smoke.")
+        }
+
+        if ($appProcess.HasExited) {
+            $exitCode = $appProcess.ExitCode
+            throw "Server UI process exited too early (exit code: $exitCode)."
+        }
         Start-Sleep -Seconds 5
-        Assert-StoryCondition -Condition (-not $appProcess.HasExited) -FailureMessage "Server UI process became unstable during smoke window."
+        if ($appProcess.HasExited) {
+            $exitCode = $appProcess.ExitCode
+            throw "Server UI process became unstable during smoke window (exit code: $exitCode)."
+        }
         $notes.Add("UI smoke passed (server app launched and stayed alive for 5s).")
     }
 

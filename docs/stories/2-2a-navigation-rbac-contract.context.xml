@@ -1,0 +1,164 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2A</storyId>
+    <title>Navigation and RBAC Contract</title>
+    <status>drafted</status>
+    <generatedAt>2026-02-25</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-2a-navigation-rbac-contract.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Product and Engineering team</asA>
+    <iWant>a single, approved navigation contract and role-permission matrix for the shared app</iWant>
+    <soThat>all upcoming stories build on one cohesive structure across Server.exe and Client.exe</soThat>
+    <tasks>- [ ] Define and document canonical route map with stable IDs and paths (AC: 1, 2)
+- [ ] Define module naming contract and route ownership table (AC: 2)
+- [ ] Create Role x Module x Action permission matrix for Admin and Data Entry Operator (AC: 3)
+- [ ] Mark each permission as `UI-visible`, `UI-hidden`, and `backend-allowed`/`backend-denied` (AC: 4)
+- [ ] Add references from this contract to upcoming story files (2.2B and onward) (AC: 5)
+- [ ] Obtain explicit stakeholder sign-off before implementation starts (AC: 1-5)</tasks>
+  </story>
+
+  <acceptanceCriteria>1. A canonical route map is defined and approved as the single source of truth for module navigation, including stable route IDs and paths.
+2. Module naming is standardized and mapped to route IDs for: Dashboard, Masters, Procurement, Production, Packing, Sales, Reports, and System.
+3. A Role x Module x Action matrix is defined for Admin and Data Entry Operator across minimum actions (`view`, `create`, `edit`, `delete`, `approve`, `view_valuation`, `manage_system`).
+4. The RBAC matrix explicitly distinguishes frontend visibility guidance from backend enforcement rules and identifies server-side authority as canonical.
+5. Contract artifacts are stored in repository documentation and referenced by subsequent implementation stories.</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>On-Premise Deployment &amp; Infrastructure; Authentication &amp; Authorization</section>
+        <snippet>The product is a distributed deployment model with server and client nodes on LAN, and user-based RBAC tied to accounts. This is the source for role boundaries and system-level permission intent.</snippet>
+      </doc>
+      <doc>
+        <path>docs/ux-design-specification.md</path>
+        <title>UX Design Specification</title>
+        <section>4.1 Chosen Design Approach; 7.1 Consistency Rules</section>
+        <snippet>The UX direction defines two role experiences (Admin and Data Entry) and role-specific navigation variants, which must map to one coherent route contract.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>IPC Pattern: Wails Bindings; Project Structure</section>
+        <snippet>Server and client executables use the same frontend behavior pattern with mode-specific backend bindings, reinforcing the need for shared route IDs and unified app structure.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Proposed Epics Structure</section>
+        <snippet>Epic sequence establishes foundational work before downstream module implementation, supporting a contract-first navigation/RBAC definition for Epic 2 continuation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-status.yaml</path>
+        <title>Sprint Status</title>
+        <section>Epic 2 status entries</section>
+        <snippet>Epic 2 has story 2.1 complete and follow-up stories pending, making this story the alignment point before further module features.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>frontend/src/App.tsx</path>
+        <kind>frontend composition</kind>
+        <symbol>ResilienceWorkspace / view-routing segment</symbol>
+        <lines>153-190</lines>
+        <reason>Current app-level navigation and view switching patterns are the practical baseline for introducing a formal route registry and role-aware shell behavior.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/context/ConnectionContext.tsx</path>
+        <kind>runtime context</kind>
+        <symbol>appMode context (server/client)</symbol>
+        <lines>1-220</lines>
+        <reason>Runtime context already differentiates execution mode; route and permission contracts should remain compatible with this shared-mode design.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/app/auth/middleware.go</path>
+        <kind>authorization policy</kind>
+        <symbol>CheckPermission</symbol>
+        <lines>1-220</lines>
+        <reason>Defines current server-side authorization gate and must remain canonical while UI visibility rules are formalized in the matrix.</reason>
+      </artifact>
+      <artifact>
+        <path>cmd/server/main.go</path>
+        <kind>application wiring</kind>
+        <symbol>server startup and binding setup</symbol>
+        <lines>1-260</lines>
+        <reason>Shows server runtime composition and reinforces that role/security authority belongs to backend services, not frontend-only checks.</reason>
+      </artifact>
+      <artifact>
+        <path>cmd/client/main.go</path>
+        <kind>application wiring</kind>
+        <symbol>client startup and shared-frontend binding setup</symbol>
+        <lines>1-50</lines>
+        <reason>Shows client runtime composition and confirms shared app architecture assumptions for route ID stability.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <go>
+        <package name="go" version="1.26" />
+        <package name="github.com/wailsapp/wails/v2" version="v2.11.0" />
+        <package name="github.com/golang-jwt/jwt/v5" version="v5.3.1" />
+      </go>
+      <node path="frontend/package.json">
+        <package name="react" version="^19.0.0" />
+        <package name="react-router-dom" version="^6.30.3" />
+        <package name="antd" version="^6.2.1" />
+      </node>
+      <frameworks>
+        <framework name="Wails" location="wails.json" />
+        <framework name="React + TypeScript" location="frontend/package.json" />
+      </frameworks>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Route IDs defined in this story must be stable and reusable by all future Epic 2+ stories.</constraint>
+    <constraint>RBAC matrix must separate UI visibility intent from backend authorization truth to prevent security drift.</constraint>
+    <constraint>Do not split into separate admin/client frontend applications; preserve one shared route system and shared component architecture.</constraint>
+    <constraint>Any permission marked denied in the matrix must map to explicit backend denial behavior, not just hidden menu entries.</constraint>
+    <constraint>Contract outputs must be reviewable and approved before Story 2.2B implementation begins.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Route Contract (new)</name>
+      <kind>documentation contract</kind>
+      <signature>route_id, path, module, shell_visibility, minimum_role</signature>
+      <path>docs/architecture.md (new cohesive app contract section) or dedicated contract doc path approved in story execution</path>
+    </interface>
+    <interface>
+      <name>RBAC Matrix Contract (new)</name>
+      <kind>documentation contract</kind>
+      <signature>role x module x action -> ui_visibility + backend_authorization</signature>
+      <path>docs/architecture.md / docs/ux-design-specification.md alignment sections or dedicated matrix artifact path approved in story execution</path>
+    </interface>
+    <interface>
+      <name>CheckPermission</name>
+      <kind>Go service method</kind>
+      <signature>CheckPermission(tokenString string, requiredRole domainAuth.Role) error</signature>
+      <path>internal/app/auth/middleware.go</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Contract-validation level: review completeness, internal consistency, and traceability from route and permission definitions to implementation stories. Security baseline requires backend-denial paths to be testable in subsequent implementation story.</standards>
+    <locations>
+      <location>docs/stories/2-2a-navigation-rbac-contract.md</location>
+      <location>docs/stories/2-2b-app-shell-role-variants.md</location>
+      <location>docs/stories/2-2c-docs-alignment-cohesive-app.md</location>
+      <location>docs/architecture.md</location>
+      <location>docs/ux-design-specification.md</location>
+      <location>docs/PRD.md</location>
+    </locations>
+    <ideas>
+      <idea ac="1,2">Review route map includes all core modules with unique, stable route IDs and deterministic paths.</idea>
+      <idea ac="3">Review matrix includes both roles and all required actions with no undefined cells for in-scope modules.</idea>
+      <idea ac="4">Confirm each permission row distinguishes UI visibility from backend allow/deny and references backend authority principle.</idea>
+      <idea ac="5">Confirm Story 2.2B and 2.2C explicitly reference 2.2A contract artifacts as prerequisites.</idea>
+    </ideas>
+  </tests>
+</story-context>

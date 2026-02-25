@@ -1,0 +1,171 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2C</storyId>
+    <title>Cohesive App Documentation Alignment</title>
+    <status>drafted</status>
+    <generatedAt>2026-02-25</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-2c-docs-alignment-cohesive-app.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>project stakeholder</asA>
+    <iWant>PRD, UX, and Architecture documents aligned to the implemented cohesive app model</iWant>
+    <soThat>planning, development, and reviews reference one consistent product definition</soThat>
+    <tasks>- [ ] Update PRD deployment/classification sections to match desktop distributed reality (AC: 1)
+- [ ] Update UX sections for shared app shell and role-variant navigation model (AC: 2)
+- [ ] Add concise cohesive app contract section in architecture doc (AC: 3)
+- [ ] Add/adjust epic-story references for sequencing and dependency clarity (AC: 4)
+- [ ] Perform consistency pass across edited sections and fix conflicting statements (AC: 5)
+- [ ] Capture a brief changelog summary documenting exactly what was aligned and why (AC: 1-5)</tasks>
+  </story>
+
+  <acceptanceCriteria>1. PRD wording is updated to reflect distributed Wails desktop deployment (`Server.exe` + `Client.exe`) and removes conflicting browser-only phrasing where applicable.
+2. UX specification explicitly states one shared app shell with role-based variants (Admin vs Data Entry) using shared route IDs.
+3. Architecture documentation includes a concise "Cohesive App Contract" section summarizing route ownership, role shell strategy, and backend-authorization authority.
+4. Epics/story planning references are updated where necessary to point to the new contract-first sequence (`2.2A` -> `2.2B` -> `2.2C` -> `2.2`).
+5. Updated documents are internally consistent and cross-linked, with no contradictory deployment or navigation model statements remaining in the edited sections.</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Project Classification; On-Premise Deployment &amp; Infrastructure; Authentication &amp; Authorization</section>
+        <snippet>Current PRD contains both legacy browser-client wording and distributed Wails server/client executable model details. This story aligns those sections to one consistent deployment narrative.</snippet>
+      </doc>
+      <doc>
+        <path>docs/ux-design-specification.md</path>
+        <title>UX Design Specification</title>
+        <section>Platform; Chosen Design Approach; Consistency Rules</section>
+        <snippet>UX defines role-specific experiences and navigation patterns but still includes browser-access phrasing. This story clarifies shared shell with role variants using one route contract.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>Executive Summary; IPC Pattern</section>
+        <snippet>Architecture already states distributed Wails with shared frontend behavior. This story adds explicit cohesive-app contract language and cross-links to planning docs.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Proposed Epics Structure</section>
+        <snippet>Epic structure remains valid; this story updates planning references to reflect contract-first sequence before remaining Epic 2 feature stories.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-status.yaml</path>
+        <title>Sprint Status</title>
+        <section>Epic 2 story tracking</section>
+        <snippet>Epic 2 includes 2.2A/2.2B/2.2C as drafted, which this story should reference for ordering consistency across planning artifacts.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/2-2a-navigation-rbac-contract.md</path>
+        <title>Story 2.2A</title>
+        <section>Acceptance Criteria</section>
+        <snippet>Defines canonical route and RBAC contract that documentation alignment must reference as baseline.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/2-2b-app-shell-role-variants.md</path>
+        <title>Story 2.2B</title>
+        <section>Acceptance Criteria</section>
+        <snippet>Defines shell implementation and guard behavior that docs should describe as actual product model.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>frontend/src/App.tsx</path>
+        <kind>current UI composition reference</kind>
+        <symbol>WindowTitleBar app title by mode; route/view switching</symbol>
+        <lines>134-174</lines>
+        <reason>Current implementation demonstrates shared app runtime behavior and server/client mode distinction used to justify doc alignment language.</reason>
+      </artifact>
+      <artifact>
+        <path>cmd/server/main.go</path>
+        <kind>server executable entrypoint</kind>
+        <symbol>Wails server app setup</symbol>
+        <lines>1-220</lines>
+        <reason>Evidence that server is a desktop executable with backend authority and UI integration, supporting updated PRD/UX wording.</reason>
+      </artifact>
+      <artifact>
+        <path>cmd/client/main.go</path>
+        <kind>client executable entrypoint</kind>
+        <symbol>Wails client app setup</symbol>
+        <lines>14-47</lines>
+        <reason>Evidence that client is a desktop executable, not browser-only endpoint, and shares frontend assets with server mode.</reason>
+      </artifact>
+      <artifact>
+        <path>wails_server.json</path>
+        <kind>build configuration</kind>
+        <symbol>main: cmd/server/main.go</symbol>
+        <lines>1-13</lines>
+        <reason>Build-level confirmation of server binary output and entrypoint used for deployment alignment documentation.</reason>
+      </artifact>
+      <artifact>
+        <path>wails_client.json</path>
+        <kind>build configuration</kind>
+        <symbol>main: cmd/client/main.go</symbol>
+        <lines>1-13</lines>
+        <reason>Build-level confirmation of client binary output and entrypoint used for deployment alignment documentation.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <go>
+        <package name="go" version="1.26" />
+        <package name="github.com/wailsapp/wails/v2" version="v2.11.0" />
+      </go>
+      <node path="frontend/package.json">
+        <package name="react" version="^19.0.0" />
+        <package name="react-router-dom" version="^6.30.3" />
+        <package name="antd" version="^6.2.1" />
+      </node>
+      <frameworks>
+        <framework name="Wails" location="wails.json" />
+        <framework name="React + TypeScript" location="frontend/package.json" />
+      </frameworks>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Document changes must be alignment-only: no scope expansion and no unapproved product-direction changes.</constraint>
+    <constraint>Preserve role intent (Admin vs Data Entry) while clarifying one shared shell and shared route IDs.</constraint>
+    <constraint>Remove or correct conflicting browser-only phrasing in edited sections where it contradicts distributed Wails executable reality.</constraint>
+    <constraint>Cross-link updates must reference approved/implemented artifacts (2.2A contract and 2.2B shell implementation).</constraint>
+    <constraint>Architecture document should include concise cohesive app contract language without rewriting unrelated sections.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Documentation Contract (new)</name>
+      <kind>cross-document alignment contract</kind>
+      <signature>deployment_model + app_shell_model + role_navigation_model + auth_authority_model</signature>
+      <path>docs/PRD.md; docs/ux-design-specification.md; docs/architecture.md</path>
+    </interface>
+    <interface>
+      <name>Sprint Status Story Sequencing</name>
+      <kind>planning status interface</kind>
+      <signature>2-2a -> 2-2b -> 2-2c -> 2-2</signature>
+      <path>docs/sprint-status.yaml</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Validation is documentation consistency and traceability. Each edited section should be reviewable against architecture/code reality and against approved 2.2A/2.2B contracts.</standards>
+    <locations>
+      <location>docs/PRD.md</location>
+      <location>docs/ux-design-specification.md</location>
+      <location>docs/architecture.md</location>
+      <location>docs/epics.md</location>
+      <location>docs/sprint-status.yaml</location>
+      <location>docs/stories/2-2a-navigation-rbac-contract.md</location>
+      <location>docs/stories/2-2b-app-shell-role-variants.md</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Check that PRD no longer presents browser-only deployment as primary when discussing current system architecture.</idea>
+      <idea ac="2">Check UX explicitly states shared shell with role variants and consistent route IDs.</idea>
+      <idea ac="3">Check architecture contains a dedicated cohesive app contract section with route ownership and backend auth authority statements.</idea>
+      <idea ac="4">Check references to story sequence are consistent in planning docs.</idea>
+      <idea ac="5">Perform contradiction scan across edited sections for deployment and navigation model terms.</idea>
+    </ideas>
+  </tests>
+</story-context>

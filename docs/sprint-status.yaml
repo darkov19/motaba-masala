@@ -54,6 +54,9 @@ development_status:
     # Epic 2: Master Data & Configuration
     epic-2: contexted
     2-1-item-master-management: done
+    2-2a-navigation-rbac-contract: done
+    2-2b-app-shell-role-variants: drafted
+    2-2c-docs-alignment-cohesive-app: drafted
     2-2-unit-conversion-engine: backlog
     2-3-recipe-bom-management: backlog
     2-4-supplier-customer-masters: backlog

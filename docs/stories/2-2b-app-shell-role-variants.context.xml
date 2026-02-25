@@ -1,0 +1,176 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2B</storyId>
+    <title>Shared AppShell with Role Variants</title>
+    <status>drafted</status>
+    <generatedAt>2026-02-25</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-2b-app-shell-role-variants.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Data Entry Operator or Admin</asA>
+    <iWant>one shared application shell that adapts by role and runtime mode</iWant>
+    <soThat>navigation is cohesive while capabilities remain appropriately restricted</soThat>
+    <tasks>- [ ] Implement shared route registry derived from Story 2.2A contract (AC: 1)
+- [ ] Introduce `AppShell` baseline layout and shared navigation composition points (AC: 1)
+- [ ] Implement `AdminShell` navigation variant (full menu tree) (AC: 2, 3)
+- [ ] Implement `OperatorShell` navigation variant (simplified/task-focused menu) (AC: 2, 3)
+- [ ] Implement route and action guard utilities integrated with role data and auth context (AC: 4, 5)
+- [ ] Add UI feedback states for unauthorized access (AC: 4)
+- [ ] Add frontend tests for shell visibility and guarded navigation behavior by role (AC: 6)
+- [ ] Add/extend backend authorization regression tests for denied actions regardless of UI state (AC: 5, 6)</tasks>
+  </story>
+
+  <acceptanceCriteria>1. A shared `AppShell` structure is implemented and used by both `Server.exe` and `Client.exe` with the same route IDs from Story 2.2A.
+2. `AdminShell` and `OperatorShell` variants are implemented as role-specific navigation/presentation layers without duplicating route definitions.
+3. Sidebar/menu visibility follows the approved Role x Module x Action matrix from Story 2.2A.
+4. Route guards and action guards enforce denied access paths and show clear feedback for unauthorized operations.
+5. Backend remains authoritative for authorization; frontend role checks do not replace server-side enforcement.
+6. Automated tests cover role-specific navigation visibility and unauthorized route/action handling.</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/stories/2-2a-navigation-rbac-contract.md</path>
+        <title>Story 2.2A Navigation and RBAC Contract</title>
+        <section>Acceptance Criteria; Tasks / Subtasks</section>
+        <snippet>Defines route IDs, module naming, and Role x Module x Action matrix that this story must implement without redefinition.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>IPC Pattern: Wails Bindings; Project Structure</section>
+        <snippet>Server and client executables share frontend behavior while backend implementation varies by binary, supporting one cohesive shell and route contract.</snippet>
+      </doc>
+      <doc>
+        <path>docs/ux-design-specification.md</path>
+        <title>UX Design Specification</title>
+        <section>4.1 Chosen Design Approach; 7.1 Consistency Rules</section>
+        <snippet>Specifies role-distinct experiences (Admin vs Data Entry) and role-specific sidebar patterns that should be implemented on shared routes.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Authentication &amp; Authorization</section>
+        <snippet>RBAC is user-based and must constrain feature access by role, requiring server-authoritative enforcement regardless of frontend visibility.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic 1 Technical Specification</title>
+        <section>Acceptance Criteria (Authoritative); APIs and Interfaces</section>
+        <snippet>Establishes role-enforcement baseline and server-side permission checks that continue to apply in shell-level navigation and action guards.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>frontend/src/App.tsx</path>
+        <kind>frontend app composition</kind>
+        <symbol>WindowTitleBar; ResilienceWorkspace; route/view switching state</symbol>
+        <lines>134-190</lines>
+        <reason>Current shell-like composition and route switching behavior is the main integration point for introducing shared AppShell and role variants.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/context/ConnectionContext.tsx</path>
+        <kind>runtime mode context</kind>
+        <symbol>detectAppMode; appMode provider value</symbol>
+        <lines>60-112</lines>
+        <reason>Provides server/client runtime mode that role-aware shell behavior must account for without branching into separate frontend codebases.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/app/auth/middleware.go</path>
+        <kind>backend authorization gate</kind>
+        <symbol>CheckPermission</symbol>
+        <lines>17-38</lines>
+        <reason>Defines server-side permission authority and role hierarchy used to enforce denied actions independent of frontend menu visibility.</reason>
+      </artifact>
+      <artifact>
+        <path>cmd/client/main.go</path>
+        <kind>client app entrypoint</kind>
+        <symbol>app.NewApp(false); Wails run configuration</symbol>
+        <lines>14-47</lines>
+        <reason>Confirms client executable uses shared frontend assets and runtime binding model that AppShell implementation must support.</reason>
+      </artifact>
+      <artifact>
+        <path>cmd/server/main.go</path>
+        <kind>server app entrypoint</kind>
+        <symbol>Wails app setup and service binding composition</symbol>
+        <lines>1-220</lines>
+        <reason>Confirms server executable uses same frontend assets while exposing server-authoritative services and authorization boundary.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <go>
+        <package name="go" version="1.26" />
+        <package name="github.com/wailsapp/wails/v2" version="v2.11.0" />
+        <package name="github.com/golang-jwt/jwt/v5" version="v5.3.1" />
+      </go>
+      <node path="frontend/package.json">
+        <package name="react" version="^19.0.0" />
+        <package name="react-router-dom" version="^6.30.3" />
+        <package name="antd" version="^6.2.1" />
+        <package name="vitest" version="^4.0.18" />
+        <package name="@testing-library/react" version="^16.3.0" />
+      </node>
+      <frameworks>
+        <framework name="Wails" location="wails.json" />
+        <framework name="React + TypeScript" location="frontend/package.json" />
+      </frameworks>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Maintain one shared route registry and avoid duplicating route definitions across admin/operator shells.</constraint>
+    <constraint>Do not fork into separate admin/client frontend projects; keep one component architecture with role/runtime adaptation.</constraint>
+    <constraint>Role-based menu visibility must align with 2.2A matrix and never weaken server-side authorization requirements.</constraint>
+    <constraint>Unauthorized routes/actions require explicit guard handling and user feedback, not silent failures.</constraint>
+    <constraint>Backend authorization checks remain mandatory even when UI hides forbidden actions.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>AppShell (new)</name>
+      <kind>frontend composition contract</kind>
+      <signature>AppShell(props: routeRegistry, role, appMode)</signature>
+      <path>frontend/src (new shell module path to be defined during implementation)</path>
+    </interface>
+    <interface>
+      <name>AdminShell / OperatorShell (new)</name>
+      <kind>frontend navigation variants</kind>
+      <signature>AdminShell(routeRegistry, permissions); OperatorShell(routeRegistry, permissions)</signature>
+      <path>frontend/src (new shell variants path to be defined during implementation)</path>
+    </interface>
+    <interface>
+      <name>Route and Action Guards (new)</name>
+      <kind>frontend guard utilities</kind>
+      <signature>canAccessRoute(role, routeId); canPerformAction(role, module, action)</signature>
+      <path>frontend/src (guard utility path to be defined during implementation)</path>
+    </interface>
+    <interface>
+      <name>CheckPermission</name>
+      <kind>Go service method</kind>
+      <signature>CheckPermission(tokenString string, requiredRole domainAuth.Role) error</signature>
+      <path>internal/app/auth/middleware.go</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Testing must validate both UX behavior (role-aware visibility and route guard messaging) and security behavior (server-side authorization remains effective when frontend constraints are bypassed).</standards>
+    <locations>
+      <location>frontend/src/__tests__/</location>
+      <location>frontend/src/components/</location>
+      <location>frontend/src/context/__tests__/</location>
+      <location>internal/app/auth/service_test.go</location>
+      <location>internal/app/inventory/service_test.go</location>
+      <location>docs/stories/2-2b-app-shell-role-variants.md</location>
+    </locations>
+    <ideas>
+      <idea ac="1,2">Verify both runtime modes render shared route IDs through shell variants without duplicate route declarations.</idea>
+      <idea ac="3">Verify Admin sees full module navigation while Data Entry sees restricted navigation per matrix.</idea>
+      <idea ac="4">Attempt navigation to forbidden route via direct URL/state and assert guard redirect + clear unauthorized feedback.</idea>
+      <idea ac="5">Bypass UI and invoke a forbidden backend action with Data Entry credentials; assert backend `forbidden` response.</idea>
+      <idea ac="6">Add regression tests for shell/menu visibility and route/action guard behavior across both roles.</idea>
+    </ideas>
+  </tests>
+</story-context>
