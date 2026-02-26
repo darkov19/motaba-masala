@@ -1,20 +1,17 @@
 import type { ReactNode } from "react";
-import { Alert, Card, Layout, Space, Tag, Typography } from "antd";
+import { Alert, Card, Layout, Space } from "antd";
 import { AdminShell } from "./AdminShell";
 import { OperatorShell } from "./OperatorShell";
 import type { UserRole } from "./rbac";
 
-const { Header, Sider, Content, Footer } = Layout;
-const { Title } = Typography;
+const { Sider, Content } = Layout;
 
 type AppShellProps = {
     titleBar: ReactNode;
-    appTitle: string;
-    appMode: "server" | "client";
     role: UserRole;
     activeRouteId: string;
+    contentDensity: "dashboard" | "form" | "default" | "master";
     onNavigate: (routeId: string) => void;
-    statusNode: ReactNode;
     licenseBanner: ReactNode;
     automationNode?: ReactNode;
     unauthorizedMessage?: string | null;
@@ -23,12 +20,10 @@ type AppShellProps = {
 
 export function AppShell({
     titleBar,
-    appTitle,
-    appMode,
     role,
     activeRouteId,
+    contentDensity,
     onNavigate,
-    statusNode,
     licenseBanner,
     automationNode,
     unauthorizedMessage,
@@ -37,22 +32,6 @@ export function AppShell({
     return (
         <Layout className={`app-shell app-shell--${role}`}>
             {titleBar}
-            <Header className="app-header">
-                <Space align="center" size={16} className="app-header__meta">
-                    <Title level={4} className="app-header__title">
-                        {appTitle}
-                    </Title>
-                    {appMode === "server" ? (
-                        <Tag color="red">Server Mode</Tag>
-                    ) : (
-                        <Tag color="blue">Client Mode</Tag>
-                    )}
-                    {role === "admin" ? <Tag color="gold">Admin</Tag> : <Tag color="green">Operator</Tag>}
-                </Space>
-                <Space align="center" size={8}>
-                    {statusNode}
-                </Space>
-            </Header>
 
             {licenseBanner ? <div className="app-license-banner">{licenseBanner}</div> : null}
 
@@ -65,8 +44,8 @@ export function AppShell({
                     )}
                 </Sider>
 
-                <Content className="app-content">
-                    <Card className="app-card app-card--workspace" variant="borderless">
+                <Content className={`app-content app-content--${contentDensity}`}>
+                    <Card className={`app-card app-card--workspace app-card--${contentDensity}`} variant="borderless">
                         <Space orientation="vertical" size={16} style={{ width: "100%" }}>
                             {automationNode}
                             {unauthorizedMessage ? (
@@ -80,12 +59,11 @@ export function AppShell({
                             {children}
                         </Space>
                     </Card>
+                    <footer className="app-content__footer">
+                        Masala Inventory Management (c) 2026
+                    </footer>
                 </Content>
             </Layout>
-
-            <Footer className="app-footer">
-                Masala Inventory Management (c) 2026
-            </Footer>
         </Layout>
     );
 }

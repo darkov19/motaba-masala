@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Layout, Typography, Card, Segmented, Space, Alert, Button, message } from "antd";
+import { Layout, Typography, Card, Space, Alert, Button, message } from "antd";
 import { useBlocker, useLocation, useNavigate } from "react-router-dom";
 import {
     EventsEmit,
@@ -13,7 +13,6 @@ import {
 import logo from "./assets/images/icon.png";
 import { ConnectionProvider } from "./context/ConnectionContext";
 import { useConnection } from "./context/ConnectionContext";
-import { ConnectionStatus } from "./components/layout/ConnectionStatus";
 import { ReconnectionOverlay } from "./components/layout/ReconnectionOverlay";
 import { GRNForm } from "./components/forms/GRNForm";
 import { BatchForm } from "./components/forms/BatchForm";
@@ -100,14 +99,6 @@ function resolveAuthToken(): string | undefined {
     }
 }
 
-const VIEW_TO_ROUTE_ID: Record<Exclude<ViewKey, "placeholder">, string> = {
-    dashboard: "dashboard.home",
-    grn: "procurement.grn",
-    batch: "production.batches",
-    "item-master": "masters.items",
-    "packaging-profile": "packing.materials",
-};
-
 function WindowControls() {
     const { appMode } = useConnection();
     const [isMaximised, setIsMaximised] = useState(false);
@@ -184,7 +175,7 @@ function WindowControls() {
     return (
         <div className="window-controls">
             <Button className="window-controls__btn" onClick={onMinimize} type="text" aria-label="Minimize">
-                _
+                <span className="window-controls__icon window-controls__icon--minimise" aria-hidden="true" />
             </Button>
             <Button
                 className="window-controls__btn"
@@ -200,7 +191,7 @@ function WindowControls() {
                 />
             </Button>
             <Button className="window-controls__btn window-controls__btn--close" onClick={onHideToTray} type="text" aria-label="Hide to tray">
-                ×
+                <span className="window-controls__icon window-controls__icon--close" aria-hidden="true" />
             </Button>
         </div>
     );
@@ -208,7 +199,7 @@ function WindowControls() {
 
 function WindowTitleBar() {
     const { appMode } = useConnection();
-    const appTitle = appMode === "server" ? "Masala Inventory Server" : "Masala Inventory Client";
+    const appTitle = appMode === "server" ? "Motaba Inventory Server" : "Motaba Inventory Client";
     return (
         <div className="window-titlebar">
             <div className="window-titlebar__brand">
@@ -368,26 +359,13 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         navigate(route.path);
     }, [navigate, role]);
 
-    const onViewChange = (value: string | number) => {
-        const nextView = String(value) as ViewKey;
-        if (nextView === activeView) {
-            return;
-        }
-
-        const routeId = VIEW_TO_ROUTE_ID[nextView as Exclude<ViewKey, "placeholder">];
-        guardedNavigate(routeId, "view");
-    };
-
-    const formViewOptions: Array<{ label: string; value: Exclude<ViewKey, "dashboard" | "placeholder"> }> = [
-        { label: "GRN Form", value: "grn" },
-        { label: "Batch Form", value: "batch" },
-        { label: "Item Master", value: "item-master" },
-        { label: "Packaging Profiles", value: "packaging-profile" },
-    ];
     const isFormView = activeView === "grn"
         || activeView === "batch"
         || activeView === "item-master"
         || activeView === "packaging-profile";
+    const canCreateInMasters = canPerformAction(role, "masters", "create");
+    const canCreateInPacking = canPerformAction(role, "packing", "create");
+    const isMasterSplitView = activeView === "item-master" || activeView === "packaging-profile";
 
     const renderLicenseBanner = () => {
         if (licenseStatus.status === "expiring") {
@@ -528,14 +506,16 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
             case "item-master":
                 return (
                     <ItemMasterForm
-                        writeDisabled={writeDisabled || !canPerformAction(role, "masters", "create")}
+                        writeDisabled={writeDisabled}
+                        readOnly={!canCreateInMasters}
                         onDirtyChange={onItemMasterDirtyChange}
                     />
                 );
             case "packaging-profile":
                 return (
                     <PackagingProfileForm
-                        writeDisabled={writeDisabled || !canPerformAction(role, "packing", "create")}
+                        writeDisabled={writeDisabled}
+                        readOnly={!canCreateInPacking}
                         onDirtyChange={onPackagingProfileDirtyChange}
                     />
                 );
@@ -562,18 +542,22 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
             : "Task-focused landing with quick operational entry points."
         : "Role-aware shell navigation with backend-authoritative access controls.";
 
-    const appTitle = appMode === "server" ? "Masala Inventory Server" : "Masala Inventory Client";
     const activeRouteId = activeRoute.id;
+    const contentDensity: "dashboard" | "form" | "default" | "master" = activeView === "dashboard"
+        ? "dashboard"
+        : isMasterSplitView
+            ? "master"
+            : isFormView
+            ? "form"
+            : "default";
 
     return (
         <AppShell
             titleBar={<WindowTitleBar />}
-            appTitle={appTitle}
-            appMode={appMode}
             role={role}
             activeRouteId={activeRouteId}
+            contentDensity={contentDensity}
             onNavigate={(routeId: string) => guardedNavigate(routeId, "view")}
-            statusNode={<ConnectionStatus />}
             licenseBanner={renderLicenseBanner()}
             automationNode={renderAutomationCard()}
             unauthorizedMessage={unauthorizedMessage}
@@ -585,41 +569,33 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                 {workspaceSubtitle}
             </Text>
 
-            <div className="workspace-quick-actions">
-                <Button
-                    onClick={() => guardedNavigate("procurement.grn", "create")}
-                    disabled={writeDisabled}
-                >
-                    New GRN
-                </Button>
-                <Button
-                    onClick={() => guardedNavigate("production.batches", "create")}
-                    disabled={writeDisabled}
-                >
-                    New Batch
-                </Button>
-                <Button
-                    onClick={() => guardedNavigate("masters.items", "view")}
-                    disabled={!canPerformAction(role, "masters", "view")}
-                >
-                    Item Master
-                </Button>
-                <Button
-                    onClick={() => guardedNavigate("packing.materials", "view")}
-                    disabled={!canPerformAction(role, "packing", "view")}
-                >
-                    Packaging Profiles
-                </Button>
-            </div>
-
-            {isFormView ? (
-                <Segmented
-                    block
-                    className="workspace-segmented"
-                    options={formViewOptions}
-                    value={activeView}
-                    onChange={onViewChange}
-                />
+            {activeView === "dashboard" ? (
+                <div className="workspace-quick-actions">
+                    <Button
+                        onClick={() => guardedNavigate("procurement.grn", "create")}
+                        disabled={writeDisabled}
+                    >
+                        New GRN
+                    </Button>
+                    <Button
+                        onClick={() => guardedNavigate("production.batches", "create")}
+                        disabled={writeDisabled}
+                    >
+                        New Batch
+                    </Button>
+                    <Button
+                        onClick={() => guardedNavigate("masters.items", "view")}
+                        disabled={!canPerformAction(role, "masters", "view")}
+                    >
+                        Item Master
+                    </Button>
+                    <Button
+                        onClick={() => guardedNavigate("packing.materials", "view")}
+                        disabled={!canPerformAction(role, "packing", "view")}
+                    >
+                        Packaging Profiles
+                    </Button>
+                </div>
             ) : null}
 
             {renderWorkspaceContent()}

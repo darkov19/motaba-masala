@@ -36,6 +36,21 @@ type WindowWithWailsBindings = Window & {
     };
 };
 
+function readAppModeOverrideFromQuery(): AppMode | null {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get("appMode") || params.get("mode");
+    if (!raw) {
+        return null;
+    }
+
+    const normalized = raw.trim().toLowerCase();
+    if (normalized === "server" || normalized === "client") {
+        return normalized;
+    }
+
+    return null;
+}
+
 function timeoutAfter(ms: number): Promise<never> {
     return new Promise((_, reject) => {
         setTimeout(() => reject(new Error("Connection probe timeout")), ms);
@@ -66,6 +81,11 @@ async function probeBackendConnection(): Promise<boolean> {
 }
 
 async function detectAppMode(): Promise<"server" | "client"> {
+    const queryOverride = readAppModeOverrideFromQuery();
+    if (queryOverride) {
+        return queryOverride;
+    }
+
     const maybeIsServerMode = (window as WindowWithWailsBindings).go?.app?.App?.IsServerMode;
     if (typeof maybeIsServerMode !== "function") {
         return "client";

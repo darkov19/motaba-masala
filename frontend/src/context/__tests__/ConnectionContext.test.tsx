@@ -18,6 +18,7 @@ function ProbeConnection() {
 
 describe("ConnectionProvider", () => {
     beforeEach(() => {
+        window.history.replaceState({}, "", "/");
         Object.defineProperty(navigator, "onLine", {
             configurable: true,
             value: true,
@@ -126,6 +127,21 @@ describe("ConnectionProvider", () => {
         fireEvent(window, new Event("online"));
 
         await waitFor(() => {
+            expect(screen.getByTestId("connected")).toHaveTextContent("true");
+        });
+    });
+
+    it("uses query override for app mode in browser tests", async () => {
+        window.history.replaceState({}, "", "/dashboard?appMode=server");
+
+        render(
+            <ConnectionProvider>
+                <ProbeConnection />
+            </ConnectionProvider>,
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId("mode")).toHaveTextContent("server");
             expect(screen.getByTestId("connected")).toHaveTextContent("true");
         });
     });

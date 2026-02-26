@@ -52,7 +52,7 @@ describe("App license status banners", () => {
                     element: <App />,
                 },
             ],
-            { initialEntries: ["/grn"] },
+            { initialEntries: ["/dashboard"] },
         );
 
         render(<RouterProvider router={router} />);
@@ -93,7 +93,7 @@ describe("App license status banners", () => {
                     element: <App />,
                 },
             ],
-            { initialEntries: ["/grn"] },
+            { initialEntries: ["/dashboard"] },
         );
 
         render(<RouterProvider router={router} />);

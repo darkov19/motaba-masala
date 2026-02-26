@@ -9,6 +9,5 @@
         "name": "darko",
         "email": ""
     },
-    "main": "cmd/server",
-    "tags": "webkit2_41"
+    "main": "cmd/server/main.go"
 }

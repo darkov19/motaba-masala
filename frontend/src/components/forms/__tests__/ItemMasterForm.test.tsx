@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { ItemMasterForm } from "../ItemMasterForm";
 
 const listItemsMock = vi.fn();
@@ -33,15 +34,18 @@ describe("ItemMasterForm", () => {
 
     it("shows inline validation and submits successfully", async () => {
         const onDirty = vi.fn();
-        render(<ItemMasterForm onDirtyChange={onDirty} />);
+        render(
+            <MemoryRouter>
+                <ItemMasterForm onDirtyChange={onDirty} />
+            </MemoryRouter>,
+        );
 
-        fireEvent.click(screen.getByText("Packing Material Master"));
+        fireEvent.click(screen.getByText("Packing Material Items"));
         fireEvent.click(screen.getByRole("button", { name: "Create Item" }));
         expect(await screen.findByText("Item name is required")).toBeInTheDocument();
 
         fireEvent.change(screen.getByPlaceholderText("Enter item name"), { target: { value: "Jar Lid" } });
         fireEvent.change(screen.getByPlaceholderText("kg, g, pcs, ltr..."), { target: { value: "pcs" } });
-        fireEvent.change(screen.getByPlaceholderText("JAR_BODY / JAR_LID / CUP_STICKER"), { target: { value: "JAR_LID" } });
 
         fireEvent.click(screen.getByRole("button", { name: "Create Item" }));
         await waitFor(() => {
@@ -83,9 +87,13 @@ describe("ItemMasterForm", () => {
         });
 
         const onDirty = vi.fn();
-        render(<ItemMasterForm onDirtyChange={onDirty} />);
+        render(
+            <MemoryRouter>
+                <ItemMasterForm onDirtyChange={onDirty} />
+            </MemoryRouter>,
+        );
 
-        fireEvent.click(screen.getByText("Packing Material Master"));
+        fireEvent.click(screen.getByText("Packing Material Items"));
         fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
         const nameInput = screen.getByPlaceholderText("Enter item name");
         fireEvent.change(nameInput, { target: { value: "Jar Body Updated" } });

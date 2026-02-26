@@ -106,7 +106,7 @@ describe("App route-level unsaved navigation blocking", () => {
         const { unmount } = render(<RouterProvider router={router} />);
 
         fireEvent.click(screen.getByLabelText("GRN Dirty"));
-        fireEvent.click(screen.getByRole("radio", { name: "Batch Form" }));
+        fireEvent.click(screen.getByRole("menuitem", { name: "Batches" }));
 
         expect(confirmMock).toHaveBeenCalledTimes(1);
         expect(router.state.location.pathname).toBe("/grn");
@@ -118,7 +118,7 @@ describe("App route-level unsaved navigation blocking", () => {
 
         expect(router.state.location.pathname).toBe("/grn");
 
-        fireEvent.click(screen.getByRole("radio", { name: "Batch Form" }));
+        fireEvent.click(screen.getByRole("menuitem", { name: "Batches" }));
         expect(confirmMock).toHaveBeenCalledTimes(2);
 
         const secondPrompt = confirmMock.mock.calls[1][0] as { onOk: () => void };
@@ -128,6 +128,9 @@ describe("App route-level unsaved navigation blocking", () => {
 
         await waitFor(() => {
             expect(router.state.location.pathname).toBe("/production/batches");
+        });
+        await waitFor(() => {
+            expect(screen.getByLabelText("Batch Dirty")).toBeInTheDocument();
         });
 
         await act(async () => {

@@ -71,6 +71,14 @@ describe("PackagingProfileForm", () => {
         });
     }, 15000);
 
+    it("does not mark default template values as dirty", async () => {
+        const onDirty = vi.fn();
+        render(<PackagingProfileForm onDirtyChange={onDirty} />);
+
+        await screen.findByPlaceholderText("Jar Pack 200g");
+        expect(onDirty).not.toHaveBeenCalledWith(true);
+    });
+
     it("blocks duplicate component selection before submit", async () => {
         const onDirty = vi.fn();
         render(<PackagingProfileForm onDirtyChange={onDirty} />);
