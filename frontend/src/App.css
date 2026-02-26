@@ -358,6 +358,44 @@
     line-height: 1.2;
 }
 
+.shell-nav__scroll,
+.app-content,
+.item-master-split__table .ant-table-body,
+.packaging-profile-split__table .ant-table-body {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(15, 23, 42, 0.16) transparent;
+}
+
+.shell-nav__scroll::-webkit-scrollbar,
+.app-content::-webkit-scrollbar,
+.item-master-split__table .ant-table-body::-webkit-scrollbar,
+.packaging-profile-split__table .ant-table-body::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.shell-nav__scroll::-webkit-scrollbar-track,
+.app-content::-webkit-scrollbar-track,
+.item-master-split__table .ant-table-body::-webkit-scrollbar-track,
+.packaging-profile-split__table .ant-table-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.shell-nav__scroll::-webkit-scrollbar-thumb,
+.app-content::-webkit-scrollbar-thumb,
+.item-master-split__table .ant-table-body::-webkit-scrollbar-thumb,
+.packaging-profile-split__table .ant-table-body::-webkit-scrollbar-thumb {
+    background: rgba(15, 23, 42, 0.16);
+    border-radius: 999px;
+}
+
+.shell-nav__scroll:hover::-webkit-scrollbar-thumb,
+.app-content:hover::-webkit-scrollbar-thumb,
+.item-master-split__table .ant-table-body:hover::-webkit-scrollbar-thumb,
+.packaging-profile-split__table .ant-table-body:hover::-webkit-scrollbar-thumb {
+    background: rgba(15, 23, 42, 0.26);
+}
+
 .app-content {
     display: flex;
     flex-direction: column;
