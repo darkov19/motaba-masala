@@ -2,7 +2,8 @@ param(
     [string]$Remote = "origin",
     [string]$Branch = "main",
     [switch]$SkipInstallers,
-    [switch]$DebugFrontend
+    [switch]$DebugFrontend,
+    [switch]$ConsoleLogs
 )
 
 Set-StrictMode -Version Latest
@@ -16,6 +17,11 @@ if (-not $PSBoundParameters.ContainsKey("DebugFrontend")) {
 # Default to skipping installers unless explicitly enabled with -SkipInstallers:$false.
 if (-not $PSBoundParameters.ContainsKey("SkipInstallers")) {
     $SkipInstallers = $true
+}
+
+# Default to console-enabled binaries so server/client open with visible logs on Windows.
+if (-not $PSBoundParameters.ContainsKey("ConsoleLogs")) {
+    $ConsoleLogs = $true
 }
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -70,11 +76,32 @@ function Get-Ldflags {
 }
 
 function Get-GoBuildLdflags([string]$WailsLdflags) {
-    $parts = @("-H=windowsgui")
+    $parts = @()
+    if (-not $ConsoleLogs) {
+        $parts += "-H=windowsgui"
+    }
     if (-not [string]::IsNullOrWhiteSpace($WailsLdflags)) {
         $parts += $WailsLdflags
     }
+    if ($parts.Count -eq 0) {
+        return ""
+    }
     return ($parts -join " ")
+}
+
+function Build-ServerBinaryFromGo([string]$WailsLdflags) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $RepoRoot "build\bin") | Out-Null
+    $env:CGO_ENABLED = "1"
+    Try-GenerateSyso (Join-Path $RepoRoot "cmd\server")
+    $goLdflags = Get-GoBuildLdflags $WailsLdflags
+
+    if ([string]::IsNullOrWhiteSpace($goLdflags)) {
+        & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -o $ServerBuildExe .\cmd\server
+    }
+    else {
+        & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -ldflags $goLdflags -o $ServerBuildExe .\cmd\server
+    }
+    Assert-CommandSucceeded "go build server"
 }
 
 function Try-GenerateSyso([string]$PackageDir) {
@@ -119,18 +146,11 @@ function Build-App {
     $header = Get-HeaderHex $ServerBuildExe
     if ($header -ne "4D5A") {
         Write-Warning "Wails output is not a PE executable (header=$header). Falling back to go build."
-        New-Item -ItemType Directory -Force -Path (Join-Path $RepoRoot "build\bin") | Out-Null
-        $env:CGO_ENABLED = "1"
-        Try-GenerateSyso (Join-Path $RepoRoot "cmd\server")
-        $goLdflags = Get-GoBuildLdflags $ldflags
-
-        if ([string]::IsNullOrWhiteSpace($ldflags)) {
-            & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -ldflags $goLdflags -o $ServerBuildExe .\cmd\server
-        }
-        else {
-            & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -ldflags $goLdflags -o $ServerBuildExe .\cmd\server
-        }
-        Assert-CommandSucceeded "go build fallback"
+        Build-ServerBinaryFromGo $ldflags
+    }
+    elseif ($ConsoleLogs) {
+        Write-Step "Rebuild server binary with visible console logs"
+        Build-ServerBinaryFromGo $ldflags
     }
 
     Assert-PeExecutable $ServerBuildExe
@@ -144,7 +164,12 @@ function Build-ClientBinary {
     Try-GenerateSyso (Join-Path $RepoRoot "cmd\client")
 
     Write-Step "Build client binary"
-    & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -ldflags $goLdflags -o $ClientExe .\cmd\client
+    if ([string]::IsNullOrWhiteSpace($goLdflags)) {
+        & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -o $ClientExe .\cmd\client
+    }
+    else {
+        & go build -buildmode=exe -tags "desktop,production,native_webview2loader" -ldflags $goLdflags -o $ClientExe .\cmd\client
+    }
     Assert-CommandSucceeded "go build client"
     Assert-PeExecutable $ClientExe
 }
@@ -225,6 +250,7 @@ try {
     Write-Step "Build completed"
     Write-Host "Output: $ServerBuildExe" -ForegroundColor Green
     Write-Host "Output: $ClientExe" -ForegroundColor Green
+    Write-Host "Console logs: $ConsoleLogs (use -ConsoleLogs:`$false for GUI-only binaries)" -ForegroundColor Green
     Write-Host "Helper: $(Join-Path $RepoRoot 'build\bin\run-server-dev.ps1')" -ForegroundColor Green
     if (-not $SkipInstallers) {
         Write-Host "Output: $ServerInstaller" -ForegroundColor Green
