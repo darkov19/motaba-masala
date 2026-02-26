@@ -350,36 +350,6 @@
     line-height: 1.2;
 }
 
-.shell-nav__scroll,
-.app-content {
-    scrollbar-width: thin;
-    scrollbar-color: #b7927f #efe5de;
-}
-
-.shell-nav__scroll::-webkit-scrollbar,
-.app-content::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-}
-
-.shell-nav__scroll::-webkit-scrollbar-track,
-.app-content::-webkit-scrollbar-track {
-    background: #efe5de;
-    border-radius: 999px;
-}
-
-.shell-nav__scroll::-webkit-scrollbar-thumb,
-.app-content::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #c9a896 0%, #b0846e 100%);
-    border-radius: 999px;
-    border: 2px solid #efe5de;
-}
-
-.shell-nav__scroll::-webkit-scrollbar-thumb:hover,
-.app-content::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, #be957f 0%, #9d6f57 100%);
-}
-
 .app-content {
     display: flex;
     flex-direction: column;
