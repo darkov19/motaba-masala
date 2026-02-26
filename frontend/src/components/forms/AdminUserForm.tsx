@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Typography, message } from "antd";
+import { DeleteOutlined, KeyOutlined, ReloadOutlined, SearchOutlined, UserOutlined } from "@ant-design/icons";
+import { Alert, Badge, Button, Card, Form, Input, Modal, Popconfirm, Segmented, Select, Space, Switch, Table, Tag, Tooltip, Typography, message } from "antd";
 import {
     createUser,
     deleteUser,
@@ -8,8 +9,8 @@ import {
     resetUserPassword,
     setUserActive,
     type UserAccount,
-    updateUserRole,
 } from "../../services/authApi";
+import "./AdminUserForm.css";
 
 const { Text } = Typography;
 
@@ -27,12 +28,10 @@ type AdminUserFormProps = {
     writeDisabled: boolean;
 };
 
+type UserStatusFilter = "all" | "active" | "disabled";
+
 function getRoleLabel(role: UserAccount["role"]): string {
     return role === "Admin" ? "Admin" : "Data Entry Operator";
-}
-
-function getRoleToggleTarget(role: UserAccount["role"]): "admin" | "operator" {
-    return role === "Admin" ? "operator" : "admin";
 }
 
 function formatDateTime(raw: string): string {
@@ -63,8 +62,11 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
     const [busyUserAction, setBusyUserAction] = useState<string | null>(null);
     const [resetTargetUser, setResetTargetUser] = useState<UserAccount | null>(null);
     const [isSubmittingReset, setIsSubmittingReset] = useState(false);
+    const [userSearch, setUserSearch] = useState("");
+    const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
 
     const currentUsername = useMemo(resolveCurrentUsername, []);
+    const normalizedCurrentUsername = useMemo(() => currentUsername.toLowerCase(), [currentUsername]);
 
     const loadUsers = useCallback(async () => {
         setIsLoadingUsers(true);
@@ -110,20 +112,14 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
         }
     };
 
-    const handleToggleRole = async (user: UserAccount) => {
-        const targetRole = getRoleToggleTarget(user.role);
+    const handleSetActive = async (user: UserAccount, isActive: boolean) => {
+        if (isActive === user.is_active) {
+            return;
+        }
         await runUserMutation(
             user.username,
-            () => updateUserRole({ username: user.username, role: targetRole }),
-            `Updated role for "${user.username}".`,
-        );
-    };
-
-    const handleToggleActive = async (user: UserAccount) => {
-        await runUserMutation(
-            user.username,
-            () => setUserActive({ username: user.username, is_active: !user.is_active }),
-            user.is_active ? `Disabled "${user.username}".` : `Enabled "${user.username}".`,
+            () => setUserActive({ username: user.username, is_active: isActive }),
+            isActive ? `Enabled "${user.username}".` : `Disabled "${user.username}".`,
         );
     };
 
@@ -167,6 +163,29 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
         }
     };
 
+    const userStats = useMemo(() => {
+        const total = users.length;
+        const active = users.filter((user) => user.is_active).length;
+        const disabled = total - active;
+        return { total, active, disabled };
+    }, [users]);
+
+    const filteredUsers = useMemo(() => {
+        const query = userSearch.trim().toLowerCase();
+        return users.filter((user) => {
+            if (statusFilter === "active" && !user.is_active) {
+                return false;
+            }
+            if (statusFilter === "disabled" && user.is_active) {
+                return false;
+            }
+            if (!query) {
+                return true;
+            }
+            return user.username.toLowerCase().includes(query) || getRoleLabel(user.role).toLowerCase().includes(query);
+        });
+    }, [statusFilter, userSearch, users]);
+
     return (
         <Space orientation="vertical" size={16} style={{ width: "100%" }}>
             <Alert
@@ -198,7 +217,6 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                         label="Password"
                         rules={[
                             { required: true, message: "Password is required" },
-                            { min: 8, message: "Password must be at least 8 characters" },
                         ]}
                     >
                         <Input.Password autoComplete="new-password" placeholder="Enter secure password" />
@@ -238,30 +256,68 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
             <Card
                 size="small"
                 title="Existing Users"
-                extra={(
-                    <Button onClick={() => void loadUsers()} loading={isLoadingUsers}>
-                        Refresh
-                    </Button>
-                )}
             >
+                <div className="existing-users-toolbar">
+                    <Input
+                        allowClear
+                        value={userSearch}
+                        onChange={(event) => setUserSearch(event.target.value)}
+                        prefix={<SearchOutlined />}
+                        placeholder="Search by username or role"
+                        className="existing-users-toolbar__search"
+                    />
+                    <Space size={8} wrap>
+                        <Segmented<UserStatusFilter>
+                            value={statusFilter}
+                            onChange={setStatusFilter}
+                            options={[
+                                { label: `All (${userStats.total})`, value: "all" },
+                                { label: `Active (${userStats.active})`, value: "active" },
+                                { label: `Disabled (${userStats.disabled})`, value: "disabled" },
+                            ]}
+                        />
+                        <Button icon={<ReloadOutlined />} onClick={() => void loadUsers()} loading={isLoadingUsers}>
+                            Refresh
+                        </Button>
+                    </Space>
+                </div>
+                <Space size={8} wrap className="existing-users-stats">
+                    <Tag className="existing-users-stats__tag existing-users-stats__tag--total">Total: {userStats.total}</Tag>
+                    <Tag className="existing-users-stats__tag existing-users-stats__tag--active">Active: {userStats.active}</Tag>
+                    <Tag className="existing-users-stats__tag existing-users-stats__tag--disabled">Disabled: {userStats.disabled}</Tag>
+                </Space>
                 <Table<UserAccount>
+                    className="existing-users-table"
                     rowKey={(record) => record.username}
                     loading={isLoadingUsers}
-                    dataSource={users}
+                    dataSource={filteredUsers}
+                    size="middle"
                     pagination={{ pageSize: 8 }}
-                    locale={{ emptyText: "No users found." }}
+                    scroll={{ x: 960 }}
+                    rowClassName={(record) => (record.is_active ? "" : "existing-users-table__row--inactive")}
+                    locale={{ emptyText: users.length > 0 ? "No users match the current filters." : "No users found." }}
                     columns={[
                         {
-                            title: "Username",
+                            title: "User",
                             dataIndex: "username",
                             key: "username",
                             render: (_, user) => {
-                                const isSelf = currentUsername !== "" && currentUsername.toLowerCase() === user.username.toLowerCase();
+                                const isSelf = normalizedCurrentUsername !== "" && normalizedCurrentUsername === user.username.toLowerCase();
                                 return (
-                                    <Space size={8}>
-                                        <Text>{user.username}</Text>
-                                        {isSelf ? <Tag color="blue">Current</Tag> : null}
-                                    </Space>
+                                    <div className="existing-users-usercell">
+                                        <span className="existing-users-usercell__avatar">
+                                            <UserOutlined />
+                                        </span>
+                                        <div className="existing-users-usercell__meta">
+                                            <Space size={8} wrap>
+                                                <Text strong>{user.username}</Text>
+                                                {isSelf ? <Tag color="blue">Current Session</Tag> : null}
+                                            </Space>
+                                            <Text type="secondary" className="existing-users-usercell__subtle">
+                                                Created {formatDateTime(user.created_at)}
+                                            </Text>
+                                        </div>
+                                    </div>
                                 );
                             },
                         },
@@ -280,7 +336,7 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                             dataIndex: "is_active",
                             key: "is_active",
                             render: (isActive: boolean) => (
-                                <Tag color={isActive ? "green" : "red"}>{isActive ? "Active" : "Disabled"}</Tag>
+                                <Badge status={isActive ? "success" : "error"} text={isActive ? "Active" : "Disabled"} />
                             ),
                         },
                         {
@@ -293,33 +349,36 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                             title: "Actions",
                             key: "actions",
                             render: (_, user) => {
-                                const isSelf = currentUsername !== "" && currentUsername.toLowerCase() === user.username.toLowerCase();
+                                const isSelf = normalizedCurrentUsername !== "" && normalizedCurrentUsername === user.username.toLowerCase();
                                 const isBusy = busyUserAction === user.username;
+                                const disableToggleReason = isSelf && user.is_active
+                                    ? "You cannot disable your currently signed-in account."
+                                    : undefined;
+                                const disableDeleteReason = isSelf
+                                    ? "You cannot delete your currently signed-in account."
+                                    : undefined;
 
                                 return (
-                                    <Space wrap>
+                                    <Space wrap size={8}>
+                                        <Tooltip title={disableToggleReason}>
+                                            <span>
+                                                <Switch
+                                                    checked={user.is_active}
+                                                    checkedChildren="Active"
+                                                    unCheckedChildren="Disabled"
+                                                    loading={isBusy}
+                                                    disabled={writeDisabled || isBusy || Boolean(disableToggleReason)}
+                                                    onChange={(checked) => void handleSetActive(user, checked)}
+                                                />
+                                            </span>
+                                        </Tooltip>
                                         <Button
                                             size="small"
-                                            onClick={() => void handleToggleRole(user)}
-                                            loading={isBusy}
-                                            disabled={writeDisabled || isBusy}
-                                        >
-                                            {user.role === "Admin" ? "Set Operator" : "Set Admin"}
-                                        </Button>
-                                        <Button
-                                            size="small"
-                                            onClick={() => void handleToggleActive(user)}
-                                            loading={isBusy}
-                                            disabled={writeDisabled || isBusy || (isSelf && user.is_active)}
-                                        >
-                                            {user.is_active ? "Disable" : "Enable"}
-                                        </Button>
-                                        <Button
-                                            size="small"
+                                            icon={<KeyOutlined />}
                                             onClick={() => openResetModal(user)}
                                             disabled={writeDisabled || isBusy}
                                         >
-                                            Reset Password
+                                            Reset
                                         </Button>
                                         <Popconfirm
                                             title={`Delete user "${user.username}"?`}
@@ -329,14 +388,19 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                                             onConfirm={() => handleDeleteUser(user)}
                                             disabled={writeDisabled || isBusy || isSelf}
                                         >
-                                            <Button
-                                                danger
-                                                size="small"
-                                                loading={isBusy}
-                                                disabled={writeDisabled || isBusy || isSelf}
-                                            >
-                                                Delete
-                                            </Button>
+                                            <Tooltip title={disableDeleteReason}>
+                                                <span>
+                                                    <Button
+                                                        danger
+                                                        size="small"
+                                                        icon={<DeleteOutlined />}
+                                                        loading={isBusy}
+                                                        disabled={writeDisabled || isBusy || Boolean(disableDeleteReason)}
+                                                    >
+                                                        Delete
+                                                    </Button>
+                                                </span>
+                                            </Tooltip>
                                         </Popconfirm>
                                     </Space>
                                 );
@@ -365,7 +429,6 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                         label="New Password"
                         rules={[
                             { required: true, message: "New password is required" },
-                            { min: 8, message: "Password must be at least 8 characters" },
                         ]}
                     >
                         <Input.Password autoComplete="new-password" placeholder="Enter a temporary password" />

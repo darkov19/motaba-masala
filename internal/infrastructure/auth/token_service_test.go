@@ -37,6 +37,9 @@ func TestTokenService_GenerateAndValidate(t *testing.T) {
 	if claims.Role != string(user.Role) {
 		t.Errorf("Expected role %s, got %s", user.Role, claims.Role)
 	}
+	if claims.UserVersion <= 0 {
+		t.Errorf("Expected positive user version, got %d", claims.UserVersion)
+	}
 }
 
 func TestTokenService_InvalidToken(t *testing.T) {

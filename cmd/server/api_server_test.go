@@ -134,6 +134,36 @@ func TestServerAPI_DeleteUserNotFoundReturnsNotFound(t *testing.T) {
 	assertErrorStatusAndMessage(t, rec, http.StatusNotFound, "user not found")
 }
 
+func TestServerAPI_UpdateUserRoleDisabledReturnsForbidden(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		updateUserRoleFn: func(_ app.UpdateUserRoleInput) error {
+			return errors.New("forbidden: role changes are disabled")
+		},
+	})
+
+	rec := postJSON(t, router, "/admin/users/role", map[string]string{
+		"auth_token": "admin-token",
+		"username":   "operator",
+		"role":       "admin",
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusForbidden, "forbidden: role changes are disabled")
+}
+
+func TestServerAPI_SetUserActiveSelfGuardReturnsConflict(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		setUserActiveFn: func(_ app.SetUserActiveInput) error {
+			return errors.New("cannot disable your own account")
+		},
+	})
+
+	rec := postJSON(t, router, "/admin/users/active", map[string]interface{}{
+		"auth_token": "admin-token",
+		"username":   "admin",
+		"is_active":  false,
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusConflict, "cannot disable your own account")
+}
+
 func (s stubServerAPIApplication) UpdateItemMaster(input appInventory.UpdateItemInput) (app.ItemMasterResult, error) {
 	if s.updateItemMasterFn != nil {
 		return s.updateItemMasterFn(input)

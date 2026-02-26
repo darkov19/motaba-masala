@@ -126,7 +126,7 @@ func (s *Service) ListUsers(token string) ([]domainAuth.User, error) {
 func (s *Service) SetUserActive(token, username string, isActive bool) error {
 	actor, err := s.CurrentUser(token)
 	if err != nil {
-		return fmt.Errorf("unauthorized: %w", err)
+		return err
 	}
 	if actor.Role != domainAuth.RoleAdmin {
 		return errors.New("forbidden: insufficient permissions")
@@ -164,53 +164,13 @@ func (s *Service) SetUserActive(token, username string, isActive bool) error {
 }
 
 func (s *Service) UpdateUserRole(token, username string, role domainAuth.Role) error {
-	if err := validateManagedRole(role); err != nil {
-		return err
-	}
-
-	actor, err := s.CurrentUser(token)
-	if err != nil {
-		return fmt.Errorf("unauthorized: %w", err)
-	}
-	if actor.Role != domainAuth.RoleAdmin {
-		return errors.New("forbidden: insufficient permissions")
-	}
-
-	targetUsername := strings.TrimSpace(username)
-	if targetUsername == "" {
-		return errors.New("username is required")
-	}
-
-	target, err := s.userRepo.FindByUsername(targetUsername)
-	if err != nil {
-		return fmt.Errorf("lookup failed: %w", err)
-	}
-	if target == nil {
-		return errors.New("user not found")
-	}
-	if target.Role == role {
-		return nil
-	}
-
-	if target.Role == domainAuth.RoleAdmin && target.IsActive && role != domainAuth.RoleAdmin {
-		if err := s.ensureAnotherActiveAdminExists(); err != nil {
-			return err
-		}
-	}
-
-	if err := s.userRepo.UpdateRole(targetUsername, role); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return errors.New("user not found")
-		}
-		return fmt.Errorf("failed to update user role: %w", err)
-	}
-	return nil
+	return errors.New("forbidden: role changes are disabled")
 }
 
 func (s *Service) ResetUserPassword(token, username, newPassword string) error {
 	actor, err := s.CurrentUser(token)
 	if err != nil {
-		return fmt.Errorf("unauthorized: %w", err)
+		return err
 	}
 	if actor.Role != domainAuth.RoleAdmin {
 		return errors.New("forbidden: insufficient permissions")
@@ -219,9 +179,6 @@ func (s *Service) ResetUserPassword(token, username, newPassword string) error {
 	targetUsername := strings.TrimSpace(username)
 	if targetUsername == "" {
 		return errors.New("username is required")
-	}
-	if len(strings.TrimSpace(newPassword)) < 8 {
-		return errors.New("password must be at least 8 characters")
 	}
 
 	target, err := s.userRepo.FindByUsername(targetUsername)
@@ -248,7 +205,7 @@ func (s *Service) ResetUserPassword(token, username, newPassword string) error {
 func (s *Service) DeleteUser(token, username string) error {
 	actor, err := s.CurrentUser(token)
 	if err != nil {
-		return fmt.Errorf("unauthorized: %w", err)
+		return err
 	}
 	if actor.Role != domainAuth.RoleAdmin {
 		return errors.New("forbidden: insufficient permissions")

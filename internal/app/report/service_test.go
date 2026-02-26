@@ -46,6 +46,7 @@ func TestReportService_GetValuation_Security(t *testing.T) {
 
 	// Case 1: Admin user (Access Granted)
 	adminUser := &domainAuth.User{Username: "admin", Role: domainAuth.RoleAdmin}
+	repo.user = &domainAuth.User{Username: "admin", Role: domainAuth.RoleAdmin, IsActive: true}
 	adminToken, _ := tokenSvc.GenerateToken(adminUser)
 	_, err := reportSvc.GetValuation(adminToken.Token)
 	if err != nil {
@@ -54,6 +55,7 @@ func TestReportService_GetValuation_Security(t *testing.T) {
 
 	// Case 2: DataEntryOperator user (Access Denied)
 	deoUser := &domainAuth.User{Username: "operator", Role: domainAuth.RoleDataEntryOperator}
+	repo.user = &domainAuth.User{Username: "operator", Role: domainAuth.RoleDataEntryOperator, IsActive: true}
 	deoToken, _ := tokenSvc.GenerateToken(deoUser)
 	_, err = reportSvc.GetValuation(deoToken.Token)
 	if err == nil {

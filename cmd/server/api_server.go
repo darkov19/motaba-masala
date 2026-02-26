@@ -427,6 +427,8 @@ func mapHTTPStatus(message string) int {
 		return http.StatusNotFound
 	case strings.Contains(msg, "already exists"), strings.Contains(msg, "last active admin"), strings.Contains(msg, "cannot modify"):
 		return http.StatusConflict
+	case strings.Contains(msg, "cannot disable your own account"), strings.Contains(msg, "cannot delete your own account"):
+		return http.StatusConflict
 	case strings.Contains(msg, "record modified"), strings.Contains(msg, "concurrency"):
 		return http.StatusConflict
 	default:

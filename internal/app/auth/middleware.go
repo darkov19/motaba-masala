@@ -3,6 +3,8 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	appSys "masala_inventory_managment/internal/app/system"
 	domainAuth "masala_inventory_managment/internal/domain/auth"
@@ -20,9 +22,9 @@ func (s *Service) CheckPermission(tokenString string, requiredRole domainAuth.Ro
 		return err
 	}
 
-	claims, err := s.tokenService.ValidateToken(tokenString)
+	user, err := s.CurrentUser(tokenString)
 	if err != nil {
-		return fmt.Errorf("unauthorized: %w", err)
+		return err
 	}
 
 	if requiredRole == "" {
@@ -35,8 +37,7 @@ func (s *Service) CheckPermission(tokenString string, requiredRole domainAuth.Ro
 		domainAuth.RoleDataEntryOperator: 1,
 	}
 
-	userRole := domainAuth.Role(claims.Role)
-	if roles[userRole] >= roles[requiredRole] {
+	if roles[user.Role] >= roles[requiredRole] {
 		return nil
 	}
 
@@ -47,12 +48,36 @@ func (s *Service) CheckPermission(tokenString string, requiredRole domainAuth.Ro
 func (s *Service) CurrentUser(tokenString string) (*domainAuth.User, error) {
 	claims, err := s.tokenService.ValidateToken(tokenString)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unauthorized: %w", err)
 	}
-	// In a real app, we might fetch from DB to ensure user still exists/active
-	// For now, return basic info from claims
-	return &domainAuth.User{
-		Username: claims.Subject,
-		Role:     domainAuth.Role(claims.Role),
-	}, nil
+
+	username := strings.TrimSpace(claims.Subject)
+	if username == "" {
+		return nil, errors.New("unauthorized: token subject is missing")
+	}
+
+	user, err := s.userRepo.FindByUsername(username)
+	if err != nil {
+		return nil, fmt.Errorf("unauthorized: failed to load user: %w", err)
+	}
+	if user == nil {
+		return nil, errors.New("unauthorized: user account not found")
+	}
+	if !user.IsActive {
+		return nil, errors.New("forbidden: account is disabled")
+	}
+
+	if claims.UserVersion > 0 {
+		if user.UpdatedAt.UTC().UnixNano() > claims.UserVersion {
+			return nil, errors.New("unauthorized: session has been revoked; please sign in again")
+		}
+	} else if claims.IssuedAt != nil {
+		issuedAt := claims.IssuedAt.Time.UTC().Truncate(time.Second)
+		updatedAt := user.UpdatedAt.UTC().Truncate(time.Second)
+		if updatedAt.After(issuedAt) {
+			return nil, errors.New("unauthorized: session has been revoked; please sign in again")
+		}
+	}
+
+	return user, nil
 }

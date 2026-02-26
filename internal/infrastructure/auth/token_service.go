@@ -23,15 +23,21 @@ func NewTokenService(secretKey string) *TokenService {
 
 // CustomClaims extends jwt.RegisteredClaims to include role information.
 type CustomClaims struct {
-	Role string `json:"role"`
+	Role        string `json:"role"`
+	UserVersion int64  `json:"user_version,omitempty"`
 	jwt.RegisteredClaims
 }
 
 // GenerateToken generates a signed JWT for the user.
 func (s *TokenService) GenerateToken(user *auth.User) (*auth.AuthToken, error) {
 	expirationTime := time.Now().Add(24 * time.Hour) // Token valid for 24 hours
+	userVersion := user.UpdatedAt.UTC().UnixNano()
+	if userVersion <= 0 {
+		userVersion = time.Now().UTC().UnixNano()
+	}
 	claims := &CustomClaims{
-		Role: string(user.Role),
+		Role:        string(user.Role),
+		UserVersion: userVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   user.Username,
 			ExpiresAt: jwt.NewNumericDate(expirationTime),

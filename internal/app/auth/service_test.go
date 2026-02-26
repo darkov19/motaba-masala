@@ -220,8 +220,8 @@ func TestService_UserManagementGuards(t *testing.T) {
 	}
 
 	err = svc.UpdateUserRole(admin1Token.Token, "admin1", domainAuth.RoleDataEntryOperator)
-	if err == nil || err.Error() != auth.ErrLastActiveAdmin {
-		t.Fatalf("expected last-active-admin guard, got %v", err)
+	if err == nil || err.Error() != "forbidden: role changes are disabled" {
+		t.Fatalf("expected role-change disabled guard, got %v", err)
 	}
 
 	if err := svc.SetUserActive(admin1Token.Token, "admin2", true); err != nil {
@@ -238,6 +238,48 @@ func TestService_UserManagementGuards(t *testing.T) {
 	}
 	if _, err := svc.ListUsers(operatorToken.Token); err == nil {
 		t.Fatalf("expected forbidden list-users for non-admin")
+	}
+}
+
+func TestService_CurrentUserRejectsRevokedSessionAfterAccountUpdate(t *testing.T) {
+	bcrypt := infraAuth.NewBcryptService()
+	tokenSvc := infraAuth.NewTokenService("test-secret")
+	repo := &mockUserRepo{users: make(map[string]*domainAuth.User)}
+	svc := auth.NewService(repo, bcrypt, tokenSvc)
+
+	seedUser(t, repo, bcrypt, "admin1", "admin-pass-1", domainAuth.RoleAdmin, true)
+
+	adminToken, err := tokenSvc.GenerateToken(&domainAuth.User{Username: "admin1", Role: domainAuth.RoleAdmin})
+	if err != nil {
+		t.Fatalf("failed to create admin token: %v", err)
+	}
+
+	// Simulate any account mutation that should revoke existing tokens immediately.
+	user := repo.users["admin1"]
+	user.UpdatedAt = time.Now().Add(2 * time.Minute)
+
+	if _, err := svc.CurrentUser(adminToken.Token); err == nil || !strings.Contains(err.Error(), "session has been revoked") {
+		t.Fatalf("expected revoked-session error, got %v", err)
+	}
+}
+
+func TestService_CurrentUserRejectsDeletedAccount(t *testing.T) {
+	bcrypt := infraAuth.NewBcryptService()
+	tokenSvc := infraAuth.NewTokenService("test-secret")
+	repo := &mockUserRepo{users: make(map[string]*domainAuth.User)}
+	svc := auth.NewService(repo, bcrypt, tokenSvc)
+
+	seedUser(t, repo, bcrypt, "admin1", "admin-pass-1", domainAuth.RoleAdmin, true)
+
+	adminToken, err := tokenSvc.GenerateToken(&domainAuth.User{Username: "admin1", Role: domainAuth.RoleAdmin})
+	if err != nil {
+		t.Fatalf("failed to create admin token: %v", err)
+	}
+
+	delete(repo.users, "admin1")
+
+	if _, err := svc.CurrentUser(adminToken.Token); err == nil || !strings.Contains(err.Error(), "user account not found") {
+		t.Fatalf("expected missing-account error, got %v", err)
 	}
 }
 
