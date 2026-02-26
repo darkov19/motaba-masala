@@ -663,6 +663,21 @@ func run() error {
 			application.Startup(ctx)
 			monitorSvc.Start(ctx)
 			runtime.WindowMaximise(ctx)
+			restoreServerWindow := func(source string) {
+				slog.Info("Window restore requested", "source", source)
+				runtime.WindowShow(ctx)
+				runtime.WindowUnminimise(ctx)
+				runtime.WindowSetAlwaysOnTop(ctx, true)
+				go func() {
+					time.Sleep(500 * time.Millisecond)
+					runtime.WindowSetAlwaysOnTop(ctx, false)
+				}()
+				if stdruntime.GOOS == "windows" {
+					if err := sysMonitor.FocusWindow("Masala Inventory Server"); err != nil {
+						slog.Warn("Failed to focus server window", "source", source, "error", err)
+					}
+				}
+			}
 			runtime.EventsOn(ctx, "app:request-hide-to-tray", func(optionalData ...interface{}) {
 				slog.Info("UI event", "action", "request-hide-to-tray")
 				runtime.WindowHide(ctx)
@@ -697,24 +712,27 @@ func run() error {
 
 						// Keep onReady non-blocking; process menu events in a dedicated goroutine.
 						go func() {
-							for {
-								select {
-								case <-ctx.Done():
-									return
-								case <-mOpen.ClickedCh:
-									slog.Info("Tray action", "action", "open-dashboard")
-									runtime.EventsEmit(ctx, "app:request-open-dashboard")
-								case <-mQuit.ClickedCh:
-									slog.Info("Tray action", "action", "exit-server")
-									runtime.WindowShow(ctx)
-									runtime.WindowUnminimise(ctx)
-									slog.Info("Tray action", "action", "emit-custom-quit-confirm")
-									runtime.EventsEmit(ctx, "app:request-quit-confirm")
+								for {
+									select {
+									case <-ctx.Done():
+										return
+									case <-mOpen.ClickedCh:
+										slog.Info("Tray action", "action", "open-dashboard")
+										restoreServerWindow("tray-open")
+										runtime.EventsEmit(ctx, "app:request-open-dashboard")
+									case <-mQuit.ClickedCh:
+										slog.Info("Tray action", "action", "exit-server")
+										restoreServerWindow("tray-exit")
+										go func() {
+											time.Sleep(120 * time.Millisecond)
+											slog.Info("Tray action", "action", "emit-custom-quit-confirm")
+											runtime.EventsEmit(ctx, "app:request-quit-confirm")
+										}()
+									}
 								}
-							}
-						}()
-					}, func() {
-						// Systray cleanup
+							}()
+						}, func() {
+							// Systray cleanup
 					})
 				}()
 			} else {
@@ -736,22 +754,16 @@ func run() error {
 			}
 
 			// Background watcher for cross-process focus pings (Linux/Unix support)
-			go func() {
-				pingFile := filepath.Join(os.TempDir(), "MasalaServerMutex.ping")
-				for {
-					if _, err := os.Stat(pingFile); err == nil {
-						_ = os.Remove(pingFile)
-						runtime.WindowShow(ctx)
-						runtime.WindowUnminimise(ctx)
-						runtime.WindowSetAlwaysOnTop(ctx, true)
-						go func() {
-							time.Sleep(500 * time.Millisecond)
-							runtime.WindowSetAlwaysOnTop(ctx, false)
-						}()
+				go func() {
+					pingFile := filepath.Join(os.TempDir(), "MasalaServerMutex.ping")
+					for {
+						if _, err := os.Stat(pingFile); err == nil {
+							_ = os.Remove(pingFile)
+							restoreServerWindow("single-instance-ping")
+						}
+						time.Sleep(500 * time.Millisecond)
 					}
-					time.Sleep(500 * time.Millisecond)
-				}
-			}()
+				}()
 
 			go func() {
 				// Poll window state at a lower cadence; this is enough for UX notifications
