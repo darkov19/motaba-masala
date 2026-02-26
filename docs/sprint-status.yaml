@@ -59,8 +59,8 @@ development_status:
     2-2c-docs-alignment-cohesive-app: done
     2-2d-shell-ux-conformance: done
     2-2e-authentication-ux-session-lifecycle-admin-user-management: done
-    2-2-unit-conversion-engine: backlog
-    2-3-recipe-bom-management: backlog
+    2-2-unit-conversion-engine: done
+    2-3-recipe-bom-management: ready-for-dev
     2-4-supplier-customer-masters: backlog
     epic-2-retrospective: optional
 

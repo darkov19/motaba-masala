@@ -26,6 +26,9 @@ type stubServerAPIApplication struct {
 	listItemsFn              func(input appInventory.ListItemsInput) ([]app.ItemMasterResult, error)
 	createPackagingProfileFn func(input appInventory.CreatePackagingProfileInput) (app.PackagingProfileResult, error)
 	listPackagingProfilesFn  func(input appInventory.ListPackagingProfilesInput) ([]app.PackagingProfileResult, error)
+	createConversionRuleFn   func(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error)
+	listConversionRulesFn    func(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error)
+	convertQuantityFn        func(input appInventory.ConvertQuantityInput) (app.UnitConversionResult, error)
 }
 
 func (s stubServerAPIApplication) Login(username, password string) (app.AuthTokenResult, error) {
@@ -192,6 +195,27 @@ func (s stubServerAPIApplication) ListPackagingProfiles(input appInventory.ListP
 	return nil, errors.New("not implemented")
 }
 
+func (s stubServerAPIApplication) CreateUnitConversionRule(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error) {
+	if s.createConversionRuleFn != nil {
+		return s.createConversionRuleFn(input)
+	}
+	return app.UnitConversionRuleResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) ListUnitConversionRules(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error) {
+	if s.listConversionRulesFn != nil {
+		return s.listConversionRulesFn(input)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) ConvertQuantity(input appInventory.ConvertQuantityInput) (app.UnitConversionResult, error) {
+	if s.convertQuantityFn != nil {
+		return s.convertQuantityFn(input)
+	}
+	return app.UnitConversionResult{}, errors.New("not implemented")
+}
+
 func TestServerAPI_LoginSuccess(t *testing.T) {
 	router := buildServerAPIRouter(stubServerAPIApplication{
 		loginFn: func(username, password string) (app.AuthTokenResult, error) {
@@ -284,6 +308,140 @@ func TestServerAPI_ListItemsUnauthorizedReturnsUnauthorized(t *testing.T) {
 		"auth_token":  "stale-token",
 	})
 	assertErrorStatusAndMessage(t, rec, http.StatusUnauthorized, "invalid or expired authentication token")
+}
+
+func TestServerAPI_ConvertQuantityMissingRuleReturnsBadRequest(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		convertQuantityFn: func(_ appInventory.ConvertQuantityInput) (app.UnitConversionResult, error) {
+			return app.UnitConversionResult{}, &appInventory.ServiceError{
+				Code:    "validation_failed",
+				Message: "conversion rule not found for requested unit pair",
+			}
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/conversions/convert", map[string]interface{}{
+		"quantity":    500,
+		"source_unit": "GRAM",
+		"target_unit": "KG",
+		"auth_token":  "admin-token",
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusBadRequest, "conversion rule not found for requested unit pair")
+}
+
+func TestServerAPI_CreateUnitConversionRuleSuccess(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		createConversionRuleFn: func(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error) {
+			if input.FromUnit != "GRAM" || input.ToUnit != "KG" || input.AuthToken != "admin-token" {
+				t.Fatalf("unexpected create conversion input: %+v", input)
+			}
+			return app.UnitConversionRuleResult{
+				ID:             10,
+				FromUnit:       "GRAM",
+				ToUnit:         "KG",
+				Factor:         0.001,
+				PrecisionScale: 4,
+				RoundingMode:   "HALF_UP",
+				IsActive:       true,
+			}, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/conversions/rules/create", map[string]interface{}{
+		"from_unit":       "GRAM",
+		"to_unit":         "KG",
+		"factor":          0.001,
+		"precision_scale": 4,
+		"rounding_mode":   "HALF_UP",
+		"auth_token":      "admin-token",
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var payload app.UnitConversionRuleResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.ID != 10 || payload.FromUnit != "GRAM" || payload.ToUnit != "KG" {
+		t.Fatalf("unexpected response payload: %#v", payload)
+	}
+}
+
+func TestServerAPI_ListUnitConversionRulesSuccess(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		listConversionRulesFn: func(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error) {
+			if input.FromUnit != "GRAM" || input.ToUnit != "KG" || input.AuthToken != "admin-token" {
+				t.Fatalf("unexpected list conversion input: %+v", input)
+			}
+			return []app.UnitConversionRuleResult{
+				{
+					ID:             11,
+					FromUnit:       "GRAM",
+					ToUnit:         "KG",
+					Factor:         0.001,
+					PrecisionScale: 4,
+					RoundingMode:   "HALF_UP",
+					IsActive:       true,
+				},
+			}, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/conversions/rules/list", map[string]interface{}{
+		"from_unit":   "GRAM",
+		"to_unit":     "KG",
+		"active_only": true,
+		"auth_token":  "admin-token",
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var payload []app.UnitConversionRuleResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if len(payload) != 1 || payload[0].ID != 11 {
+		t.Fatalf("unexpected response payload: %#v", payload)
+	}
+}
+
+func TestServerAPI_ConvertQuantitySuccess(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		convertQuantityFn: func(input appInventory.ConvertQuantityInput) (app.UnitConversionResult, error) {
+			if input.Quantity != 500 || input.SourceUnit != "GRAM" || input.TargetUnit != "KG" || input.AuthToken != "admin-token" {
+				t.Fatalf("unexpected convert quantity input: %+v", input)
+			}
+			return app.UnitConversionResult{
+				QtyConverted: 0.5,
+				SourceUnit:   "GRAM",
+				TargetUnit:   "KG",
+				Factor:       0.001,
+			}, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/conversions/convert", map[string]interface{}{
+		"quantity":    500,
+		"source_unit": "GRAM",
+		"target_unit": "KG",
+		"auth_token":  "admin-token",
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var payload app.UnitConversionResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.QtyConverted != 0.5 || payload.SourceUnit != "GRAM" || payload.TargetUnit != "KG" {
+		t.Fatalf("unexpected response payload: %#v", payload)
+	}
 }
 
 func postJSON(t *testing.T, handler http.Handler, path string, payload interface{}) *httptest.ResponseRecorder {
