@@ -1,6 +1,6 @@
 # Story 1.6: Server Resilience & Stability
 
-Status: review
+Status: done
 
 ## Story
 

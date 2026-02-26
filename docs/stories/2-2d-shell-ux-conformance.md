@@ -51,22 +51,30 @@ so that Server and Client experiences remain cohesive before Epic 2 feature expa
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+GPT-5 Codex
 
 ### Debug Log References
 
 - 2026-02-26: Story drafted from Correct Course workflow output and approved Sprint Change Proposal.
-- 2026-02-26: Implemented shell UX conformance updates in AppShell/App CSS/App routing and added maximize control; frontend lint/tests passing.
-- 2026-02-26: Fixed mode-aware quit confirmation copy so client runtime no longer shows server-specific exit messaging.
+- 2026-02-26: Implemented shell UX conformance updates in AppShell/App CSS/App routing and added maximize control (`f8823d2a`, `d4987bb9`); frontend lint/tests passing.
+- 2026-02-26: Fixed mode-aware quit confirmation copy so client runtime no longer shows server-specific exit messaging (`d4987bb9`).
+- 2026-02-26: Fixed Packaging Profiles dirty-state/type-guard regression that blocked Windows production build (`71b4d41f`).
+- 2026-02-26: Updated shell scrollbar implementation across multiple passes (native fallback + ultra-thin constant style) (`050050f2`, `fb84177f`, `631ae241`).
+- 2026-02-26: Added titlebar drag-region fix for Wails-native frameless behavior (`b10cb928`).
+- 2026-02-26: Hardened tray restore/focus flow so dashboard/quit dialog reliably surfaces from tray (`ca5efe24`).
+- 2026-02-26: Updated Windows build script to emit console-log binaries for server/client diagnostics (`9b2998e5`).
 
 ### Completion Notes List
 
-- Implemented fixed titlebar/header shell behavior with content-only scrolling and polished themed scrollbar treatment.
+- Implemented fixed titlebar/header shell behavior with content-only scrolling and right-panel footer placement.
 - Replaced generic placeholder dashboard with role-specific landing surfaces (Admin Command Center / Operator Speed Hub).
 - Reduced startup duplicate request error noise by mounting only active route view components.
-- Added maximize/restore titlebar control using Wails runtime window toggle APIs.
+- Added maximize/restore titlebar control using Wails runtime window toggle APIs and enabled Wails-native titlebar dragging.
 - Corrected quit confirmation text/buttons to follow runtime mode (`Server` vs `Client`).
-- Updated shell regression tests and validated frontend suites.
+- Updated master-data workspace UX (split table+form layout, role-based read-only surfaces, packaging profile behavior fixes).
+- Fixed server tray re-open reliability by restoring/focusing window before opening dashboard/quit dialog.
+- Added Windows build support for console-visible server/client binaries to improve runtime diagnostics during validation.
+- Updated shell regression tests and validated frontend + server test/build suites.
 - Remaining: capture fresh server/client screenshot evidence for final signoff (manual Windows run).
 
 ### Screenshot Checklist (2026-02-26)
@@ -86,10 +94,23 @@ so that Server and Client experiences remain cohesive before Epic 2 feature expa
 
 Note: All items are code-fixed and test/lint validated. Fresh runtime screenshots are still required for visual signoff.
 
+### Additional Stakeholder-Driven Fixes (Post-Screenshot Audit)
+
+| Issue | Resolution Status | Evidence Path |
+| --- | --- | --- |
+| Footer copyright should appear only on right panel | Fixed | `frontend/src/shell/AppShell.tsx`, `frontend/src/App.css` |
+| App scrollbar looked inconsistent/hideous in packaged app | Fixed via native + thin constant scrollbar tuning | `frontend/src/App.css` |
+| Title bar was not draggable like regular windows | Fixed using Wails drag regions | `frontend/src/App.css` |
+| Server app tray reopen/quit dialog unreliable | Fixed by backend restore/focus helper before tray events | `cmd/server/main.go` |
+| Need direct runtime logs from server/client binaries on Windows | Fixed via console-enabled build outputs | `scripts/windows-hard-sync-build-run.ps1` |
+
 ### Validation Runs
 
-- `npm --prefix frontend run test:run` -> PASS (28 tests)
+- `npm --prefix frontend run build` -> PASS
+- `npm --prefix frontend run test:run` -> PASS (30 tests)
 - `npm --prefix frontend run lint` -> PASS
+- `go test ./internal/infrastructure/system` -> PASS
+- `GOCACHE=/tmp/go-cache go test ./cmd/server` -> PASS
 
 ### File List
 
@@ -97,13 +118,27 @@ Note: All items are code-fixed and test/lint validated. Fresh runtime screenshot
 - frontend/src/App.tsx
 - frontend/src/App.css
 - frontend/src/shell/AppShell.tsx
+- frontend/src/shell/RoleShellNavigation.tsx
 - frontend/src/style.css
 - frontend/src/hooks/useUnsavedChanges.ts
+- frontend/src/context/ConnectionContext.tsx
+- frontend/src/components/forms/ItemMasterForm.tsx
+- frontend/src/components/forms/PackagingProfileForm.tsx
 - frontend/src/__tests__/AppShellRBAC.test.tsx
 - frontend/src/__tests__/AppNavigationBlocker.test.tsx
+- frontend/src/__tests__/AppLicenseStatus.test.tsx
+- frontend/src/components/forms/__tests__/ItemMasterForm.test.tsx
+- frontend/src/components/forms/__tests__/PackagingProfileForm.test.tsx
+- frontend/src/context/__tests__/ConnectionContext.test.tsx
+- cmd/server/main.go
+- scripts/windows-hard-sync-build-run.ps1
+- wails.json
 
 ## Change Log
 
 - 2026-02-26: Initial draft created from approved sprint change proposal.
 - 2026-02-26: Status moved to in-progress after implementing shell UX conformance code changes and regression test updates.
 - 2026-02-26: Status moved to review with screenshot checklist completed and manual Windows screenshot capture marked as final pending signoff step.
+- 2026-02-26: Applied additional UX remediation from stakeholder validation and audit loop (`d4987bb9`, `71b4d41f`, `050050f2`, `b10cb928`, `fb84177f`, `631ae241`).
+- 2026-02-26: Added server tray reopen/focus reliability hardening from runtime validation (`ca5efe24`).
+- 2026-02-26: Added Windows console-log build support for server/client troubleshooting in native runs (`9b2998e5`).

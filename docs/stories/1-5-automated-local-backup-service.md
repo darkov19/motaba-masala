@@ -1,6 +1,6 @@
 # Story 1.5: Automated Local Backup Service
 
-Status: review
+Status: done
 
 ## Story
 
