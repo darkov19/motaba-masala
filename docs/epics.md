@@ -25,7 +25,7 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 
 **Goal:** Create the "Digital Twin" configuration layer (Items, Recipes, Packaging Profiles, Suppliers).
 
-- **Contract-First Sequencing:** Story execution and references in this epic follow `2.2A -> 2.2B -> 2.2C -> 2.2` before proceeding with later feature stories.
+- **Contract-First Sequencing:** Story execution and references in this epic follow `2.2A -> 2.2B -> 2.2C -> 2.2D -> 2.2` before proceeding with later feature stories.
 
 - **Scope:** CRUD for all masters, Unit Conversion logic (KG <-> Grams), Recipe BOM definition, and reusable Packaging Profile setup for composite packing-material consumption.
 
@@ -262,6 +262,46 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 
 **Source Mapping:** PRD `FR-001A` (Item Master canonical structure + type-specific views), PRD `FR-009A` (composite packing profile behavior).
 
+### Story 2.2D: AppShell UX Conformance Hardening
+
+**As a** project stakeholder,
+**I want** the shared AppShell implementation to match the approved UX behavior and visual direction across Server and Client modes,
+**So that** the product experience stays cohesive and later feature UIs do not inherit shell-level UX drift.
+
+**Acceptance Criteria:**
+
+- **Given** the app shell is loaded on `Server.exe` and `Client.exe`
+- **When** the user scrolls page content
+- **Then** the window title bar and app header remain fixed
+- **And** only the workspace content region scrolls
+- **And** shell chrome behavior is consistent with desktop UX expectations
+
+- **Given** an Admin user logs in
+- **When** the dashboard route is active
+- **Then** the landing surface reflects command-center intent (decision-oriented summary cues), not a generic placeholder-only workspace
+
+- **Given** a Data Entry Operator logs in
+- **When** the dashboard route is active
+- **Then** the landing surface reflects speed-hub intent (task-first quick actions and recent/operational context), not Admin-focused presentation density
+
+- **Given** sidebar and shell surfaces are rendered
+- **When** compared against approved UX design direction
+- **Then** spacing, typography hierarchy, and visual density align with Story 2.2B UX references
+- **And** shell theming details (including scrollbar/chrome polish) are internally consistent
+
+- **Given** startup or initial request failures occur
+- **When** feedback is displayed
+- **Then** errors are deduplicated and actionable
+- **And** the UI avoids repetitive toast spam that obscures context
+
+- **Given** shell UX conformance work is complete
+- **When** validation runs
+- **Then** regression tests cover corrected shell behavior and role-specific surfaces
+- **And** screenshot evidence for server/client shell states is captured for review
+
+**Technical Notes:** This corrective story follows Story 2.2C and must complete before Story 2.2 implementation continues.
+Must preserve route/module naming and role constraints from `docs/navigation-rbac-contract.md`.
+
 ### Story 2.2: Unit Conversion Engine
 
 **As a** Developer,
@@ -277,7 +317,7 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 
 **Technical Notes:** Store everything in Base Unit internally. UI handles display conversion.
 Must align route/module naming and role constraints with `docs/navigation-rbac-contract.md` (Story 2.2A baseline).
-This story is intentionally sequenced after Story 2.2C documentation alignment to ensure planning/design/architecture references are coherent before implementation.
+This story is intentionally sequenced after Story 2.2D shell UX conformance hardening to ensure implementation continues on a verified cohesive shell baseline.
 
 ### Story 2.3: Recipe (BOM) Management
 

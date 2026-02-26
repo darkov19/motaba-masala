@@ -130,8 +130,6 @@ describe("App route-level unsaved navigation blocking", () => {
             expect(router.state.location.pathname).toBe("/production/batches");
         });
 
-        fireEvent.click(screen.getByLabelText("GRN Dirty"));
-
         await act(async () => {
             await router.navigate("/grn");
         });

@@ -35,10 +35,10 @@ export function AppShell({
     children,
 }: AppShellProps) {
     return (
-        <Layout className="app-shell" style={{ minHeight: "100vh" }}>
+        <Layout className={`app-shell app-shell--${role}`}>
             {titleBar}
             <Header className="app-header">
-                <Space align="center" size={16}>
+                <Space align="center" size={16} className="app-header__meta">
                     <Title level={4} className="app-header__title">
                         {appTitle}
                     </Title>
@@ -54,7 +54,7 @@ export function AppShell({
                 </Space>
             </Header>
 
-            {licenseBanner}
+            {licenseBanner ? <div className="app-license-banner">{licenseBanner}</div> : null}
 
             <Layout className="app-shell__body">
                 <Sider width={260} className="app-shell__sider" theme="light">
@@ -66,7 +66,7 @@ export function AppShell({
                 </Sider>
 
                 <Content className="app-content">
-                    <Card className="app-card" variant="borderless">
+                    <Card className="app-card app-card--workspace" variant="borderless">
                         <Space orientation="vertical" size={16} style={{ width: "100%" }}>
                             {automationNode}
                             {unauthorizedMessage ? (
@@ -83,7 +83,7 @@ export function AppShell({
                 </Content>
             </Layout>
 
-            <Footer style={{ textAlign: "center" }}>
+            <Footer className="app-footer">
                 Masala Inventory Management (c) 2026
             </Footer>
         </Layout>

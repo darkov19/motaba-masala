@@ -1,4 +1,8 @@
 .app-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
     background: #f6f7fb;
 }
 
@@ -12,6 +16,7 @@
     border-bottom: 1px solid #1d2026;
     -webkit-app-region: drag;
     user-select: none;
+    flex: 0 0 auto;
 }
 
 .window-titlebar__brand {
@@ -43,7 +48,13 @@
     align-items: center;
     justify-content: space-between;
     background: #7d1111;
-    padding: 0 24px;
+    padding: 0 18px;
+    min-height: 46px;
+    flex: 0 0 auto;
+}
+
+.app-header__meta {
+    min-width: 0;
 }
 
 .app-header__logo {
@@ -55,6 +66,11 @@
 .app-header__title.ant-typography {
     color: #fff;
     margin: 0;
+    font-size: 29px;
+}
+
+.app-license-banner {
+    flex: 0 0 auto;
 }
 
 .window-controls {
@@ -78,30 +94,207 @@
     background: rgba(255, 255, 255, 0.16) !important;
 }
 
+.window-controls__icon {
+    position: relative;
+    display: inline-block;
+    width: 12px;
+    height: 10px;
+}
+
+.window-controls__icon--maximise {
+    border: 1.5px solid currentColor;
+    border-top-width: 2px;
+}
+
+.window-controls__icon--restore::before,
+.window-controls__icon--restore::after {
+    content: "";
+    position: absolute;
+    box-sizing: border-box;
+    width: 9px;
+    height: 7px;
+    border: 1.5px solid currentColor;
+    background: transparent;
+}
+
+.window-controls__icon--restore::before {
+    top: 0;
+    right: 0;
+}
+
+.window-controls__icon--restore::after {
+    bottom: 0;
+    left: 0;
+}
+
 .window-controls__btn--close.ant-btn:hover {
     background: #cb2f2f !important;
 }
 
-.app-content {
-    padding: 24px 16px;
-    display: flex;
-    justify-content: center;
-}
-
 .app-shell__body {
+    display: flex;
+    flex: 1;
     min-height: 0;
+    overflow: hidden;
 }
 
 .app-shell__sider.ant-layout-sider {
+    flex: 0 0 auto;
     background: linear-gradient(180deg, #faf5f2 0%, #f4eee9 100%);
     border-right: 1px solid #e8ddd6;
-    padding: 18px 10px;
+    padding: 14px 10px;
+    overflow: hidden;
+}
+
+.app-shell__sider .ant-space {
+    width: 100%;
+}
+
+.app-shell__sider .ant-menu {
+    background: transparent;
+    border-inline-end: 0;
+    max-height: calc(100vh - 170px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+}
+
+.app-shell__sider .ant-menu,
+.app-content {
+    scrollbar-width: thin;
+    scrollbar-color: #b7927f #efe5de;
+}
+
+.app-shell__sider .ant-menu::-webkit-scrollbar,
+.app-content::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.app-shell__sider .ant-menu::-webkit-scrollbar-track,
+.app-content::-webkit-scrollbar-track {
+    background: #efe5de;
+    border-radius: 999px;
+}
+
+.app-shell__sider .ant-menu::-webkit-scrollbar-thumb,
+.app-content::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #c9a896 0%, #b0846e 100%);
+    border-radius: 999px;
+    border: 2px solid #efe5de;
+}
+
+.app-shell__sider .ant-menu::-webkit-scrollbar-thumb:hover,
+.app-content::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #be957f 0%, #9d6f57 100%);
+}
+
+.app-shell__sider .ant-menu-item-group-title {
+    color: #8e8884;
+    font-size: 12px;
+    text-transform: none;
+    font-weight: 600;
+}
+
+.app-shell__sider .ant-menu-item {
+    margin-inline: 0 !important;
+    width: 100%;
+    border-radius: 10px;
+    min-height: 34px;
+    line-height: 34px;
+}
+
+.app-shell__sider .ant-menu-item-selected {
+    background: rgba(125, 17, 17, 0.14) !important;
+    color: #8e1212;
+    font-weight: 600;
+}
+
+.app-content {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 18px;
 }
 
 .app-card {
     width: 100%;
-    max-width: 980px;
+    max-width: 1040px;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.app-card--workspace {
+    margin-bottom: 12px;
+}
+
+.workspace-heading.ant-typography {
+    margin-bottom: 0;
+}
+
+.workspace-subtitle.ant-typography {
+    margin-top: -4px;
+}
+
+.workspace-quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.workspace-segmented {
+    width: 100%;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.dashboard-panel {
+    grid-column: span 12;
+}
+
+.dashboard-kpi-card {
+    grid-column: span 4;
+}
+
+.dashboard-kpi-card__label.ant-typography {
+    font-size: 12px;
+}
+
+.dashboard-kpi-card__value.ant-typography {
+    margin: 0;
+}
+
+.dashboard-list {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.dashboard-list li {
+    margin-bottom: 6px;
+}
+
+.app-shell--operator .app-shell__sider .ant-menu-item {
+    min-height: 38px;
+    line-height: 38px;
+}
+
+.app-shell--operator .workspace-quick-actions .ant-btn {
+    min-width: 130px;
+}
+
+.app-footer {
+    text-align: center;
+    padding: 8px 16px !important;
+    color: #8f8f8f;
+    font-size: 12px;
+    flex: 0 0 auto;
 }
 
 .reconnection-overlay {
@@ -139,25 +332,33 @@
     }
 
     .app-header {
-        height: auto;
-        min-height: 64px;
-        gap: 12px;
-        flex-direction: column;
+        min-height: 62px;
+        gap: 10px;
+        flex-wrap: wrap;
         justify-content: center;
-        padding: 12px;
+        padding: 8px 12px;
     }
 
     .app-header__title.ant-typography {
-        font-size: 16px;
+        font-size: 18px;
     }
 
     .app-shell__sider.ant-layout-sider {
         width: 100% !important;
         max-width: 100% !important;
         min-width: 100% !important;
+        max-height: 34vh;
     }
 
     .app-shell__body {
         flex-direction: column;
+    }
+
+    .app-content {
+        padding: 12px;
+    }
+
+    .dashboard-kpi-card {
+        grid-column: span 12;
     }
 }

@@ -92,7 +92,12 @@ describe("App shell RBAC behavior", () => {
         render(<RouterProvider router={router} />);
 
         expect(await screen.findByText("Admin Shell")).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Admin Command Center" })).toBeInTheDocument();
         expect(screen.getByRole("menuitem", { name: "Users" })).toBeInTheDocument();
+        expect(screen.queryByText("Mock GRN Form")).not.toBeInTheDocument();
+        expect(screen.queryByText("Mock Batch Form")).not.toBeInTheDocument();
+        expect(screen.queryByText("Mock Item Master Form")).not.toBeInTheDocument();
+        expect(screen.queryByText("Mock Packaging Profile Form")).not.toBeInTheDocument();
 
         router.dispose();
     });
@@ -113,6 +118,7 @@ describe("App shell RBAC behavior", () => {
         render(<RouterProvider router={router} />);
 
         expect(await screen.findByText("Operator Shell")).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Operator Speed Hub" })).toBeInTheDocument();
         await waitFor(() => {
             expect(screen.getByText(/Route system\.users is not available for your role\./i)).toBeInTheDocument();
         });

@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Layout, Typography, Card, Segmented, Space, Alert, Button, message } from "antd";
 import { useBlocker, useLocation, useNavigate } from "react-router-dom";
-import { EventsEmit, EventsOn, LogInfo, WindowShow, WindowUnminimise } from "../wailsjs/runtime/runtime";
+import {
+    EventsEmit,
+    EventsOn,
+    LogInfo,
+    WindowIsMaximised,
+    WindowShow,
+    WindowToggleMaximise,
+    WindowUnminimise,
+} from "../wailsjs/runtime/runtime";
 import logo from "./assets/images/icon.png";
 import { ConnectionProvider } from "./context/ConnectionContext";
 import { useConnection } from "./context/ConnectionContext";
@@ -102,6 +110,8 @@ const VIEW_TO_ROUTE_ID: Record<Exclude<ViewKey, "placeholder">, string> = {
 
 function WindowControls() {
     const { appMode } = useConnection();
+    const [isMaximised, setIsMaximised] = useState(false);
+
     const trace = (msg: string) => {
         console.info(msg);
         try {
@@ -110,6 +120,26 @@ function WindowControls() {
             // no-op outside Wails runtime
         }
     };
+
+    const syncMaximisedState = useCallback(async () => {
+        try {
+            const maximised = await WindowIsMaximised();
+            setIsMaximised(Boolean(maximised));
+        } catch {
+            setIsMaximised(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        void syncMaximisedState();
+        const onResize = () => {
+            void syncMaximisedState();
+        };
+        window.addEventListener("resize", onResize);
+        return () => {
+            window.removeEventListener("resize", onResize);
+        };
+    }, [syncMaximisedState]);
 
     const onMinimize = () => {
         trace("[UI][WindowControls] Minimize clicked -> emit app:request-minimize");
@@ -139,10 +169,35 @@ function WindowControls() {
         }
     };
 
+    const onToggleMaximise = () => {
+        trace("[UI][WindowControls] Toggle maximize clicked");
+        try {
+            WindowToggleMaximise();
+            window.setTimeout(() => {
+                void syncMaximisedState();
+            }, 50);
+        } catch {
+            // no-op outside Wails runtime
+        }
+    };
+
     return (
         <div className="window-controls">
             <Button className="window-controls__btn" onClick={onMinimize} type="text" aria-label="Minimize">
                 _
+            </Button>
+            <Button
+                className="window-controls__btn"
+                onClick={onToggleMaximise}
+                type="text"
+                aria-label={isMaximised ? "Restore window" : "Maximize window"}
+            >
+                <span
+                    className={`window-controls__icon ${
+                        isMaximised ? "window-controls__icon--restore" : "window-controls__icon--maximise"
+                    }`}
+                    aria-hidden="true"
+                />
             </Button>
             <Button className="window-controls__btn window-controls__btn--close" onClick={onHideToTray} type="text" aria-label="Hide to tray">
                 ×
@@ -269,6 +324,7 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         isDirty: hasUnsaved,
         message: "You have unsaved changes. Leave anyway?",
         blocker,
+        appMode,
     });
 
     const setDirtyFor = useCallback((view: ViewKey, isDirty: boolean) => {
@@ -321,6 +377,17 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         const routeId = VIEW_TO_ROUTE_ID[nextView as Exclude<ViewKey, "placeholder">];
         guardedNavigate(routeId, "view");
     };
+
+    const formViewOptions: Array<{ label: string; value: Exclude<ViewKey, "dashboard" | "placeholder"> }> = [
+        { label: "GRN Form", value: "grn" },
+        { label: "Batch Form", value: "batch" },
+        { label: "Item Master", value: "item-master" },
+        { label: "Packaging Profiles", value: "packaging-profile" },
+    ];
+    const isFormView = activeView === "grn"
+        || activeView === "batch"
+        || activeView === "item-master"
+        || activeView === "packaging-profile";
 
     const renderLicenseBanner = () => {
         if (licenseStatus.status === "expiring") {
@@ -386,6 +453,115 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         );
     };
 
+    const renderAdminDashboard = () => (
+        <div className="dashboard-grid">
+            <Card className="dashboard-kpi-card" size="small">
+                <Text type="secondary" className="dashboard-kpi-card__label">Stock Value Pipeline</Text>
+                <Title level={4} className="dashboard-kpi-card__value">{"Raw -> Bulk -> Finished"}</Title>
+                <Text type="secondary">Command-center valuation widgets attach here.</Text>
+            </Card>
+            <Card className="dashboard-kpi-card" size="small">
+                <Text type="secondary" className="dashboard-kpi-card__label">Critical Alerts</Text>
+                <Title level={4} className="dashboard-kpi-card__value">Priority Queue</Title>
+                <Text type="secondary">Low stock and service alerts are summarized first.</Text>
+            </Card>
+            <Card className="dashboard-kpi-card" size="small">
+                <Text type="secondary" className="dashboard-kpi-card__label">Operations Pulse</Text>
+                <Title level={4} className="dashboard-kpi-card__value">Live Activity</Title>
+                <Text type="secondary">Recent GRN, Batch, and Dispatch activity appears here.</Text>
+            </Card>
+            <Card className="dashboard-panel" size="small" title="Admin Focus">
+                <ul className="dashboard-list">
+                    <li>Review valuation and low-stock exceptions before opening modules.</li>
+                    <li>Prioritize blocking risks first, then delegate transactional work.</li>
+                    <li>Use route menu to drill into Masters, Procurement, Production, and Reports.</li>
+                </ul>
+            </Card>
+        </div>
+    );
+
+    const renderOperatorDashboard = () => (
+        <div className="dashboard-grid">
+            <Card className="dashboard-panel" size="small" title="Speed Hub">
+                <Text type="secondary">
+                    Use quick actions for rapid task entry, then continue with keyboard-first forms.
+                </Text>
+            </Card>
+            <Card className="dashboard-kpi-card" size="small">
+                <Text type="secondary" className="dashboard-kpi-card__label">Ready Queue</Text>
+                <Title level={4} className="dashboard-kpi-card__value">GRN / Batch / Dispatch</Title>
+                <Text type="secondary">Operator flow starts from action-first entry points.</Text>
+            </Card>
+            <Card className="dashboard-kpi-card" size="small">
+                <Text type="secondary" className="dashboard-kpi-card__label">Recent Work</Text>
+                <Title level={4} className="dashboard-kpi-card__value">Last Transactions</Title>
+                <Text type="secondary">Recent submissions are surfaced for quick verification.</Text>
+            </Card>
+            <Card className="dashboard-kpi-card" size="small">
+                <Text type="secondary" className="dashboard-kpi-card__label">Form Readiness</Text>
+                <Title level={4} className="dashboard-kpi-card__value">Keyboard First</Title>
+                <Text type="secondary">Focus starts in primary fields for fast tab-entry rhythm.</Text>
+            </Card>
+        </div>
+    );
+
+    const renderWorkspaceContent = () => {
+        switch (activeView) {
+            case "dashboard":
+                return role === "admin" ? renderAdminDashboard() : renderOperatorDashboard();
+            case "grn":
+                return (
+                    <GRNForm
+                        userKey={role}
+                        writeDisabled={writeDisabled}
+                        onDirtyChange={onGRNDirtyChange}
+                    />
+                );
+            case "batch":
+                return (
+                    <BatchForm
+                        userKey={role}
+                        writeDisabled={writeDisabled}
+                        onDirtyChange={onBatchDirtyChange}
+                    />
+                );
+            case "item-master":
+                return (
+                    <ItemMasterForm
+                        writeDisabled={writeDisabled || !canPerformAction(role, "masters", "create")}
+                        onDirtyChange={onItemMasterDirtyChange}
+                    />
+                );
+            case "packaging-profile":
+                return (
+                    <PackagingProfileForm
+                        writeDisabled={writeDisabled || !canPerformAction(role, "packing", "create")}
+                        onDirtyChange={onPackagingProfileDirtyChange}
+                    />
+                );
+            default:
+                return (
+                    <Alert
+                        type="info"
+                        showIcon
+                        title={`Route ${activeRoute.id}`}
+                        description="This route is part of the approved contract and is reserved for upcoming stories."
+                    />
+                );
+        }
+    };
+
+    const workspaceTitle = activeView === "dashboard"
+        ? role === "admin"
+            ? "Admin Command Center"
+            : "Operator Speed Hub"
+        : activeRoute.label;
+    const workspaceSubtitle = activeView === "dashboard"
+        ? role === "admin"
+            ? "Decision-oriented overview with role-safe navigation and operational visibility."
+            : "Task-focused landing with quick operational entry points."
+        : "Role-aware shell navigation with backend-authoritative access controls.";
+
     const appTitle = appMode === "server" ? "Masala Inventory Server" : "Masala Inventory Client";
     const activeRouteId = activeRoute.id;
 
@@ -402,14 +578,14 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
             automationNode={renderAutomationCard()}
             unauthorizedMessage={unauthorizedMessage}
         >
-            <Title level={2} style={{ marginBottom: 0 }}>
-                Shared AppShell Workspace
+            <Title level={2} className="workspace-heading">
+                {workspaceTitle}
             </Title>
-            <Text type="secondary">
-                Role-aware shell navigation with backend-authoritative access controls.
+            <Text type="secondary" className="workspace-subtitle">
+                {workspaceSubtitle}
             </Text>
 
-            <Space>
+            <div className="workspace-quick-actions">
                 <Button
                     onClick={() => guardedNavigate("procurement.grn", "create")}
                     disabled={writeDisabled}
@@ -434,62 +610,19 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                 >
                     Packaging Profiles
                 </Button>
-            </Space>
+            </div>
 
-            <Segmented
-                block
-                options={[
-                    { label: "GRN Form", value: "grn" },
-                    { label: "Batch Form", value: "batch" },
-                    { label: "Item Master", value: "item-master" },
-                    { label: "Packaging Profiles", value: "packaging-profile" },
-                ]}
-                value={activeView === "dashboard" || activeView === "placeholder" ? "grn" : activeView}
-                onChange={onViewChange}
-            />
+            {isFormView ? (
+                <Segmented
+                    block
+                    className="workspace-segmented"
+                    options={formViewOptions}
+                    value={activeView}
+                    onChange={onViewChange}
+                />
+            ) : null}
 
-            <div style={{ display: activeView === "grn" ? "block" : "none" }}>
-                <GRNForm
-                    userKey={role}
-                    writeDisabled={writeDisabled}
-                    onDirtyChange={onGRNDirtyChange}
-                />
-            </div>
-            <div style={{ display: activeView === "batch" ? "block" : "none" }}>
-                <BatchForm
-                    userKey={role}
-                    writeDisabled={writeDisabled}
-                    onDirtyChange={onBatchDirtyChange}
-                />
-            </div>
-            <div style={{ display: activeView === "item-master" ? "block" : "none" }}>
-                <ItemMasterForm
-                    writeDisabled={writeDisabled || !canPerformAction(role, "masters", "create")}
-                    onDirtyChange={onItemMasterDirtyChange}
-                />
-            </div>
-            <div style={{ display: activeView === "packaging-profile" ? "block" : "none" }}>
-                <PackagingProfileForm
-                    writeDisabled={writeDisabled || !canPerformAction(role, "packing", "create")}
-                    onDirtyChange={onPackagingProfileDirtyChange}
-                />
-            </div>
-            <div style={{ display: activeView === "dashboard" ? "block" : "none" }}>
-                <Alert
-                    type="info"
-                    showIcon
-                    title="Dashboard route active"
-                    description="Select a module from the role-specific shell menu."
-                />
-            </div>
-            <div style={{ display: activeView === "placeholder" ? "block" : "none" }}>
-                <Alert
-                    type="info"
-                    showIcon
-                    title={`Route ${activeRoute.id}`}
-                    description="This route is part of the approved contract and is reserved for upcoming stories."
-                />
-            </div>
+            {renderWorkspaceContent()}
             <ReconnectionOverlay suppress={Boolean(suppressReconnectionOverlay)} />
         </AppShell>
     );

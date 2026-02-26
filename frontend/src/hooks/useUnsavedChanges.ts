@@ -9,6 +9,7 @@ type UseUnsavedChangesOptions = {
     isDirty: boolean;
     message?: string;
     blocker?: Blocker;
+    appMode?: "server" | "client";
 };
 
 function setForceQuit(force: boolean) {
@@ -36,6 +37,7 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
         isDirty,
         message = "You have unsaved changes. Leave anyway?",
         blocker,
+        appMode = "server",
     } = options;
     const quitInProgressRef = useRef(false);
     const quitDialogOpenRef = useRef(false);
@@ -127,17 +129,22 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
                     return;
                 }
                 quitDialogOpenRef.current = true;
+                const appLabel = appMode === "server" ? "Server" : "Client";
+                const exitLabel = appMode === "server" ? "Exit Server" : "Exit Client";
+                const runningLabel = appMode === "server" ? "Keep Running" : "Stay Open";
                 Modal.confirm({
-                    title: "Exit Masala Inventory Server?",
+                    title: `Exit Masala Inventory ${appLabel}?`,
                     content: isDirty
                         ? "You have unsaved changes. Exiting now may lose recent edits. Do you want to exit anyway?"
-                        : "The server will stop and connected clients may be disconnected. Do you want to exit now?",
+                        : appMode === "server"
+                            ? "The server will stop and connected clients may be disconnected. Do you want to exit now?"
+                            : "The client application will close. Do you want to exit now?",
                     icon: createElement(ExclamationCircleFilled, {
                         style: { color: "#7D1111" },
                     }),
                     centered: true,
-                    okText: "Exit Server",
-                    cancelText: "Keep Running",
+                    okText: exitLabel,
+                    cancelText: runningLabel,
                     okButtonProps: { danger: true },
                     onOk: () => {
                         trace("[UI][QuitFlow] Confirm dialog accepted -> quitting");
@@ -157,7 +164,7 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
             unsubscribe?.();
             unsubscribeQuitConfirm?.();
         };
-    }, [isDirty, message]);
+    }, [appMode, isDirty, message]);
 
     const confirmIfUnsaved = async (onConfirm: () => void): Promise<boolean> => {
         if (!isDirty) {
