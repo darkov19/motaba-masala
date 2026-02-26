@@ -14,6 +14,7 @@
     padding: 0 10px 0 12px;
     background: linear-gradient(180deg, #8c1414 0%, #6f0f0f 100%);
     border-bottom: 1px solid #560a0a;
+    --wails-draggable: drag;
     -webkit-app-region: drag;
     user-select: none;
     flex: 0 0 auto;
@@ -80,7 +81,14 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    --wails-draggable: no-drag;
     -webkit-app-region: no-drag;
+}
+
+.window-controls *,
+.window-controls *::before,
+.window-controls *::after {
+    --wails-draggable: no-drag;
 }
 
 .window-controls__btn.ant-btn {
