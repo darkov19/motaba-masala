@@ -302,6 +302,46 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 **Technical Notes:** This corrective story follows Story 2.2C and must complete before Story 2.2 implementation continues.
 Must preserve route/module naming and role constraints from `docs/navigation-rbac-contract.md`.
 
+### Story 2.2E: Authentication UX, Session Lifecycle, and Admin User Management
+
+**As a** System Admin and authenticated user,
+**I want** a complete authentication lifecycle (login, session handling, logout) and an actionable Admin users screen,
+**So that** access control works end-to-end in the real UI and Admin can provision users safely.
+
+**Acceptance Criteria:**
+
+- **Given** no valid session token exists
+- **When** the app starts
+- **Then** the user sees a login screen before entering shell routes
+- **And** shell/module routes are not accessible until successful login
+
+- **Given** valid credentials are submitted
+- **When** login succeeds
+- **Then** the user enters the role-appropriate shell landing experience
+- **And** protected requests use the authenticated session token
+
+- **Given** an authenticated session has expired (24h JWT baseline)
+- **When** the user attempts a protected action
+- **Then** the app redirects to login with a clear session-expired message
+- **And** the user must re-authenticate
+
+- **Given** an authenticated user chooses logout
+- **When** logout is confirmed
+- **Then** session token/state is cleared from storage
+- **And** the app returns to login state
+
+- **Given** an Admin opens `System > Users` (`/system/users`)
+- **When** they submit username, password, and role
+- **Then** the app calls backend create-user flow and shows success/error feedback
+- **And** non-Admin users cannot access this surface
+
+- **Given** auth lifecycle implementation is complete
+- **When** validation runs
+- **Then** tests cover login success/failure, expiry redirect, logout behavior, and admin-only users access
+
+**Technical Notes:** This story closes the auth UX/session lifecycle gap identified by Correct Course on 2026-02-26.
+Must preserve backend-authoritative authorization boundaries and `docs/navigation-rbac-contract.md` route identity.
+
 ### Story 2.2: Unit Conversion Engine
 
 **As a** Developer,
@@ -553,7 +593,7 @@ Role and module access assumptions must remain consistent with `docs/navigation-
 - **And** the "Cost Price" of the FG is calculated (Bulk Cost + Packing Material Cost + Overheads)
 - **And** when a packaging profile is used, FG cost includes all consumed profile components (e.g., Jar Body + Lid + Cup Sticker) based on their effective item costs
 
-**Technical Notes:** Roll up costs: (Bulk Cost/g * Pack Weight) + Packing Cost. For profile-based packs, `Packing Cost` is the sum of all mapped component costs at consumed quantities.
+**Technical Notes:** Roll up costs: (Bulk Cost/g \* Pack Weight) + Packing Cost. For profile-based packs, `Packing Cost` is the sum of all mapped component costs at consumed quantities.
 
 ---
 

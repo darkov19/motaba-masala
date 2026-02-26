@@ -1,244 +1,216 @@
-# Sprint Change Proposal - UX Conformance Correction (Story 2.2B)
+# Sprint Change Proposal - Authentication UX and Session Lifecycle Completion
 
 Date: 2026-02-26
 Author: darko (facilitated via Correct Course workflow)
-Change Trigger Story: 2.2B (Shared AppShell with Role Variants)
+Change Trigger: Authentication UX and lifecycle coverage gap (login/logout/admin user management)
 Execution Mode: Incremental
 
 ## 1. Issue Summary
 
 ### Problem Statement
 
-During post-implementation review of Story 2.2B, the implemented AppShell experience in both `Server.exe` and `Client.exe` diverges from the approved UX specification in `docs/ux-design-specification.md`.
+The project has backend authentication and RBAC foundations, but user-facing authentication lifecycle behavior is incomplete and under-specified in implementation artifacts. Specifically:
+
+- No implemented login screen/auth gate before shell workspace
+- No implemented logout flow
+- `system.users` route exists but is still placeholder content (no Admin user-creation UI)
+- Session duration exists in code (24h JWT) but is not explicitly captured as product behavior in planning docs
 
 ### Discovery Context
 
-The issue was identified through visual verification of runtime screenshots after Story 2.2B had been marked `done`.
+The gap surfaced during implementation-phase review when validating where login/logout/new-user behavior is planned and implemented.
 
 ### Evidence
 
-- `Screenshots/server/server_dashboard.png`
-- `Screenshots/client/client_dashboard.png`
-- `Screenshots/server/server_title_bar_and_header_gets_scrolled.png`
-- `Screenshots/server/server_part_that_visible_on_all_tabs.png`
-- `Screenshots/server/server_imporve_scrollbar_to_match_the_theme.png`
-- `Screenshots/server/server_requests_failied_on_startup.png`
-- `Screenshots/client/client_requests_failied_on_startup.png`
-
-### Observed Mismatches
-
-- Generic placeholder-centric workspace is shown instead of role-specific landing experience expectations.
-- Shell chrome/scroll behavior appears inconsistent with expected desktop-shell interaction.
-- Sidebar and shell visual density/polish are not aligned with approved UX direction.
-- Startup error UX is repetitive and non-actionable in current screenshot evidence.
+- Story foundation exists: `docs/stories/1-4-local-authentication-rbac.md`
+- API/backend support exists: `auth.Login`, `admin.CreateUser`, token generation
+- Current session token TTL in code: 24h (`internal/infrastructure/auth/token_service.go`)
+- Frontend shell currently launches without explicit login screen flow in `frontend/src/App.tsx`
+- `system.users` route is defined but unresolved to functional UI (`frontend/src/shell/rbac.ts` + placeholder render path in `App.tsx`)
 
 ## 2. Impact Analysis
 
 ### Epic Impact
 
-- **Epic 2 remains viable** and can continue.
-- Story `2.2B` is functionally complete but **UX-conformance incomplete** relative to approved design intent.
-- A corrective story is required before proceeding with additional feature UI work to avoid compounding divergence.
+- Epic 2 remains viable.
+- Current Epic 2 sequence needs one focused story to close auth UX/session lifecycle gaps before broader feature expansion.
 
 ### Story Impact
 
-- Keep `2.2B` as historical `done` (do not rewrite history).
-- Add a corrective story: **`2.2D - Shell UX Conformance Hardening`**.
-- Prioritize `2.2D` before additional Epic 2 feature story implementation.
+- Keep completed stories unchanged (`1.4`, `2.1`, `2.2A`, `2.2B`, `2.2C`) as historical record.
+- Add new story in Epic 2:
+  - **Story 2.2E: Authentication UX, Session Lifecycle, and Admin User Management**
+- Sequence recommendation:
+  - Finish `2.2D` review closure, then execute `2.2E`, then continue `2.3+`.
 
 ### Artifact Conflicts
 
-- **PRD:** No core product-scope conflict identified; no PRD changes required.
-- **Architecture:** Contract is currently too high-level to prevent shell UX drift; add explicit conformance constraints.
-- **UX Specification:** Intent exists, but implementation gate criteria are not explicit enough to enforce behavior-level conformance.
-- **Planning/Tracking:** `docs/epics.md` sequencing and `docs/sprint-status.yaml` require update to include `2.2D`.
+- **PRD:** Requires Admin user management and role-based access, but auth lifecycle UX is not explicit enough.
+- **Architecture:** Auth/token pattern is documented, but session lifecycle contract (TTL/expiry/logout UX expectations) is not explicit.
+- **UX Specification:** User journeys mention login but do not define enforceable login/expiry/logout behavior and admin user-management surface acceptance.
+- **Navigation/RBAC Contract:** `system.users` route is contractual but currently placeholder in implementation.
 
 ### Technical Impact
 
-Affected implementation zones:
+Affected areas likely include:
 
-- `frontend/src/App.tsx`
-- `frontend/src/App.css`
-- `frontend/src/shell/AppShell.tsx`
-- Potentially `frontend/src/shell/RoleShellNavigation.tsx`
-- Shell regression tests and screenshot baselines
-
-Risk of not correcting now:
-
-- Future module screens will inherit non-conforming shell patterns, increasing rework cost across Epic 3+.
+- `frontend/src/App.tsx` (auth gate, login/logout routing behavior)
+- `frontend/src/shell/*` (logout controls and system/users navigation completion)
+- Wails bindings usage for auth/admin operations
+- Frontend tests for lifecycle and role-based behavior
 
 ## 3. Recommended Approach
 
 ### Selected Path
 
-**Option 1: Direct Adjustment** via a new corrective story (`2.2D`).
+**Option 1: Direct Adjustment** (add/execute a targeted Epic 2 story).
 
 ### Rationale
 
-- Fastest path with least disruption.
-- Preserves current architecture and RBAC contract.
-- Creates explicit, auditable correction scope.
-- Avoids costly rollback churn and unnecessary MVP re-scope.
+- Backend primitives are already present.
+- No rollback required.
+- No MVP scope reduction required.
+- Fastest path to align product requirements, UX, architecture, and implementation.
 
 ### Estimate and Risk
 
 - Effort: **Medium**
-- Risk: **Low**
-- Timeline impact: **+2 to 4 working days** (implementation, test updates, visual verification)
+- Risk: **Low-Medium**
+- Timeline impact: **+3 to 5 working days** (story drafting, implementation, test hardening, validation)
 
 ## 4. Detailed Change Proposals
 
-## 4.1 Stories / Planning Artifacts
+### 4.1 Story / Planning Change
 
-### A) `docs/epics.md` - Epic 2 sequencing and corrective story insertion
-
-OLD:
-
-- `2.2A -> 2.2B -> 2.2C -> 2.2`
-- No corrective story for shell UX conformance.
-
-NEW:
-
-- `2.2A -> 2.2B -> 2.2C -> 2.2D -> 2.2`
-- Add `Story 2.2D: AppShell UX Conformance Hardening` with acceptance criteria for:
-    - Shell chrome behavior (fixed titlebar/header; content-only scroll).
-    - Role-appropriate landing experience (Admin command-center cues, Operator speed-hub cues).
-    - Visual conformance (sidebar density/spacing/typography/color behavior).
-    - Error UX conformance (deduplicated, actionable startup/network errors).
-    - Regression coverage (tests + screenshot baseline for server/client shell).
-
-Justification:
-
-- Preserves historical completion while making corrective scope explicit and trackable.
-
-### B) `docs/sprint-status.yaml` - status tracking
+Artifact: `docs/epics.md`, `docs/sprint-status.yaml`
 
 OLD:
 
-- `2-2b-app-shell-role-variants: done`
-- `2-2c-docs-alignment-cohesive-app: done`
-- No `2-2d-*` key.
+- No dedicated story that closes login/logout/admin user-management UI lifecycle end-to-end.
 
 NEW:
 
-- Keep `2-2b` and `2-2c` as `done`.
-- Add `2-2d-shell-ux-conformance: drafted`.
+- Add **Story 2.2E: Authentication UX, Session Lifecycle, and Admin User Management** with acceptance criteria for:
+  - Login screen and auth gate before shell routes
+  - Logout action returns to login and clears session state
+  - Admin `system.users` surface supports create-user flow
+  - Session-expired behavior is user-visible and requires re-login
+  - Regression tests cover lifecycle and role visibility
 
-Justification:
+Rationale:
 
-- Enables backlog and execution routing without rewriting prior status.
+- Creates clear ownership and acceptance gates without rewriting completed history.
 
-## 4.2 PRD
+### 4.2 PRD Clarification
 
-### `docs/PRD.md`
+Artifact: `docs/PRD.md`
 
 OLD:
 
-- Current PRD scope and UX principles already support the intended direction.
+- Role-based RBAC and user management intent exist, but lifecycle UX behavior is implicit.
 
 NEW:
 
-- **No change proposed**.
+- Add concise clarifications:
+  - Login UX is required before entering shell when no valid session exists.
+  - Session UX is token-gated for protected operations/routes.
+  - Logout UX must end session and return to login.
+  - Session TTL baseline: **24h absolute from login** (MVP baseline).
+  - Admin UI must expose user creation for role-bound user provisioning.
 
-Justification:
+Rationale:
 
-- The issue is implementation/spec conformance drift, not product requirement mismatch.
+- Makes expected runtime behavior explicit and testable.
 
-## 4.3 Architecture
+### 4.3 Architecture Clarification
 
-### `docs/architecture.md` - `Implementation Patterns -> 0. Cohesive App Contract`
+Artifact: `docs/architecture.md`
 
 OLD:
 
-- Cohesive app contract exists at conceptual level.
+- Authentication/token usage is described at a high level.
 
 NEW:
 
-- Add explicit conformance constraints:
-    - Shell layering contract: titlebar/header fixed; only workspace content scrolls.
-    - Role-variant UX contract: admin/default presentation differs from operator/default presentation while route IDs remain shared.
-    - Visual quality gate: no placeholder-only default landing for completed shell stories.
-    - Error feedback contract: startup/network errors must be deduplicated and actionable.
-    - Verification gate: screenshot baseline checks for server/client shell.
+- Add explicit lifecycle contract:
+  - JWT TTL baseline: **24h absolute**
+  - Expired token behavior requires re-authentication
+  - Frontend auth gate is required for protected shell entry
+  - Logout is session-state termination (token removal + auth reset)
+  - Backend remains security authority for authorization
 
-Justification:
+Rationale:
 
-- Reduces interpretation ambiguity and prevents recurrence of the same drift.
+- Aligns architecture language with implemented token model and expected UX behavior.
 
-## 4.4 UI/UX Specification
+### 4.4 UX Specification Clarification
 
-### `docs/ux-design-specification.md` - `4.1 Chosen Design Approach` + `7.1 Consistency Rules`
+Artifact: `docs/ux-design-specification.md`
 
 OLD:
 
-- Intent documented, but behavior-level implementation gates are implicit.
+- Critical journeys start from Login but acceptance behavior is not explicit for expiry/logout/admin-user-management surface.
 
 NEW:
 
-- Add explicit “Conformance Criteria (implementation gate)” block covering:
-    - Header/titlebar persistence behavior during scroll.
-    - Sidebar density/presentation expectations by role.
-    - Default landing behavior expectations by role.
-    - Startup/error notification behavior (clear, non-duplicative, actionable).
-    - Visual acceptance evidence requirement (server/client screenshots).
+- Add auth UX conformance criteria:
+  - No valid session -> login entry first
+  - Expired session -> clear redirect/message to login
+  - Logout affordance in shell returns to login
+  - Admin route `System > Users` is actionable (not placeholder)
 
-Justification:
+Rationale:
 
-- Converts design intent into verifiable acceptance language for implementation and QA.
+- Converts journey intent into verifiable UX acceptance checks.
 
-## 4.5 Code / Tests (Implementation Scope)
+### 4.5 Code and Test Scope
 
-### `frontend/src/App.css`, `frontend/src/App.tsx`, `frontend/src/shell/AppShell.tsx` (+ related tests)
+Implementation targets:
 
-OLD:
+- Frontend login route/screen and auth gate
+- Logout action and token/session clearing behavior
+- `system.users` Admin create-user UI
+- Binding integration to existing backend auth/admin calls
+- Regression tests:
+  - login success/failure
+  - session-expiry redirect
+  - logout redirect/session clear
+  - admin-only users route behavior
 
-- Shell behavior and visuals in screenshots are not fully conformant with approved UX direction.
+Rationale:
 
-NEW:
-
-- Implement targeted shell UX corrections under `2.2D`:
-    - Fixed chrome + content-only scroll behavior.
-    - Stronger role-variant landing surfaces.
-    - Refined shell visual tokens and navigation presentation.
-    - Deduplicated startup failure messaging with clearer recovery actions.
-    - Regression tests and screenshot baselines for both runtime modes.
-
-Justification:
-
-- Ensures conformance is measurable and sustained.
+- Ensures documentation updates map to executable, test-backed behavior.
 
 ## 5. Implementation Handoff
 
 ### Scope Classification
 
-**Moderate** - requires backlog/story planning updates plus frontend shell implementation and regression updates.
+**Moderate**
 
 ### Routing
 
-- **Primary Route:** Product Owner / Scrum Master (backlog sequencing + story drafting for `2.2D`).
-- **Secondary Route:** Development Team (implement `2.2D` code/test changes).
-- **Support Route:** UX/Architecture review pass for acceptance signoff.
-
-### Responsibilities
-
-- PO/SM:
-    - Create and prioritize `2.2D` before additional Epic 2 feature UI work.
-    - Update planning artifacts (`epics`, `sprint-status`).
-- Dev Team:
-    - Implement shell/UI corrections and regression tests.
-    - Produce before/after screenshot evidence for server and client modes.
-- UX/Architect reviewer:
-    - Validate conformance to updated UX + architecture constraints.
+- **Primary:** Product Owner / Scrum Master
+  - Draft/prioritize Story 2.2E and update sprint sequencing
+- **Secondary:** Development Team
+  - Implement auth lifecycle UI and admin user-management surface
+- **Review Support:** UX + Architect
+  - Validate lifecycle conformance and architecture alignment
 
 ### Success Criteria
 
-- `2.2D` drafted, approved, and tracked in sprint status.
-- Shell behavior and visuals match UX conformance criteria.
-- Startup error UX is actionable and non-duplicative.
-- Regression tests pass and screenshot evidence is archived.
+- Story 2.2E drafted and tracked
+- Login/logout/session-expiry behaviors implemented and validated
+- Admin users management surface is functional
+- Documentation and tests align with implemented behavior
 
 ## Proposal Decision Record
 
-- Change Trigger: Approved as Story `2.2B` UX conformance drift.
-- Strategy: Option 1 Direct Adjustment.
-- Mechanism: Add corrective Story `2.2D` and execute immediately before further feature UI expansion.
+- Trigger: Auth lifecycle and admin-user-management UX coverage gap
+- Selected Strategy: Option 1 - Direct Adjustment
+- Delivery Mechanism: Add and execute Story 2.2E before continuing major Epic 2+ feature rollout
+- User Approval: yes (2026-02-26)
+- Approved Scope Classification: Moderate
+- Approved Handoff Route:
+  - Product Owner / Scrum Master
+  - Development Team
+  - UX + Architect review

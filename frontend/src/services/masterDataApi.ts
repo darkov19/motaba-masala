@@ -1,3 +1,10 @@
+import {
+    extractErrorMessage,
+    isSessionAuthError,
+    notifyAuthSessionExpired,
+    resolveAuthToken,
+} from "./authApi";
+
 export type ServiceFieldError = {
     field: string;
     message: string;
@@ -80,28 +87,11 @@ function getBinding(): AppBinding {
 }
 
 function mapServiceError(error: unknown): Error {
-    if (typeof error === "object" && error !== null && "message" in error) {
-        const withMessage = error as { message?: string };
-        return new Error(withMessage.message || "Request failed");
+    const message = extractErrorMessage(error);
+    if (isSessionAuthError(error)) {
+        notifyAuthSessionExpired("Session expired or unauthorized. Please sign in again.");
     }
-    return new Error("Request failed");
-}
-
-function resolveAuthToken(): string | undefined {
-    if (typeof window === "undefined") {
-        return undefined;
-    }
-    try {
-        return (
-            window.localStorage.getItem("auth_token")
-            || window.localStorage.getItem("token")
-            || window.sessionStorage.getItem("auth_token")
-            || window.sessionStorage.getItem("token")
-            || undefined
-        );
-    } catch {
-        return undefined;
-    }
+    return new Error(message);
 }
 
 export async function listItems(activeOnly = true, itemType?: ItemMaster["item_type"], search?: string): Promise<ItemMaster[]> {

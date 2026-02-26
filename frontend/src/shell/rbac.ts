@@ -3,7 +3,7 @@ import type { AppMode } from "../context/ConnectionContext";
 export type UserRole = "admin" | "operator";
 export type ModuleKey = "dashboard" | "masters" | "procurement" | "production" | "packing" | "sales" | "reports" | "system";
 export type ActionKey = "view" | "create" | "edit" | "delete" | "approve" | "view_valuation" | "manage_system";
-export type ViewKey = "dashboard" | "grn" | "batch" | "item-master" | "packaging-profile" | "placeholder";
+export type ViewKey = "dashboard" | "grn" | "batch" | "item-master" | "packaging-profile" | "system-users" | "placeholder";
 
 export type AppRoute = {
     id: string;
@@ -31,7 +31,7 @@ export const ROUTE_REGISTRY: AppRoute[] = [
     { id: "reports.stock-ledger", path: "/reports/stock-ledger", module: "reports", label: "Stock Ledger", minRole: "operator", viewKey: "placeholder" },
     { id: "reports.wastage", path: "/reports/wastage", module: "reports", label: "Wastage", minRole: "operator", viewKey: "placeholder" },
     { id: "reports.audit", path: "/reports/audit", module: "reports", label: "Audit Trail", minRole: "operator", viewKey: "placeholder" },
-    { id: "system.users", path: "/system/users", module: "system", label: "Users", minRole: "admin", viewKey: "placeholder" },
+    { id: "system.users", path: "/system/users", module: "system", label: "Users", minRole: "admin", viewKey: "system-users" },
     { id: "system.license", path: "/system/license", module: "system", label: "License", minRole: "admin", viewKey: "placeholder" },
     { id: "system.backup", path: "/system/backup", module: "system", label: "Backup", minRole: "admin", viewKey: "placeholder" },
 ];

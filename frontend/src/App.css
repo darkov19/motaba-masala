@@ -332,6 +332,10 @@
     gap: 10px;
 }
 
+.shell-nav__footer-text {
+    min-width: 0;
+}
+
 .shell-nav__avatar {
     width: 32px;
     height: 32px;
@@ -356,6 +360,23 @@
     color: #64748b;
     font-size: 12px;
     line-height: 1.2;
+}
+
+.shell-nav__logout {
+    margin-left: auto;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.shell-nav__logout:hover {
+    border-color: #cbd5e1;
+    color: #0f172a;
 }
 
 .shell-nav__scroll,
@@ -421,6 +442,29 @@
     margin-bottom: 0;
     flex: 1 1 auto;
     min-height: 0;
+}
+
+.auth-gate {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(160deg, #f8fafc 0%, #fee2e2 100%);
+    padding: 20px;
+}
+
+.auth-gate__card.ant-card {
+    width: min(430px, 100%);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+}
+
+.auth-gate__title.ant-typography {
+    margin: 0;
+}
+
+.auth-gate__subtitle.ant-typography {
+    display: block;
 }
 
 .app-card--dashboard {

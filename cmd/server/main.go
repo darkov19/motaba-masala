@@ -581,16 +581,17 @@ func run() error {
 				return err
 			}
 			tokenService := infraAuth.NewTokenService(jwtSecret)
-				authService = appAuth.NewService(userRepo, bcryptService, tokenService)
-				application.SetSessionRoleResolver(func(authToken string) (string, error) {
-					user, err := authService.CurrentUser(authToken)
-					if err != nil {
-						return "", err
-					}
-					return string(user.Role), nil
-				})
-				reportService = appReport.NewAppService(authService)
-				adminService = appAdmin.NewService(authService, backupService, licenseSvc, logError)
+			authService = appAuth.NewService(userRepo, bcryptService, tokenService)
+			application.SetAuthService(authService)
+			application.SetSessionRoleResolver(func(authToken string) (string, error) {
+				user, err := authService.CurrentUser(authToken)
+				if err != nil {
+					return "", err
+				}
+				return string(user.Role), nil
+			})
+			reportService = appReport.NewAppService(authService)
+			adminService = appAdmin.NewService(authService, backupService, licenseSvc, logError)
 			inventoryRepo := db.NewSqliteInventoryRepository(dbManager.GetDB())
 			inventoryService := appInventory.NewService(inventoryRepo, func(authToken string) (domainAuth.Role, error) {
 				user, err := authService.CurrentUser(authToken)
@@ -712,27 +713,27 @@ func run() error {
 
 						// Keep onReady non-blocking; process menu events in a dedicated goroutine.
 						go func() {
-								for {
-									select {
-									case <-ctx.Done():
-										return
-									case <-mOpen.ClickedCh:
-										slog.Info("Tray action", "action", "open-dashboard")
-										restoreServerWindow("tray-open")
-										runtime.EventsEmit(ctx, "app:request-open-dashboard")
-									case <-mQuit.ClickedCh:
-										slog.Info("Tray action", "action", "exit-server")
-										restoreServerWindow("tray-exit")
-										go func() {
-											time.Sleep(120 * time.Millisecond)
-											slog.Info("Tray action", "action", "emit-custom-quit-confirm")
-											runtime.EventsEmit(ctx, "app:request-quit-confirm")
-										}()
-									}
+							for {
+								select {
+								case <-ctx.Done():
+									return
+								case <-mOpen.ClickedCh:
+									slog.Info("Tray action", "action", "open-dashboard")
+									restoreServerWindow("tray-open")
+									runtime.EventsEmit(ctx, "app:request-open-dashboard")
+								case <-mQuit.ClickedCh:
+									slog.Info("Tray action", "action", "exit-server")
+									restoreServerWindow("tray-exit")
+									go func() {
+										time.Sleep(120 * time.Millisecond)
+										slog.Info("Tray action", "action", "emit-custom-quit-confirm")
+										runtime.EventsEmit(ctx, "app:request-quit-confirm")
+									}()
 								}
-							}()
-						}, func() {
-							// Systray cleanup
+							}
+						}()
+					}, func() {
+						// Systray cleanup
 					})
 				}()
 			} else {
@@ -754,16 +755,16 @@ func run() error {
 			}
 
 			// Background watcher for cross-process focus pings (Linux/Unix support)
-				go func() {
-					pingFile := filepath.Join(os.TempDir(), "MasalaServerMutex.ping")
-					for {
-						if _, err := os.Stat(pingFile); err == nil {
-							_ = os.Remove(pingFile)
-							restoreServerWindow("single-instance-ping")
-						}
-						time.Sleep(500 * time.Millisecond)
+			go func() {
+				pingFile := filepath.Join(os.TempDir(), "MasalaServerMutex.ping")
+				for {
+					if _, err := os.Stat(pingFile); err == nil {
+						_ = os.Remove(pingFile)
+						restoreServerWindow("single-instance-ping")
 					}
-				}()
+					time.Sleep(500 * time.Millisecond)
+				}
+			}()
 
 			go func() {
 				// Poll window state at a lower cadence; this is enough for UX notifications

@@ -76,6 +76,30 @@ const confirmMock = vi.fn<(...args: unknown[]) => unknown>();
 
 describe("App route-level unsaved navigation blocking", () => {
     beforeEach(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+        (window as unknown as {
+            go?: {
+                app?: {
+                    App?: {
+                        GetRecoveryState?: () => Promise<unknown>;
+                        GetLicenseStatus?: () => Promise<unknown>;
+                        GetLicenseLockoutState?: () => Promise<unknown>;
+                        GetSessionRole?: () => Promise<string>;
+                    };
+                };
+            };
+        }).go = {
+            app: {
+                App: {
+                    GetRecoveryState: vi.fn().mockResolvedValue({ enabled: false, message: "", backups: [] }),
+                    GetLicenseStatus: vi.fn().mockResolvedValue({ status: "active", days_remaining: 0 }),
+                    GetLicenseLockoutState: vi.fn().mockResolvedValue({ enabled: false, reason: "", message: "", hardware_id: "" }),
+                    GetSessionRole: vi.fn().mockResolvedValue("operator"),
+                },
+            },
+        };
+        localStorage.setItem("auth_token", "trusted-session-token");
         confirmMock.mockReset();
         vi.spyOn(Modal, "confirm").mockImplementation(
             (...args: Parameters<typeof Modal.confirm>) => {
@@ -90,6 +114,7 @@ describe("App route-level unsaved navigation blocking", () => {
 
     afterEach(() => {
         vi.restoreAllMocks();
+        delete (window as unknown as { go?: unknown }).go;
     });
 
     it("blocks dirty active route transition and allows clean active route transition", async () => {
@@ -105,6 +130,7 @@ describe("App route-level unsaved navigation blocking", () => {
 
         const { unmount } = render(<RouterProvider router={router} />);
 
+        expect(await screen.findByText("Operator Shell")).toBeInTheDocument();
         fireEvent.click(screen.getByLabelText("GRN Dirty"));
         fireEvent.click(screen.getByRole("menuitem", { name: "Batches" }));
 

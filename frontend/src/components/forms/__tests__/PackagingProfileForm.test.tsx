@@ -56,6 +56,7 @@ describe("PackagingProfileForm", () => {
         const onDirty = vi.fn();
         render(<PackagingProfileForm onDirtyChange={onDirty} />);
 
+        await screen.findByPlaceholderText("Jar Pack 200g");
         fireEvent.click(screen.getByRole("button", { name: "Create Profile" }));
         expect(await screen.findByText("Profile name is required")).toBeInTheDocument();
 

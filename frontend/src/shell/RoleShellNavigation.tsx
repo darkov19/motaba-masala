@@ -8,6 +8,7 @@ type RoleShellNavigationProps = {
     role: UserRole;
     activeRouteId: string;
     onNavigate: (routeId: string) => void;
+    onLogout: () => void;
 };
 
 function resolveDisplayName(role: UserRole): string {
@@ -32,7 +33,7 @@ function resolveDisplayName(role: UserRole): string {
     return fallback;
 }
 
-export function RoleShellNavigation({ role, activeRouteId, onNavigate }: RoleShellNavigationProps) {
+export function RoleShellNavigation({ role, activeRouteId, onNavigate, onLogout }: RoleShellNavigationProps) {
     const sections = getNavigationByRole(role);
     const displayName = resolveDisplayName(role);
 
@@ -101,6 +102,9 @@ export function RoleShellNavigation({ role, activeRouteId, onNavigate }: RoleShe
                     <div className="shell-nav__footer-name">{displayName}</div>
                     <div className="shell-nav__footer-role">{role === "admin" ? "Admin" : "Operator"}</div>
                 </div>
+                <button type="button" className="shell-nav__logout" onClick={onLogout}>
+                    Logout
+                </button>
             </div>
         </nav>
     );

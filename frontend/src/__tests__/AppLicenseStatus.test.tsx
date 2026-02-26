@@ -21,6 +21,8 @@ vi.mock("../components/forms/PackagingProfileForm", () => ({
 
 describe("App license status banners", () => {
     it("shows grace-period banner and disables New action buttons", async () => {
+        localStorage.clear();
+        sessionStorage.clear();
         (window as unknown as {
             go?: {
                 app?: {
@@ -28,6 +30,7 @@ describe("App license status banners", () => {
                         GetRecoveryState?: () => Promise<unknown>;
                         GetLicenseLockoutState?: () => Promise<unknown>;
                         GetLicenseStatus?: () => Promise<unknown>;
+                        GetSessionRole?: () => Promise<string>;
                     };
                 };
             };
@@ -36,6 +39,7 @@ describe("App license status banners", () => {
                 App: {
                     GetRecoveryState: vi.fn().mockResolvedValue({ enabled: false, message: "", backups: [] }),
                     GetLicenseLockoutState: vi.fn().mockResolvedValue({ enabled: false, message: "", hardware_id: "" }),
+                    GetSessionRole: vi.fn().mockResolvedValue("admin"),
                     GetLicenseStatus: vi.fn().mockResolvedValue({
                         status: "grace-period",
                         days_remaining: -2,
@@ -44,6 +48,7 @@ describe("App license status banners", () => {
                 },
             },
         };
+        localStorage.setItem("auth_token", "trusted-session-token");
 
         const router = createMemoryRouter(
             [
@@ -66,6 +71,8 @@ describe("App license status banners", () => {
     });
 
     it("falls back to safe read-only state when license status fetch fails", async () => {
+        localStorage.clear();
+        sessionStorage.clear();
         (window as unknown as {
             go?: {
                 app?: {
@@ -73,6 +80,7 @@ describe("App license status banners", () => {
                         GetRecoveryState?: () => Promise<unknown>;
                         GetLicenseLockoutState?: () => Promise<unknown>;
                         GetLicenseStatus?: () => Promise<unknown>;
+                        GetSessionRole?: () => Promise<string>;
                     };
                 };
             };
@@ -81,10 +89,12 @@ describe("App license status banners", () => {
                 App: {
                     GetRecoveryState: vi.fn().mockResolvedValue({ enabled: false, message: "", backups: [] }),
                     GetLicenseLockoutState: vi.fn().mockResolvedValue({ enabled: false, message: "", hardware_id: "" }),
+                    GetSessionRole: vi.fn().mockResolvedValue("admin"),
                     GetLicenseStatus: vi.fn().mockRejectedValue(new Error("timeout")),
                 },
             },
         };
+        localStorage.setItem("auth_token", "trusted-session-token");
 
         const router = createMemoryRouter(
             [

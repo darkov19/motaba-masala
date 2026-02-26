@@ -1,6 +1,7 @@
 package auth_test
 
 import (
+	"strings"
 	"testing"
 
 	"masala_inventory_managment/internal/app/auth"
@@ -57,5 +58,32 @@ func TestService_CreateUser_Security(t *testing.T) {
 	err = svc.CreateUser(adminToken.Token, "user4", "pass4", domainAuth.RoleDataEntryOperator)
 	if err != nil {
 		t.Errorf("Admin: Expected no error for user creation, got %v", err)
+	}
+}
+
+func TestService_CreateUser_ValidationAndLoginFlow(t *testing.T) {
+	bcrypt := infraAuth.NewBcryptService()
+	tokenSvc := infraAuth.NewTokenService("test-secret")
+	repo := &mockUserRepo{users: make(map[string]*domainAuth.User)}
+	svc := auth.NewService(repo, bcrypt, tokenSvc)
+
+	if err := svc.CreateUser("", "admin1", "secure-pass", domainAuth.RoleAdmin); err != nil {
+		t.Fatalf("expected bootstrap admin creation success, got %v", err)
+	}
+
+	adminToken, err := svc.Login("admin1", "secure-pass")
+	if err != nil {
+		t.Fatalf("expected admin login success, got %v", err)
+	}
+	if strings.TrimSpace(adminToken.Token) == "" {
+		t.Fatalf("expected issued token")
+	}
+
+	if _, err := svc.Login("admin1", "bad-pass"); err == nil {
+		t.Fatalf("expected invalid credentials error for bad password")
+	}
+
+	if err := svc.CreateUser(adminToken.Token, "admin1", "another-pass", domainAuth.RoleDataEntryOperator); err == nil {
+		t.Fatalf("expected duplicate username validation error")
 	}
 }

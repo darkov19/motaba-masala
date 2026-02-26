@@ -1,0 +1,246 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2E</storyId>
+    <title>Authentication UX, Session Lifecycle, and Admin User Management</title>
+    <status>drafted</status>
+    <generatedAt>2026-02-26</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-2e-authentication-ux-session-lifecycle-admin-user-management.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>System Admin and authenticated user</asA>
+    <iWant>a complete authentication lifecycle (login, session handling, logout) and an actionable Admin users screen</iWant>
+    <soThat>access control works end-to-end in the real UI and Admin can provision users safely</soThat>
+    <tasks>- [ ] Add authentication entry flow and login screen (AC: 1, 2)
+  - [ ] Implement login form UI and validation in frontend shell entry path
+  - [ ] Wire login submission to backend auth service binding
+  - [ ] Block protected shell routes until authentication succeeds
+- [ ] Implement session lifecycle handling (AC: 2, 3, 4)
+  - [ ] Ensure authenticated requests use stored token consistently
+  - [ ] Detect expired/invalid session during protected operations and route to login with clear message
+  - [ ] Implement logout action that clears session state and redirects to login
+- [ ] Implement Admin user-management surface on `system.users` (AC: 5)
+  - [ ] Replace placeholder content with Admin create-user form
+  - [ ] Wire create-user action to backend `CreateUser` flow and show actionable success/failure feedback
+  - [ ] Enforce admin-only route visibility/behavior per RBAC contract
+- [ ] Add regression tests for auth lifecycle and role boundaries (AC: 6)
+  - [ ] Frontend tests for login success/failure and route-gating behavior
+  - [ ] Frontend tests for logout and expired-session re-authentication path
+  - [ ] Frontend tests confirming non-admin access denial for `system.users`
+  - [ ] Backend tests to preserve `CreateUser` permission and validation behavior</tasks>
+  </story>
+
+  <acceptanceCriteria>1. If no valid session token exists, application entry shows a login screen before shell routes are accessible.
+2. Successful login with valid credentials transitions the user to role-appropriate shell routes and applies token-backed protected operations.
+3. Session expiration follows the current JWT baseline (24h absolute), and expired sessions force re-authentication with clear user feedback.
+4. Logout clears session token/state and returns the user to login state.
+5. Admin-only `System &gt; Users` (`/system/users`) supports create-user flow (`username`, `password`, `role`) backed by existing backend authorization checks.
+6. Regression coverage validates login success/failure, session-expiry redirect, logout behavior, and admin-only access to `system.users`.</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Authentication &amp; Authorization; Data Integrity &amp; Security</section>
+        <snippet>PRD defines user-based RBAC and explicitly includes Admin user management responsibilities, grounding the need for complete auth lifecycle UX and admin user provisioning.</snippet>
+      </doc>
+      <doc>
+        <path>docs/ux-design-specification.md</path>
+        <title>UX Design Specification</title>
+        <section>5.1 Critical User Paths</section>
+        <snippet>Critical journeys for both Admin and Data Entry start at Login, which makes explicit login entry and session-state routing required for UX conformance.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>4. Zero-Config Networking Pattern (UDP + RPC)</section>
+        <snippet>Architecture states login credentials produce a session token and all subsequent RPC calls require token-backed authorization, reinforcing token lifecycle handling.</snippet>
+      </doc>
+      <doc>
+        <path>docs/navigation-rbac-contract.md</path>
+        <title>Navigation and RBAC Contract (Story 2.2A)</title>
+        <section>Canonical Route Map</section>
+        <snippet>`system.users` is a canonical Admin-only route, so the placeholder implementation must be replaced with actionable user-management UI while preserving route identity.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic 1 Technical Specification</title>
+        <section>APIs and Interfaces</section>
+        <snippet>Technical API contract already includes `auth.Login` and `admin.CreateUser`, which this story should consume from frontend lifecycle flows rather than recreate.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-4-local-authentication-rbac.md</path>
+        <title>Story 1.4: Local Authentication &amp; RBAC</title>
+        <section>Acceptance Criteria; Tasks / Subtasks</section>
+        <snippet>Backend auth, role checks, and create-user permissions are implemented and verified; this story extends that foundation into end-to-end UI/session behavior.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/2-2b-app-shell-role-variants.md</path>
+        <title>Story 2.2B: Shared AppShell with Role Variants</title>
+        <section>Acceptance Criteria; Review Follow-ups</section>
+        <snippet>Shell and RBAC guard behavior is established, including trusted session-role binding, providing the current entrypoint for adding explicit auth gate and logout behavior.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-change-proposal-2026-02-26.md</path>
+        <title>Sprint Change Proposal - Authentication UX and Session Lifecycle Completion</title>
+        <section>Issue Summary; Detailed Change Proposals</section>
+        <snippet>Defines the approved direct-adjustment plan for login/logout/session lifecycle closure and Admin users screen implementation under Story 2.2E.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Epic 2 - Story 2.2E</section>
+        <snippet>Epic 2 now explicitly includes Story 2.2E and positions it before deeper feature expansion, making this context the execution baseline for the next implementation step.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>internal/app/auth/service.go</path>
+        <kind>application service</kind>
+        <symbol>func (s *Service) Login; func (s *Service) CreateUser</symbol>
+        <lines>27-83</lines>
+        <reason>Core backend auth operations already exist and should be consumed by new login/admin-user UI flows.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/app/auth/middleware.go</path>
+        <kind>authorization middleware</kind>
+        <symbol>func (s *Service) CheckPermission</symbol>
+        <lines>17-44</lines>
+        <reason>Enforces token validation and role hierarchy, defining server-authoritative guard behavior for protected actions.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/infrastructure/auth/token_service.go</path>
+        <kind>token service</kind>
+        <symbol>func (s *TokenService) GenerateToken; func (s *TokenService) ValidateToken</symbol>
+        <lines>31-71</lines>
+        <reason>Defines current session model including 24h JWT expiration and validation behavior required for AC3/AC4.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/domain/auth/service.go</path>
+        <kind>domain interface</kind>
+        <symbol>type AuthService interface</symbol>
+        <lines>9-13</lines>
+        <reason>Canonical service contract for login and user creation used across application layers.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/app/app.go</path>
+        <kind>Wails app binding</kind>
+        <symbol>func (a *App) GetSessionRole</symbol>
+        <lines>330-338</lines>
+        <reason>Frontend currently resolves trusted role from backend session token via this binding; auth lifecycle work should align to this pattern.</reason>
+      </artifact>
+      <artifact>
+        <path>cmd/server/main.go</path>
+        <kind>server bootstrap</kind>
+        <symbol>bindings append authService/reportService/adminService</symbol>
+        <lines>646-649</lines>
+        <reason>Confirms auth/admin services are already bound in server runtime for frontend interaction.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/App.tsx</path>
+        <kind>frontend shell entry composition</kind>
+        <symbol>resolveAuthToken; trusted session role loading; route access guard</symbol>
+        <lines>72-100,243-297</lines>
+        <reason>Primary integration point for adding login gate, expiry redirect handling, and logout navigation behavior.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/shell/rbac.ts</path>
+        <kind>route registry and role map</kind>
+        <symbol>ROUTE_REGISTRY; system.users route</symbol>
+        <lines>18-37</lines>
+        <reason>Defines canonical frontend route identity including admin-only `system.users` currently mapped as placeholder view.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/shell/RoleShellNavigation.tsx</path>
+        <kind>navigation surface</kind>
+        <symbol>routeMarks and menu rendering for system users route</symbol>
+        <lines>35-58,70-94</lines>
+        <reason>Existing shell navigation already surfaces Users for admin contexts; story should connect this route to functional user-management content.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/__tests__/AppShellRBAC.test.tsx</path>
+        <kind>frontend regression tests</kind>
+        <symbol>admin users menu visibility and operator route denial tests</symbol>
+        <lines>79-133</lines>
+        <reason>Provides established test pattern to extend for login/logout/session-expiry lifecycle coverage.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <go>
+        <package name="go" version="1.26" />
+        <package name="github.com/wailsapp/wails/v2" version="v2.11.0" />
+        <package name="github.com/golang-jwt/jwt/v5" version="v5.3.1" />
+        <package name="golang.org/x/crypto" version="v0.35.0" />
+      </go>
+      <node path="frontend/package.json">
+        <package name="react" version="^19.0.0" />
+        <package name="react-router-dom" version="^6.30.3" />
+        <package name="antd" version="^6.2.1" />
+        <package name="vitest" version="^4.0.18" />
+        <package name="@testing-library/react" version="^16.3.0" />
+      </node>
+      <frameworks>
+        <framework name="Wails" location="wails.json" />
+        <framework name="React + TypeScript" location="frontend/package.json" />
+      </frameworks>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Preserve backend-authoritative authorization; frontend guards and visibility are UX controls, not security boundaries.</constraint>
+    <constraint>Maintain canonical route IDs and role constraints from `docs/navigation-rbac-contract.md`, especially `system.users` admin-only semantics.</constraint>
+    <constraint>Reuse existing auth service contracts (`Login`, `CreateUser`, token validation) instead of introducing parallel authentication channels.</constraint>
+    <constraint>Keep session lifecycle behavior consistent with current JWT baseline (24h absolute) unless architecture/product requirements explicitly change.</constraint>
+    <constraint>Ensure protected shell routes remain inaccessible without valid authenticated session state.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>AuthService</name>
+      <kind>Go domain interface</kind>
+      <signature>Login(username, password string) (*AuthToken, error); CreateUser(token, username, password string, role Role) error</signature>
+      <path>internal/domain/auth/service.go</path>
+    </interface>
+    <interface>
+      <name>CheckPermission</name>
+      <kind>Go service method</kind>
+      <signature>CheckPermission(tokenString string, requiredRole domainAuth.Role) error</signature>
+      <path>internal/app/auth/middleware.go</path>
+    </interface>
+    <interface>
+      <name>TokenService</name>
+      <kind>Go infrastructure service</kind>
+      <signature>GenerateToken(user *auth.User) (*auth.AuthToken, error); ValidateToken(tokenString string) (*CustomClaims, error)</signature>
+      <path>internal/infrastructure/auth/token_service.go</path>
+    </interface>
+    <interface>
+      <name>App.GetSessionRole</name>
+      <kind>Wails app binding</kind>
+      <signature>GetSessionRole(authToken string) (string, error)</signature>
+      <path>internal/app/app.go</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Combine frontend lifecycle UX verification and backend authorization invariants: validate login gate behavior, role-aware route access, and token-expiry handling while preserving server-side permission enforcement for protected operations.</standards>
+    <locations>
+      <location>frontend/src/__tests__/</location>
+      <location>frontend/src/shell/</location>
+      <location>frontend/src/App.tsx</location>
+      <location>internal/app/auth/service_test.go</location>
+      <location>internal/app/report/service_test.go</location>
+      <location>internal/app/inventory/service_test.go</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Render app with no auth token and assert login entry route/screen is shown before shell navigation.</idea>
+      <idea ac="2">Submit valid login credentials and assert role-appropriate shell landing plus token-backed protected request path.</idea>
+      <idea ac="3">Use expired/invalid token and assert clear session-expired feedback with redirect to login.</idea>
+      <idea ac="4">Trigger logout from authenticated state and assert token/session storage is cleared and login screen is shown.</idea>
+      <idea ac="5">Verify Admin can access `system.users` create-user form while operator direct navigation is denied.</idea>
+      <idea ac="6">Add regression suite covering login failure handling, expiry redirect, logout flow, and admin-only users access rules.</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -45,12 +45,16 @@ describe("App recovery and license states", () => {
     const restoreBackup = vi.fn();
     const getLicenseStatus = vi.fn();
     const getLicenseLockoutState = vi.fn();
+    const getSessionRole = vi.fn();
 
     beforeEach(() => {
+        localStorage.clear();
+        sessionStorage.clear();
         getRecoveryState.mockReset();
         restoreBackup.mockReset();
         getLicenseStatus.mockReset();
         getLicenseLockoutState.mockReset();
+        getSessionRole.mockReset();
 
         getRecoveryState.mockResolvedValue({
             enabled: true,
@@ -68,6 +72,7 @@ describe("App recovery and license states", () => {
             message: "",
             hardware_id: "",
         });
+        getSessionRole.mockResolvedValue("operator");
 
         (window as unknown as {
             go?: {
@@ -77,6 +82,7 @@ describe("App recovery and license states", () => {
                         RestoreBackup?: typeof restoreBackup;
                         GetLicenseStatus?: typeof getLicenseStatus;
                         GetLicenseLockoutState?: typeof getLicenseLockoutState;
+                        GetSessionRole?: typeof getSessionRole;
                     };
                 };
             };
@@ -87,9 +93,12 @@ describe("App recovery and license states", () => {
                     RestoreBackup: restoreBackup,
                     GetLicenseStatus: getLicenseStatus,
                     GetLicenseLockoutState: getLicenseLockoutState,
+                    GetSessionRole: getSessionRole,
                 },
             },
         };
+        localStorage.setItem("auth_token", "trusted-session-token");
+        localStorage.setItem("auth_expires_at", String(Math.floor(Date.now() / 1000) + 3600));
 
         vi.spyOn(message, "success").mockImplementation(() => undefined as never);
         vi.spyOn(message, "error").mockImplementation(() => undefined as never);

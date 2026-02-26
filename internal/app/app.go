@@ -13,7 +13,9 @@ import (
 	"strings"
 	"time"
 
+	appAuth "masala_inventory_managment/internal/app/auth"
 	appInventory "masala_inventory_managment/internal/app/inventory"
+	domainAuth "masala_inventory_managment/internal/domain/auth"
 )
 
 type RecoveryState struct {
@@ -54,6 +56,7 @@ type App struct {
 	connectivityProbe     func() error
 	lockoutRetryHandler   func() (LockoutRetryResult, error)
 	inventoryService      *appInventory.Service
+	authService           *appAuth.Service
 	sessionRoleResolver   func(string) (string, error)
 }
 
@@ -327,6 +330,10 @@ func (a *App) SetSessionRoleResolver(resolver func(string) (string, error)) {
 	a.sessionRoleResolver = resolver
 }
 
+func (a *App) SetAuthService(service *appAuth.Service) {
+	a.authService = service
+}
+
 func (a *App) GetSessionRole(authToken string) (string, error) {
 	token := strings.TrimSpace(authToken)
 	if token == "" {
@@ -340,6 +347,59 @@ func (a *App) GetSessionRole(authToken string) (string, error) {
 
 func (a *App) SetInventoryService(service *appInventory.Service) {
 	a.inventoryService = service
+}
+
+type AuthTokenResult struct {
+	Token     string `json:"token"`
+	ExpiresAt int64  `json:"expires_at"`
+}
+
+type CreateUserInput struct {
+	AuthToken string `json:"auth_token"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	Role      string `json:"role"`
+}
+
+func normalizeRole(raw string) (domainAuth.Role, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "admin":
+		return domainAuth.RoleAdmin, nil
+	case "operator", "dataentryoperator":
+		return domainAuth.RoleDataEntryOperator, nil
+	default:
+		return "", fmt.Errorf("invalid role: %s", raw)
+	}
+}
+
+func (a *App) Login(username, password string) (AuthTokenResult, error) {
+	if a.authService == nil {
+		return AuthTokenResult{}, fmt.Errorf("auth service is not configured")
+	}
+	token, err := a.authService.Login(strings.TrimSpace(username), password)
+	if err != nil {
+		return AuthTokenResult{}, err
+	}
+	return AuthTokenResult{
+		Token:     token.Token,
+		ExpiresAt: token.ExpiresAt,
+	}, nil
+}
+
+func (a *App) CreateUser(input CreateUserInput) error {
+	if a.authService == nil {
+		return fmt.Errorf("auth service is not configured")
+	}
+	role, err := normalizeRole(input.Role)
+	if err != nil {
+		return err
+	}
+	return a.authService.CreateUser(
+		strings.TrimSpace(input.AuthToken),
+		strings.TrimSpace(input.Username),
+		input.Password,
+		role,
+	)
 }
 
 type ItemMasterResult struct {

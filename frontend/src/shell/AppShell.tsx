@@ -12,6 +12,7 @@ type AppShellProps = {
     activeRouteId: string;
     contentDensity: "dashboard" | "form" | "default" | "master";
     onNavigate: (routeId: string) => void;
+    onLogout: () => void;
     licenseBanner: ReactNode;
     automationNode?: ReactNode;
     unauthorizedMessage?: string | null;
@@ -24,6 +25,7 @@ export function AppShell({
     activeRouteId,
     contentDensity,
     onNavigate,
+    onLogout,
     licenseBanner,
     automationNode,
     unauthorizedMessage,
@@ -38,9 +40,9 @@ export function AppShell({
             <Layout className="app-shell__body" data-testid="app-shell-body">
                 <Sider width={260} className="app-shell__sider" theme="light">
                     {role === "admin" ? (
-                        <AdminShell activeRouteId={activeRouteId} onNavigate={onNavigate} />
+                        <AdminShell activeRouteId={activeRouteId} onNavigate={onNavigate} onLogout={onLogout} />
                     ) : (
-                        <OperatorShell activeRouteId={activeRouteId} onNavigate={onNavigate} />
+                        <OperatorShell activeRouteId={activeRouteId} onNavigate={onNavigate} onLogout={onLogout} />
                     )}
                 </Sider>
 
