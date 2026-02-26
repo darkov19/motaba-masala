@@ -143,6 +143,25 @@ describe("Authentication lifecycle", () => {
         router.dispose();
     });
 
+    it("shows string-based login errors returned by bindings", async () => {
+        loginMock.mockRejectedValue("invalid credentials");
+
+        const router = createMemoryRouter(
+            [{ path: "*", element: <App /> }],
+            { initialEntries: ["/dashboard"] },
+        );
+
+        render(<RouterProvider router={router} />);
+        expect(await screen.findByRole("heading", { name: "Sign In" })).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText("Username"), { target: { value: "admin" } });
+        fireEvent.change(screen.getByLabelText("Password"), { target: { value: "badpass" } });
+        fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+
+        expect(await screen.findByText("invalid credentials")).toBeInTheDocument();
+        router.dispose();
+    });
+
     it("clears session and returns to login on logout", async () => {
         localStorage.setItem("auth_token", "trusted-session-token");
         localStorage.setItem("auth_expires_at", String(Math.floor(Date.now() / 1000) + 3600));

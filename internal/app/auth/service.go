@@ -3,6 +3,8 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 
 	domainAuth "masala_inventory_managment/internal/domain/auth"
 	infraAuth "masala_inventory_managment/internal/infrastructure/auth"
@@ -26,24 +28,35 @@ func NewService(repo domainAuth.UserRepository, bcrypt *infraAuth.BcryptService,
 
 // Login authenticates a user and returns a token.
 func (s *Service) Login(username, password string) (*domainAuth.AuthToken, error) {
-	user, err := s.userRepo.FindByUsername(username)
+	normalizedUsername := strings.TrimSpace(username)
+	if normalizedUsername == "" {
+		slog.Warn("Auth login rejected", "reason", "empty-username")
+		return nil, errors.New("invalid credentials")
+	}
+
+	user, err := s.userRepo.FindByUsername(normalizedUsername)
 	if err != nil {
+		slog.Error("Auth login lookup failed", "username", normalizedUsername, "error", err)
 		return nil, fmt.Errorf("failed to find user: %w", err)
 	}
 	if user == nil {
+		slog.Warn("Auth login failed", "username", normalizedUsername, "reason", "user-not-found")
 		return nil, errors.New("invalid credentials")
 	}
 
 	err = s.bcryptService.CheckPasswordHash(password, user.PasswordHash)
 	if err != nil {
+		slog.Warn("Auth login failed", "username", normalizedUsername, "reason", "password-mismatch")
 		return nil, errors.New("invalid credentials")
 	}
 
 	token, err := s.tokenService.GenerateToken(user)
 	if err != nil {
+		slog.Error("Auth login token generation failed", "username", normalizedUsername, "error", err)
 		return nil, fmt.Errorf("failed to generate token: %w", err)
 	}
 
+	slog.Info("Auth login succeeded", "username", normalizedUsername, "role", user.Role)
 	return token, nil
 }
 

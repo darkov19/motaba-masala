@@ -614,6 +614,9 @@ func run() error {
 				if err := authService.CreateUser("", bootstrapUser, bootstrapPassword, domainAuth.RoleAdmin); err != nil {
 					return fmt.Errorf("failed to create bootstrap admin user: %w", err)
 				}
+				slog.Info("Bootstrap admin user created", "username", bootstrapUser)
+			} else {
+				slog.Info("Existing users detected; bootstrap admin creation skipped", "users", userCount)
 			}
 
 			if err := backupService.StartScheduler(); err != nil {

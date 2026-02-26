@@ -444,8 +444,13 @@
     min-height: 0;
 }
 
-.auth-gate {
+.auth-shell {
     min-height: 100vh;
+}
+
+.auth-gate {
+    flex: 1;
+    min-height: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -465,6 +470,39 @@
 
 .auth-gate__subtitle.ant-typography {
     display: block;
+}
+
+.auth-gate__brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.auth-gate__brand-logo {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+}
+
+.auth-gate__brand-copy {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.auth-gate__brand-kicker.ant-typography {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #7d1111;
+}
+
+.auth-gate__brand-title.ant-typography {
+    margin: 0;
+    line-height: 1.15;
+    color: #0f172a;
 }
 
 .app-card--dashboard {

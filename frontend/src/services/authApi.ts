@@ -102,6 +102,9 @@ export function extractErrorMessage(error: unknown): string {
     if (error instanceof Error && error.message) {
         return error.message;
     }
+    if (typeof error === "string" && error.trim().length > 0) {
+        return error;
+    }
     if (typeof error === "object" && error !== null && "message" in error) {
         const withMessage = error as { message?: string };
         if (withMessage.message) {

@@ -636,52 +636,76 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         forceLoginState("You have been logged out.");
     }, [forceLoginState]);
 
+    const authSurfaceTitle = appMode === "server" ? "Motaba Inventory Server" : "Motaba Inventory Client";
+
     if (authLoading) {
         return (
-            <Layout className="auth-gate">
-                <Card className="auth-gate__card" variant="borderless">
-                    <Space orientation="vertical" align="center" size={12} style={{ width: "100%" }}>
-                        <Spin />
-                        <Text type="secondary">Checking session...</Text>
-                    </Space>
-                </Card>
+            <Layout className="app-shell auth-shell" style={{ minHeight: "100vh" }}>
+                <WindowTitleBar />
+                <Content className="auth-gate">
+                    <Card className="auth-gate__card" variant="borderless">
+                        <Space orientation="vertical" align="center" size={16} style={{ width: "100%" }}>
+                            <div className="auth-gate__brand">
+                                <img src={logo} className="auth-gate__brand-logo" alt="Motaba logo" />
+                                <div className="auth-gate__brand-copy">
+                                    <Text className="auth-gate__brand-kicker">Motaba</Text>
+                                    <Title level={4} className="auth-gate__brand-title">{authSurfaceTitle}</Title>
+                                </div>
+                            </div>
+                            <Space orientation="vertical" align="center" size={12} style={{ width: "100%" }}>
+                                <Spin />
+                                <Text type="secondary">Checking session...</Text>
+                            </Space>
+                        </Space>
+                    </Card>
+                </Content>
             </Layout>
         );
     }
 
     if (authRequired) {
         return (
-            <Layout className="auth-gate">
-                <Card className="auth-gate__card" variant="borderless">
-                    <Space orientation="vertical" size={14} style={{ width: "100%" }}>
-                        <Title level={3} className="auth-gate__title">Sign In</Title>
-                        <Text type="secondary" className="auth-gate__subtitle">
-                            Enter your credentials to access Masala Inventory Management.
-                        </Text>
-                        {authMessage ? (
-                            <Alert type="warning" showIcon title={authMessage} />
-                        ) : null}
-                        <Form<LoginFormValues> layout="vertical" onFinish={handleLogin}>
-                            <Form.Item
-                                name="username"
-                                label="Username"
-                                rules={[{ required: true, message: "Username is required" }]}
-                            >
-                                <Input autoComplete="username" />
-                            </Form.Item>
-                            <Form.Item
-                                name="password"
-                                label="Password"
-                                rules={[{ required: true, message: "Password is required" }]}
-                            >
-                                <Input.Password autoComplete="current-password" />
-                            </Form.Item>
-                            <Button type="primary" htmlType="submit" block loading={authSubmitting}>
-                                Sign In
-                            </Button>
-                        </Form>
-                    </Space>
-                </Card>
+            <Layout className="app-shell auth-shell" style={{ minHeight: "100vh" }}>
+                <WindowTitleBar />
+                <Content className="auth-gate">
+                    <Card className="auth-gate__card" variant="borderless">
+                        <Space orientation="vertical" size={14} style={{ width: "100%" }}>
+                            <div className="auth-gate__brand">
+                                <img src={logo} className="auth-gate__brand-logo" alt="Motaba logo" />
+                                <div className="auth-gate__brand-copy">
+                                    <Text className="auth-gate__brand-kicker">Motaba</Text>
+                                    <Title level={4} className="auth-gate__brand-title">{authSurfaceTitle}</Title>
+                                </div>
+                            </div>
+                            <Title level={3} className="auth-gate__title">Sign In</Title>
+                            <Text type="secondary" className="auth-gate__subtitle">
+                                Enter your credentials to access Masala Inventory Management.
+                            </Text>
+                            {authMessage ? (
+                                <Alert type="warning" showIcon title={authMessage} />
+                            ) : null}
+                            <Form<LoginFormValues> layout="vertical" onFinish={handleLogin}>
+                                <Form.Item
+                                    name="username"
+                                    label="Username"
+                                    rules={[{ required: true, message: "Username is required" }]}
+                                >
+                                    <Input autoComplete="username" />
+                                </Form.Item>
+                                <Form.Item
+                                    name="password"
+                                    label="Password"
+                                    rules={[{ required: true, message: "Password is required" }]}
+                                >
+                                    <Input.Password autoComplete="current-password" />
+                                </Form.Item>
+                                <Button type="primary" htmlType="submit" block loading={authSubmitting}>
+                                    Sign In
+                                </Button>
+                            </Form>
+                        </Space>
+                    </Card>
+                </Content>
             </Layout>
         );
     }
