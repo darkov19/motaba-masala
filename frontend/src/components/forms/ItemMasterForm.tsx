@@ -160,7 +160,7 @@ export function ItemMasterForm({ onDirtyChange, writeDisabled = false, readOnly 
                 <Alert
                     type="info"
                     showIcon
-                    message="Read-only access"
+                    title="Read-only access"
                     description="Your role can view Item Master records, but cannot create or edit in Masters."
                 />
             ) : null}

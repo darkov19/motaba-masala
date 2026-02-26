@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Layout, Typography, Card, Space, Alert, Button, message } from "antd";
+import { Layout, Typography, Card, Space, Alert, Button, Form, Input, Spin, message } from "antd";
 import { useBlocker, useLocation, useNavigate } from "react-router-dom";
 import {
     EventsEmit,
@@ -18,6 +18,7 @@ import { GRNForm } from "./components/forms/GRNForm";
 import { BatchForm } from "./components/forms/BatchForm";
 import { ItemMasterForm } from "./components/forms/ItemMasterForm";
 import { PackagingProfileForm } from "./components/forms/PackagingProfileForm";
+import { AdminUserForm } from "./components/forms/AdminUserForm";
 import { useUnsavedChanges } from "./hooks/useUnsavedChanges";
 import { AppShell } from "./shell/AppShell";
 import {
@@ -30,6 +31,16 @@ import {
     type UserRole,
     type ViewKey,
 } from "./shell/rbac";
+import {
+    AUTH_SESSION_EXPIRED_EVENT,
+    clearAuthSession,
+    extractErrorMessage,
+    getSessionRole,
+    login,
+    resolveAuthExpiry,
+    resolveAuthToken,
+    saveAuthSession,
+} from "./services/authApi";
 import "./App.css";
 
 const { Header, Content } = Layout;
@@ -80,24 +91,11 @@ type WindowWithAppBindings = Window & {
                 GetAutomationStatus?: () => Promise<AutomationStatus>;
                 RetryLockoutValidation?: () => Promise<LockoutRetryResult>;
                 GetSessionRole?: (authToken: string) => Promise<string>;
+                Login?: (username: string, password: string) => Promise<{ token: string; expires_at: number }>;
             };
         };
     };
 };
-
-function resolveAuthToken(): string | undefined {
-    try {
-        return (
-            window.localStorage.getItem("auth_token")
-            || window.localStorage.getItem("token")
-            || window.sessionStorage.getItem("auth_token")
-            || window.sessionStorage.getItem("token")
-            || undefined
-        );
-    } catch {
-        return undefined;
-    }
-}
 
 function WindowControls() {
     const { appMode } = useConnection();
@@ -216,11 +214,20 @@ type ResilienceWorkspaceProps = {
     automationStatus: AutomationStatus | null;
 };
 
+type LoginFormValues = {
+    username: string;
+    password: string;
+};
+
 function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWorkspaceProps) {
     const { appMode } = useConnection();
     const navigate = useNavigate();
     const location = useLocation();
     const [trustedSessionRole, setTrustedSessionRole] = useState<string | null>(null);
+    const [authLoading, setAuthLoading] = useState(true);
+    const [authRequired, setAuthRequired] = useState(false);
+    const [authMessage, setAuthMessage] = useState<string | null>(null);
+    const [authSubmitting, setAuthSubmitting] = useState(false);
     const role = useMemo<UserRole>(() => resolveUserRole(appMode, trustedSessionRole), [appMode, trustedSessionRole]);
     const [unauthorizedMessage, setUnauthorizedMessage] = useState<string | null>(null);
     const [dirtyByView, setDirtyByView] = useState<Record<ViewKey, boolean>>({
@@ -230,6 +237,7 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         grn: false,
         batch: false,
         "packaging-profile": false,
+        "system-users": false,
     });
     const activeRoute = resolveRouteByPath(location.pathname) ?? getDefaultRouteForRole(role);
     const activeView = activeRoute.viewKey;
@@ -242,36 +250,51 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
 
     useEffect(() => {
         let mounted = true;
-        const maybeGetSessionRole = (window as WindowWithAppBindings).go?.app?.App?.GetSessionRole;
 
         const loadTrustedRole = async () => {
-            if (typeof maybeGetSessionRole !== "function") {
-                if (mounted) {
-                    setTrustedSessionRole(null);
-                }
-                return;
-            }
             const authToken = resolveAuthToken();
             if (!authToken) {
                 if (mounted) {
                     setTrustedSessionRole(null);
+                    setAuthRequired(true);
+                    setAuthLoading(false);
+                }
+                return;
+            }
+            const expiry = resolveAuthExpiry();
+            if (expiry && Date.now() >= expiry*1000) {
+                clearAuthSession();
+                if (mounted) {
+                    setTrustedSessionRole(null);
+                    setAuthRequired(true);
+                    setAuthMessage("Session expired. Please sign in again.");
+                    setAuthLoading(false);
                 }
                 return;
             }
             try {
-                const nextRole = await maybeGetSessionRole(authToken);
+                const nextRole = await getSessionRole(authToken);
                 if (mounted) {
                     setTrustedSessionRole(nextRole || null);
+                    setAuthRequired(false);
+                    setAuthLoading(false);
                 }
-            } catch {
+            } catch (error) {
+                clearAuthSession();
                 if (mounted) {
                     setTrustedSessionRole(null);
+                    setAuthRequired(true);
+                    setAuthMessage(extractErrorMessage(error));
+                    setAuthLoading(false);
                 }
             }
         };
 
         void loadTrustedRole();
         const onStorage = () => {
+            if (mounted) {
+                setAuthLoading(true);
+            }
             void loadTrustedRole();
         };
         window.addEventListener("storage", onStorage);
@@ -282,8 +305,63 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         };
     }, [appMode]);
 
+    const forceLoginState = useCallback((reason: string) => {
+        clearAuthSession();
+        setTrustedSessionRole(null);
+        setAuthRequired(true);
+        setAuthLoading(false);
+        setAuthSubmitting(false);
+        setUnauthorizedMessage(null);
+        setAuthMessage(reason);
+        navigate("/dashboard", { replace: true });
+    }, [navigate]);
+
+    const handleLogin = useCallback(async (values: LoginFormValues) => {
+        const username = values.username.trim();
+        if (!username || !values.password) {
+            setAuthMessage("Username and password are required.");
+            return;
+        }
+
+        setAuthSubmitting(true);
+        setAuthMessage(null);
+        try {
+            const tokenResult = await login(username, values.password);
+            if (!tokenResult?.token) {
+                throw new Error("Login did not return a session token.");
+            }
+            const trustedRole = await getSessionRole(tokenResult.token);
+            saveAuthSession(tokenResult.token, username, tokenResult.expires_at);
+            setTrustedSessionRole(trustedRole || null);
+            setUnauthorizedMessage(null);
+            setAuthRequired(false);
+            setAuthLoading(false);
+            navigate(getDefaultRouteForRole(resolveUserRole(appMode, trustedRole)).path, { replace: true });
+        } catch (error) {
+            setAuthMessage(extractErrorMessage(error));
+            setAuthRequired(true);
+        } finally {
+            setAuthSubmitting(false);
+        }
+    }, [appMode, navigate]);
+
+    useEffect(() => {
+        const onSessionExpired = (event: Event) => {
+            const customEvent = event as CustomEvent<{ message?: string }>;
+            const messageText = customEvent.detail?.message || "Session expired. Please sign in again.";
+            forceLoginState(messageText);
+        };
+        window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, onSessionExpired as EventListener);
+        return () => {
+            window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, onSessionExpired as EventListener);
+        };
+    }, [forceLoginState]);
+
     useEffect(() => {
         const route = resolveRouteByPath(location.pathname);
+        if (authLoading || authRequired) {
+            return;
+        }
         if (!route) {
             navigate(getDefaultRouteForRole(role).path, { replace: true });
             return;
@@ -294,7 +372,7 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
             navigate(getDefaultRouteForRole(role).path, { replace: true });
             return;
         }
-    }, [location.pathname, navigate, role]);
+    }, [authLoading, authRequired, location.pathname, navigate, role]);
 
     const hasUnsaved = useMemo(
         () =>
@@ -303,6 +381,7 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
             || dirtyByView.batch
             || dirtyByView["item-master"]
             || dirtyByView["packaging-profile"]
+            || dirtyByView["system-users"]
             || dirtyByView.placeholder,
         [dirtyByView],
     );
@@ -519,6 +598,8 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                         onDirtyChange={onPackagingProfileDirtyChange}
                     />
                 );
+            case "system-users":
+                return <AdminUserForm writeDisabled={writeDisabled} />;
             default:
                 return (
                     <Alert
@@ -551,6 +632,60 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
             ? "form"
             : "default";
 
+    const handleLogout = useCallback(() => {
+        forceLoginState("You have been logged out.");
+    }, [forceLoginState]);
+
+    if (authLoading) {
+        return (
+            <Layout className="auth-gate">
+                <Card className="auth-gate__card" variant="borderless">
+                    <Space orientation="vertical" align="center" size={12} style={{ width: "100%" }}>
+                        <Spin />
+                        <Text type="secondary">Checking session...</Text>
+                    </Space>
+                </Card>
+            </Layout>
+        );
+    }
+
+    if (authRequired) {
+        return (
+            <Layout className="auth-gate">
+                <Card className="auth-gate__card" variant="borderless">
+                    <Space orientation="vertical" size={14} style={{ width: "100%" }}>
+                        <Title level={3} className="auth-gate__title">Sign In</Title>
+                        <Text type="secondary" className="auth-gate__subtitle">
+                            Enter your credentials to access Masala Inventory Management.
+                        </Text>
+                        {authMessage ? (
+                            <Alert type="warning" showIcon title={authMessage} />
+                        ) : null}
+                        <Form<LoginFormValues> layout="vertical" onFinish={handleLogin}>
+                            <Form.Item
+                                name="username"
+                                label="Username"
+                                rules={[{ required: true, message: "Username is required" }]}
+                            >
+                                <Input autoComplete="username" />
+                            </Form.Item>
+                            <Form.Item
+                                name="password"
+                                label="Password"
+                                rules={[{ required: true, message: "Password is required" }]}
+                            >
+                                <Input.Password autoComplete="current-password" />
+                            </Form.Item>
+                            <Button type="primary" htmlType="submit" block loading={authSubmitting}>
+                                Sign In
+                            </Button>
+                        </Form>
+                    </Space>
+                </Card>
+            </Layout>
+        );
+    }
+
     return (
         <AppShell
             titleBar={<WindowTitleBar />}
@@ -558,6 +693,7 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
             activeRouteId={activeRouteId}
             contentDensity={contentDensity}
             onNavigate={(routeId: string) => guardedNavigate(routeId, "view")}
+            onLogout={handleLogout}
             licenseBanner={renderLicenseBanner()}
             automationNode={renderAutomationCard()}
             unauthorizedMessage={unauthorizedMessage}

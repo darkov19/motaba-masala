@@ -143,7 +143,7 @@ export function PackagingProfileForm({ onDirtyChange, writeDisabled = false, rea
                 <Alert
                     type="info"
                     showIcon
-                    message="Read-only access"
+                    title="Read-only access"
                     description="Your role can view Packaging Profiles, but cannot create or edit them."
                 />
             ) : null}
