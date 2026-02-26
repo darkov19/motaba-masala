@@ -220,7 +220,7 @@ type LoginFormValues = {
 };
 
 function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWorkspaceProps) {
-    const { appMode } = useConnection();
+    const { appMode, isConnected, isChecking, retryNow } = useConnection();
     const navigate = useNavigate();
     const location = useLocation();
     const [trustedSessionRole, setTrustedSessionRole] = useState<string | null>(null);
@@ -322,6 +322,10 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
             setAuthMessage("Username and password are required.");
             return;
         }
+        if (appMode === "client" && !isConnected) {
+            setAuthMessage("Cannot reach server. Start the Server app and try again.");
+            return;
+        }
 
         setAuthSubmitting(true);
         setAuthMessage(null);
@@ -338,12 +342,24 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
             setAuthLoading(false);
             navigate(getDefaultRouteForRole(resolveUserRole(appMode, trustedRole)).path, { replace: true });
         } catch (error) {
-            setAuthMessage(extractErrorMessage(error));
+            const rawMessage = extractErrorMessage(error);
+            const normalized = rawMessage.toLowerCase();
+            const isNetworkFailure = normalized.includes("server request failed")
+                || normalized.includes("dial tcp")
+                || normalized.includes("connectex")
+                || normalized.includes("connection refused")
+                || normalized.includes("actively refused")
+                || normalized.includes("timeout");
+            if (appMode === "client" && (isNetworkFailure || !isConnected)) {
+                setAuthMessage("Cannot reach server. Start the Server app and verify network settings, then retry.");
+            } else {
+                setAuthMessage(rawMessage);
+            }
             setAuthRequired(true);
         } finally {
             setAuthSubmitting(false);
         }
-    }, [appMode, navigate]);
+    }, [appMode, isConnected, navigate]);
 
     useEffect(() => {
         const onSessionExpired = (event: Event) => {
@@ -681,6 +697,19 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                             <Text type="secondary" className="auth-gate__subtitle">
                                 Enter your credentials to access Masala Inventory Management.
                             </Text>
+                            {appMode === "client" && !isConnected ? (
+                                <Alert
+                                    type="error"
+                                    showIcon
+                                    title="Server unavailable"
+                                    description="Client cannot reach the server. Start the server and retry connection."
+                                    action={(
+                                        <Button size="small" onClick={() => void retryNow()} loading={isChecking}>
+                                            Retry
+                                        </Button>
+                                    )}
+                                />
+                            ) : null}
                             {authMessage ? (
                                 <Alert type="warning" showIcon title={authMessage} />
                             ) : null}
@@ -699,7 +728,13 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                                 >
                                     <Input.Password autoComplete="current-password" />
                                 </Form.Item>
-                                <Button type="primary" htmlType="submit" block loading={authSubmitting}>
+                                <Button
+                                    type="primary"
+                                    htmlType="submit"
+                                    block
+                                    loading={authSubmitting}
+                                    disabled={appMode === "client" && !isConnected}
+                                >
                                     Sign In
                                 </Button>
                             </Form>
