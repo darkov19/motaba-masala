@@ -13,7 +13,7 @@ type ProfileFormValues = {
     pack_mode: string;
     components: Array<{
         packing_material_item_id?: number;
-        qty_per_unit?: number;
+        qty_per_unit?: number | null;
     }>;
 };
 
@@ -63,7 +63,7 @@ export function PackagingProfileForm({ onDirtyChange, writeDisabled = false, rea
             return true;
         }
         const rawQty = first?.qty_per_unit;
-        if (rawQty === undefined || rawQty === null || rawQty === "") {
+        if (rawQty == null) {
             return false;
         }
         const qty = Number(rawQty);
