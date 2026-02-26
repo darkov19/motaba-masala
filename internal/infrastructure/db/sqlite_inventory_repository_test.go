@@ -452,3 +452,376 @@ func TestSqliteInventoryRepository_CreatePackagingProfile_RespectsInactiveFlag(t
 		t.Fatalf("expected profile to persist as inactive, got active")
 	}
 }
+
+func TestSqliteInventoryRepository_UnitConversionRules_CreateAndFindWithFallback(t *testing.T) {
+	repo, _ := setupInventoryRepo(t)
+
+	item := &domainInventory.Item{
+		SKU:      "SKU-CONV-1",
+		Name:     "Conversion Item",
+		ItemType: domainInventory.ItemTypeRaw,
+		BaseUnit: "KG",
+		IsActive: true,
+	}
+	if err := repo.CreateItem(item); err != nil {
+		t.Fatalf("CreateItem failed: %v", err)
+	}
+
+	globalRule := &domainInventory.UnitConversionRule{
+		FromUnit:       "GRAM",
+		ToUnit:         "KG",
+		Factor:         0.001,
+		PrecisionScale: 4,
+		RoundingMode:   domainInventory.RoundingModeHalfUp,
+		IsActive:       true,
+	}
+	if err := repo.CreateUnitConversionRule(globalRule); err != nil {
+		t.Fatalf("CreateUnitConversionRule global failed: %v", err)
+	}
+
+	found, err := repo.FindUnitConversionRule(domainInventory.UnitConversionLookup{
+		ItemID:   &item.ID,
+		FromUnit: "GRAM",
+		ToUnit:   "KG",
+	})
+	if err != nil {
+		t.Fatalf("FindUnitConversionRule fallback failed: %v", err)
+	}
+	if found.ItemID != nil {
+		t.Fatalf("expected global rule fallback, got item-specific rule")
+	}
+
+	itemSpecific := &domainInventory.UnitConversionRule{
+		ItemID:         &item.ID,
+		FromUnit:       "GRAM",
+		ToUnit:         "KG",
+		Factor:         0.002,
+		PrecisionScale: 4,
+		RoundingMode:   domainInventory.RoundingModeHalfUp,
+		IsActive:       true,
+	}
+	if err := repo.CreateUnitConversionRule(itemSpecific); err != nil {
+		t.Fatalf("CreateUnitConversionRule item-specific failed: %v", err)
+	}
+
+	found, err = repo.FindUnitConversionRule(domainInventory.UnitConversionLookup{
+		ItemID:   &item.ID,
+		FromUnit: "GRAM",
+		ToUnit:   "KG",
+	})
+	if err != nil {
+		t.Fatalf("FindUnitConversionRule item-specific failed: %v", err)
+	}
+	if found.ItemID == nil || *found.ItemID != item.ID {
+		t.Fatalf("expected item-specific conversion rule")
+	}
+	if found.Factor != 0.002 {
+		t.Fatalf("expected item-specific factor 0.002, got %f", found.Factor)
+	}
+}
+
+func TestSqliteInventoryRepository_UnitConversionRules_ListAndMissingRule(t *testing.T) {
+	repo, _ := setupInventoryRepo(t)
+
+	rule := &domainInventory.UnitConversionRule{
+		FromUnit:       "GRAM",
+		ToUnit:         "KG",
+		Factor:         0.001,
+		PrecisionScale: 3,
+		RoundingMode:   domainInventory.RoundingModeDown,
+		IsActive:       true,
+	}
+	if err := repo.CreateUnitConversionRule(rule); err != nil {
+		t.Fatalf("CreateUnitConversionRule failed: %v", err)
+	}
+
+	rules, err := repo.ListUnitConversionRules(domainInventory.UnitConversionRuleFilter{
+		FromUnit:   "GRAM",
+		ToUnit:     "KG",
+		ActiveOnly: true,
+	})
+	if err != nil {
+		t.Fatalf("ListUnitConversionRules failed: %v", err)
+	}
+	if len(rules) != 1 {
+		t.Fatalf("expected 1 conversion rule, got %d", len(rules))
+	}
+	if rules[0].RoundingMode != domainInventory.RoundingModeDown {
+		t.Fatalf("expected rounding mode DOWN, got %s", rules[0].RoundingMode)
+	}
+
+	_, err = repo.FindUnitConversionRule(domainInventory.UnitConversionLookup{
+		FromUnit: "LITER",
+		ToUnit:   "KG",
+	})
+	if !errors.Is(err, domainInventory.ErrConversionRuleNotFound) {
+		t.Fatalf("expected ErrConversionRuleNotFound, got %v", err)
+	}
+}
+
+func TestSqliteInventoryRepository_CreateAndListRecipes(t *testing.T) {
+	repo, _ := setupInventoryRepo(t)
+
+	outputItem := &domainInventory.Item{
+		SKU:      "SKU-RCP-OUT-1",
+		Name:     "Bulk Garam Masala",
+		ItemType: domainInventory.ItemTypeBulkPowder,
+		BaseUnit: "kg",
+		IsActive: true,
+	}
+	rawChili := &domainInventory.Item{
+		SKU:      "SKU-RCP-RAW-1",
+		Name:     "Raw Chili",
+		ItemType: domainInventory.ItemTypeRaw,
+		BaseUnit: "kg",
+		IsActive: true,
+	}
+	rawCoriander := &domainInventory.Item{
+		SKU:      "SKU-RCP-RAW-2",
+		Name:     "Raw Coriander",
+		ItemType: domainInventory.ItemTypeRaw,
+		BaseUnit: "kg",
+		IsActive: true,
+	}
+	for _, item := range []*domainInventory.Item{outputItem, rawChili, rawCoriander} {
+		if err := repo.CreateItem(item); err != nil {
+			t.Fatalf("CreateItem failed: %v", err)
+		}
+	}
+
+	recipe := &domainInventory.Recipe{
+		RecipeCode:         "RCP-GM-001",
+		OutputItemID:       outputItem.ID,
+		OutputQtyBase:      100,
+		ExpectedWastagePct: 2.5,
+		IsActive:           true,
+		Components: []domainInventory.RecipeComponent{
+			{InputItemID: rawChili.ID, InputQtyBase: 60, LineNo: 1},
+			{InputItemID: rawCoriander.ID, InputQtyBase: 42.5, LineNo: 2},
+		},
+	}
+	if err := repo.CreateRecipe(recipe); err != nil {
+		t.Fatalf("CreateRecipe failed: %v", err)
+	}
+
+	recipes, err := repo.ListRecipes(domainInventory.RecipeListFilter{
+		ActiveOnly: true,
+		Search:     "RCP-GM",
+	})
+	if err != nil {
+		t.Fatalf("ListRecipes failed: %v", err)
+	}
+	if len(recipes) != 1 {
+		t.Fatalf("expected 1 recipe, got %d", len(recipes))
+	}
+	if len(recipes[0].Components) != 2 {
+		t.Fatalf("expected 2 recipe components, got %d", len(recipes[0].Components))
+	}
+	if recipes[0].ExpectedWastagePct != 2.5 {
+		t.Fatalf("expected wastage 2.5, got %f", recipes[0].ExpectedWastagePct)
+	}
+}
+
+func TestSqliteInventoryRepository_CreateRecipe_RejectsInvalidOutputItemType(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	rawOutput := &domainInventory.Item{
+		SKU:      "SKU-RCP-OUT-RAW",
+		Name:     "Raw Coriander",
+		ItemType: domainInventory.ItemTypeRaw,
+		BaseUnit: "kg",
+		IsActive: true,
+	}
+	rawInput := &domainInventory.Item{
+		SKU:      "SKU-RCP-RAW-ONLY",
+		Name:     "Raw Chili",
+		ItemType: domainInventory.ItemTypeRaw,
+		BaseUnit: "kg",
+		IsActive: true,
+	}
+	for _, item := range []*domainInventory.Item{rawOutput, rawInput} {
+		if err := repo.CreateItem(item); err != nil {
+			t.Fatalf("CreateItem failed: %v", err)
+		}
+	}
+
+	recipe := &domainInventory.Recipe{
+		RecipeCode:    "RCP-BAD-OUT",
+		OutputItemID:  rawOutput.ID,
+		OutputQtyBase: 100,
+		IsActive:      true,
+		Components: []domainInventory.RecipeComponent{
+			{InputItemID: rawInput.ID, InputQtyBase: 100, LineNo: 1},
+		},
+	}
+	if err := repo.CreateRecipe(recipe); err == nil {
+		t.Fatalf("expected output item type validation failure")
+	}
+
+	var count int
+	if err := manager.GetDB().QueryRow("SELECT COUNT(1) FROM recipes").Scan(&count); err != nil {
+		t.Fatalf("failed to query recipes count: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected rollback with zero recipes, got %d", count)
+	}
+}
+
+func TestSqliteInventoryRepository_CreateRecipe_RejectsMissingComponentAndRollsBack(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	outputItem := &domainInventory.Item{
+		SKU:      "SKU-RCP-OUT-ROLLBACK",
+		Name:     "Bulk Turmeric Mix",
+		ItemType: domainInventory.ItemTypeBulkPowder,
+		BaseUnit: "kg",
+		IsActive: true,
+	}
+	if err := repo.CreateItem(outputItem); err != nil {
+		t.Fatalf("CreateItem failed: %v", err)
+	}
+
+	recipe := &domainInventory.Recipe{
+		RecipeCode:    "RCP-ROLLBACK",
+		OutputItemID:  outputItem.ID,
+		OutputQtyBase: 50,
+		IsActive:      true,
+		Components: []domainInventory.RecipeComponent{
+			{InputItemID: 999999, InputQtyBase: 50, LineNo: 1},
+		},
+	}
+	if err := repo.CreateRecipe(recipe); err == nil {
+		t.Fatalf("expected missing component failure")
+	}
+
+	var count int
+	if err := manager.GetDB().QueryRow("SELECT COUNT(1) FROM recipes").Scan(&count); err != nil {
+		t.Fatalf("failed to query recipes count: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected rollback with zero recipes, got %d", count)
+	}
+}
+
+func TestSqliteInventoryRepository_UpdateRecipe_InvalidComponentRollsBack(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	outputItem := &domainInventory.Item{
+		SKU:      "SKU-RCP-OUT-UPD-RB",
+		Name:     "Bulk Pepper Mix",
+		ItemType: domainInventory.ItemTypeBulkPowder,
+		BaseUnit: "kg",
+		IsActive: true,
+	}
+	rawInput := &domainInventory.Item{
+		SKU:      "SKU-RCP-RAW-UPD-RB",
+		Name:     "Raw Pepper",
+		ItemType: domainInventory.ItemTypeRaw,
+		BaseUnit: "kg",
+		IsActive: true,
+	}
+	for _, item := range []*domainInventory.Item{outputItem, rawInput} {
+		if err := repo.CreateItem(item); err != nil {
+			t.Fatalf("CreateItem failed: %v", err)
+		}
+	}
+
+	recipe := &domainInventory.Recipe{
+		RecipeCode:         "RCP-UPD-RB-1",
+		OutputItemID:       outputItem.ID,
+		OutputQtyBase:      100,
+		ExpectedWastagePct: 1.5,
+		IsActive:           true,
+		Components: []domainInventory.RecipeComponent{
+			{InputItemID: rawInput.ID, InputQtyBase: 100, LineNo: 1},
+		},
+	}
+	if err := repo.CreateRecipe(recipe); err != nil {
+		t.Fatalf("CreateRecipe failed: %v", err)
+	}
+	if err := manager.GetDB().QueryRow("SELECT updated_at FROM recipes WHERE id = ?", recipe.ID).Scan(&recipe.UpdatedAt); err != nil {
+		t.Fatalf("failed to query recipe updated_at: %v", err)
+	}
+
+	updateAttempt := *recipe
+	updateAttempt.OutputQtyBase = 120
+	updateAttempt.ExpectedWastagePct = 3.5
+	updateAttempt.Components = []domainInventory.RecipeComponent{
+		{InputItemID: 999999, InputQtyBase: 120, LineNo: 1},
+	}
+	if err := repo.UpdateRecipe(&updateAttempt); err == nil {
+		t.Fatalf("expected update to fail for invalid component item")
+	}
+
+	recipes, err := repo.ListRecipes(domainInventory.RecipeListFilter{Search: "RCP-UPD-RB-1"})
+	if err != nil {
+		t.Fatalf("ListRecipes failed: %v", err)
+	}
+	if len(recipes) != 1 {
+		t.Fatalf("expected one recipe after failed update, got %d", len(recipes))
+	}
+	if recipes[0].OutputQtyBase != 100 {
+		t.Fatalf("expected output quantity to remain 100, got %f", recipes[0].OutputQtyBase)
+	}
+	if recipes[0].ExpectedWastagePct != 1.5 {
+		t.Fatalf("expected wastage to remain 1.5, got %f", recipes[0].ExpectedWastagePct)
+	}
+	if len(recipes[0].Components) != 1 {
+		t.Fatalf("expected original component set to remain intact, got %d components", len(recipes[0].Components))
+	}
+	if recipes[0].Components[0].InputItemID != rawInput.ID {
+		t.Fatalf("expected original component item %d, got %d", rawInput.ID, recipes[0].Components[0].InputItemID)
+	}
+}
+
+func TestSqliteInventoryRepository_UpdateRecipe_ConcurrencyConflict(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	outputItem := &domainInventory.Item{
+		SKU:      "SKU-RCP-OUT-CC",
+		Name:     "Bulk Sambar Mix",
+		ItemType: domainInventory.ItemTypeBulkPowder,
+		BaseUnit: "kg",
+		IsActive: true,
+	}
+	rawInput := &domainInventory.Item{
+		SKU:      "SKU-RCP-RAW-CC",
+		Name:     "Raw Chili",
+		ItemType: domainInventory.ItemTypeRaw,
+		BaseUnit: "kg",
+		IsActive: true,
+	}
+	for _, item := range []*domainInventory.Item{outputItem, rawInput} {
+		if err := repo.CreateItem(item); err != nil {
+			t.Fatalf("CreateItem failed: %v", err)
+		}
+	}
+
+	recipe := &domainInventory.Recipe{
+		RecipeCode:    "RCP-CC-1",
+		OutputItemID:  outputItem.ID,
+		OutputQtyBase: 100,
+		IsActive:      true,
+		Components: []domainInventory.RecipeComponent{
+			{InputItemID: rawInput.ID, InputQtyBase: 100, LineNo: 1},
+		},
+	}
+	if err := repo.CreateRecipe(recipe); err != nil {
+		t.Fatalf("CreateRecipe failed: %v", err)
+	}
+	if err := manager.GetDB().QueryRow("SELECT updated_at FROM recipes WHERE id = ?", recipe.ID).Scan(&recipe.UpdatedAt); err != nil {
+		t.Fatalf("failed to query recipe updated_at: %v", err)
+	}
+
+	stale := *recipe
+
+	recipe.ExpectedWastagePct = 3
+	if err := repo.UpdateRecipe(recipe); err != nil {
+		t.Fatalf("UpdateRecipe failed: %v", err)
+	}
+
+	stale.ExpectedWastagePct = 4
+	if err := repo.UpdateRecipe(&stale); !errors.Is(err, domainErrors.ErrConcurrencyConflict) {
+		t.Fatalf("expected concurrency conflict, got %v", err)
+	}
+}

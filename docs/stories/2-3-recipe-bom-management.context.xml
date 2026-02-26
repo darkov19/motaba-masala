@@ -1,0 +1,297 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>3</storyId>
+    <title>Recipe (BOM) Management</title>
+    <status>drafted</status>
+    <generatedAt>2026-02-26T18:20:07+00:00</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-3-recipe-bom-management.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Data Entry Operator</asA>
+    <iWant>to define and maintain recipes for bulk powders with structured BOM inputs and expected output/wastage</iWant>
+    <soThat>production batches can auto-calculate consumption and support yield benchmarking</soThat>
+    <tasks>- [ ] Implement recipe domain model and persistence schema for BOM header/details (AC: 1, 2, 3)
+  - [ ] Add migration(s) for `recipes` and `recipe_components` with required constraints (`recipe_code` uniqueness, FK constraints, line uniqueness)
+  - [ ] Implement repository methods for create/update/list recipe + components with transactional persistence
+  - [ ] Ensure normalized/base-unit quantity storage for component lines
+- [ ] Implement recipe application/service contracts and validation policies (AC: 1, 2, 3, 4)
+  - [ ] Add `CreateRecipe`, `UpdateRecipe`, and `ListRecipes` service operations aligned with Epic 2 interfaces
+  - [ ] Enforce validation for output-item compatibility, minimum component count, and expected wastage range
+  - [ ] Return actionable validation errors on invalid item references or malformed payloads
+- [ ] Wire recipe management into the `masters.recipes` module flow while preserving route/RBAC contract (AC: 1, 4)
+  - [ ] Integrate backend endpoint/binding flow for recipe CRUD/list under existing module ownership conventions
+  - [ ] Preserve backend-authoritative authorization checks for recipe write operations
+  - [ ] Keep route identity/module naming aligned with `docs/navigation-rbac-contract.md`
+- [ ] Add automated test coverage mapped to acceptance criteria (AC: 1, 2, 3, 4)
+  - [ ] Unit tests for recipe validation rules (required fields, expected wastage bounds, component count)
+  - [ ] Integration tests for transactional header/detail persistence and FK rejection on unknown items
+  - [ ] API/contract tests for recipe create/update/list success and error paths (including prior-story advisory on success-path coverage)
+  - [ ] Authorization tests validating role enforcement in backend for recipe writes
+- [ ] Add Windows validation automation for story scope (AC: 1, 2, 3, 4)
+  - [ ] Create `scripts/s2-3-win-test.ps1` to run build/start and recipe-focused validation checks with explicit PASS/FAIL output
+  - [ ] Ensure script returns non-zero exit code on failure</tasks>
+  </story>
+
+  <acceptanceCriteria>1. The system allows creation and maintenance of recipe/BOM definitions with one output item and one or more input component lines, matching Epic 2 recipe scope. [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative); docs/epics.md#Story 2.3: Recipe (BOM) Management]
+2. Recipe definitions support capture of expected wastage percentage for later yield benchmarking. [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative); docs/epics.md#Story 2.3: Recipe (BOM) Management]
+3. Recipe persistence enforces referential integrity so recipe component lines cannot reference non-existent items and saves header/details transactionally. [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative); docs/tech-spec-epic-2.md#Workflows and Sequencing]
+4. Recipe master data is discoverable and usable by downstream workflows via list/query interfaces after creation. [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative); docs/tech-spec-epic-2.md#Workflows and Sequencing]</acceptanceCriteria>
+
+  <artifacts>
+    <docs><doc>
+  <path>docs/epics.md</path>
+  <title>masala_inventory_managment - Epic Breakdown</title>
+  <section>Story 2.3: Recipe (BOM) Management</section>
+  <snippet>Story 2.3 defines recipe management for bulk powders with BOM inputs and expected output. Acceptance criteria require saving BOM definitions and capturing expected wastage percentage for benchmarking. Technical notes call out recipe header/detail structure and RBAC contract consistency.</snippet>
+</doc>
+<doc>
+  <path>docs/tech-spec-epic-2.md</path>
+  <title>Epic Technical Specification: Master Data &amp; Configuration</title>
+  <section>Services and Modules</section>
+  <snippet>The spec defines a RecipeService responsible for BOM header/detail management and expected wastage handling. It positions master-domain services in backend app/domain layers and keeps frontend as role-aware consumer UI.</snippet>
+</doc>
+<doc>
+  <path>docs/tech-spec-epic-2.md</path>
+  <title>Epic Technical Specification: Master Data &amp; Configuration</title>
+  <section>Data Models and Contracts</section>
+  <snippet>The planned `recipes` and `recipe_components` entities define output item, normalized quantities, wastage percentage, and line-level uniqueness constraints. Contract notes require foreign-key integrity and normalized quantities to avoid drift.</snippet>
+</doc>
+<doc>
+  <path>docs/tech-spec-epic-2.md</path>
+  <title>Epic Technical Specification: Master Data &amp; Configuration</title>
+  <section>APIs and Interfaces</section>
+  <snippet>Target interfaces include `CreateRecipe`, `UpdateRecipe`, and `ListRecipes` with validation around output item type, duplicate lines, and missing component items. Authorization expectations keep master-data writes backend-restricted.</snippet>
+</doc>
+<doc>
+  <path>docs/tech-spec-epic-2.md</path>
+  <title>Epic Technical Specification: Master Data &amp; Configuration</title>
+  <section>Acceptance Criteria (Authoritative)</section>
+  <snippet>Authoritative ACs for this story area require recipe create/maintain, expected wastage capture, referential integrity, and discoverability through list/query interfaces. Traceability mapping ties these to recipe APIs and transactional persistence tests.</snippet>
+</doc>
+<doc>
+  <path>docs/PRD.md</path>
+  <title>masala_inventory_managment - Product Requirements Document</title>
+  <section>Functional Requirements</section>
+  <snippet>FR-005 requires a recipe engine where the system fetches BOM ingredients for production and operators enter actual consumed quantities. This makes stable recipe master definitions a prerequisite for production execution.</snippet>
+</doc>
+<doc>
+  <path>docs/PRD.md</path>
+  <title>masala_inventory_managment - Product Requirements Document</title>
+  <section>Domain-Specific Requirements</section>
+  <snippet>The domain requires dual UOM behavior and defined loss factors for expected versus actual outcomes. Recipe wastage capture directly supports these benchmarking requirements.</snippet>
+</doc>
+<doc>
+  <path>docs/architecture.md</path>
+  <title>Architecture: Masala Inventory Management</title>
+  <section>Project Structure</section>
+  <snippet>The backend follows hexagonal architecture with `internal/app`, `internal/domain`, and `internal/infrastructure` layers. Story implementation should place recipe domain logic and orchestration in those layers rather than UI components.</snippet>
+</doc>
+<doc>
+  <path>docs/architecture.md</path>
+  <title>Architecture: Masala Inventory Management</title>
+  <section>0. Cohesive App Contract</section>
+  <snippet>Route ownership is anchored to the navigation/RBAC contract and backend authorization remains the security authority. Frontend guards are UX-only and cannot replace server-side enforcement.</snippet>
+</doc>
+<doc>
+  <path>docs/navigation-rbac-contract.md</path>
+  <title>Navigation and RBAC Contract (Story 2.2A)</title>
+  <section>Canonical Route Map (Stable IDs and Paths)</section>
+  <snippet>The canonical route map includes `masters.recipes` under the Masters module for both Admin and Operator visibility. Route IDs are treated as stable contract identifiers for implementation and tests.</snippet>
+</doc>
+<doc>
+  <path>docs/navigation-rbac-contract.md</path>
+  <title>Navigation and RBAC Contract (Story 2.2A)</title>
+  <section>Frontend vs Backend Authority (Canonical Rule)</section>
+  <snippet>The contract explicitly states backend authorization is authoritative, hidden UI is never authorization, and mismatches resolve in favor of backend denial. Recipe write paths must follow this rule.</snippet>
+</doc>
+<doc>
+  <path>docs/ux-design-specification.md</path>
+  <title>Masala Inventory Management — UX Design Specification</title>
+  <section>Contract Consistency</section>
+  <snippet>The UX design specifies one cohesive shell with role-based variants and shared route/module ownership aligned to the navigation contract. Recipe workflow UI should fit this existing shell behavior rather than introducing alternate navigation patterns.</snippet>
+</doc>
+<doc>
+  <path>docs/testing/windows-story-script-standard.md</path>
+  <title>Windows Story Script Standard</title>
+  <section>Script Contract (Mandatory)</section>
+  <snippet>Each story requires a Windows validation script with per-story naming, runtime checks, explicit PASS/FAIL summary, and non-zero exit on failure. Story records must include validation evidence before review.</snippet>
+</doc></docs>
+    <code><artifact>
+  <path>internal/domain/inventory/repository.go</path>
+  <kind>domain repository contract</kind>
+  <symbol>type Repository interface</symbol>
+  <lines>15-31</lines>
+  <reason>Central persistence contract already houses master-data operations and should be extended with recipe methods instead of creating bypass persistence paths.</reason>
+</artifact>
+<artifact>
+  <path>internal/domain/inventory/entities.go</path>
+  <kind>domain entities and validation</kind>
+  <symbol>ItemType constants; func (i *Item) ValidateMasterContract</symbol>
+  <lines>10-17,85-106</lines>
+  <reason>Defines canonical item typing and validation constraints that recipe output/component item references must respect.</reason>
+</artifact>
+<artifact>
+  <path>internal/app/inventory/service.go</path>
+  <kind>application service</kind>
+  <symbol>func (s *Service) requireMasterWriteAccess; mapValidationError; service input structs</symbol>
+  <lines>169-227</lines>
+  <reason>Provides established backend authorization and validation error mapping patterns to mirror for recipe create/update/list operations.</reason>
+</artifact>
+<artifact>
+  <path>internal/infrastructure/db/sqlite_inventory_repository.go</path>
+  <kind>repository implementation</kind>
+  <symbol>func (r *SqliteInventoryRepository) CreatePackagingProfile</symbol>
+  <lines>220-288</lines>
+  <reason>Shows transaction pattern for header/child persistence and rollback behavior, directly applicable to recipe + recipe_components saves.</reason>
+</artifact>
+<artifact>
+  <path>internal/infrastructure/db/migrations_test.go</path>
+  <kind>migration integration test</kind>
+  <symbol>TestMigrator_RunMigrations_Integration</symbol>
+  <lines>10-45</lines>
+  <reason>Verifies migration registration and expected tables, providing baseline for adding recipe table assertions once migrations are added.</reason>
+</artifact>
+<artifact>
+  <path>cmd/server/api_server.go</path>
+  <kind>HTTP API router</kind>
+  <symbol>POST /inventory/conversions/* handlers and mapped error wiring</symbol>
+  <lines>360-421</lines>
+  <reason>Demonstrates endpoint registration and consistent request decode/error mapping patterns for upcoming recipe endpoints.</reason>
+</artifact>
+<artifact>
+  <path>internal/app/app.go</path>
+  <kind>Wails app binding</kind>
+  <symbol>CreateUnitConversionRule; ListUnitConversionRules; ConvertQuantity</symbol>
+  <lines>852-937</lines>
+  <reason>Illustrates server/client binding parity (`postToServerAPI` on client mode) that recipe bindings should follow.</reason>
+</artifact>
+<artifact>
+  <path>frontend/src/services/masterDataApi.ts</path>
+  <kind>frontend typed service client</kind>
+  <symbol>AppBinding type and create/list/convert master-data wrappers</symbol>
+  <lines>119-274</lines>
+  <reason>Existing token-backed binding wrappers are the correct extension point for recipe API calls and error normalization.</reason>
+</artifact>
+<artifact>
+  <path>frontend/src/shell/rbac.ts</path>
+  <kind>route and RBAC contract implementation</kind>
+  <symbol>ROUTE_REGISTRY entry for masters.recipes; canPerformAction; canAccessRoute</symbol>
+  <lines>18-37,102-112</lines>
+  <reason>Confirms route identity and role gating rules that story 2.3 must preserve.</reason>
+</artifact>
+<artifact>
+  <path>frontend/src/App.tsx</path>
+  <kind>workspace view routing</kind>
+  <symbol>renderWorkspaceContent default placeholder route handling</symbol>
+  <lines>581-629</lines>
+  <reason>`masters.recipes` currently renders placeholder workflow content; implementing story UI requires replacing this path with recipe-specific components without changing route IDs.</reason>
+</artifact>
+<artifact>
+  <path>internal/app/inventory/service_test.go</path>
+  <kind>backend service tests</kind>
+  <symbol>OperatorDeniedByBackend and conversion validation test patterns</symbol>
+  <lines>324-423</lines>
+  <reason>Provides RBAC and validation test style to replicate for recipe write authorization and recipe validation behaviors.</reason>
+</artifact>
+<artifact>
+  <path>cmd/server/api_server_test.go</path>
+  <kind>API contract tests</kind>
+  <symbol>inventory route status mapping and success/error assertions</symbol>
+  <lines>277-370</lines>
+  <reason>Demonstrates server API test structure to extend for recipe create/update/list endpoint contracts.</reason>
+</artifact></code>
+    <dependencies><go>
+  <package name="go" version="1.26" />
+  <package name="github.com/wailsapp/wails/v2" version="v2.11.0" />
+  <package name="github.com/mattn/go-sqlite3" version="v1.14.34" />
+  <package name="github.com/golang-migrate/migrate/v4" version="v4.18.2" />
+  <package name="github.com/golang-jwt/jwt/v5" version="v5.3.1" />
+</go>
+<node path="frontend/package.json">
+  <package name="react" version="^19.0.0" />
+  <package name="react-dom" version="^19.0.0" />
+  <package name="react-router-dom" version="^6.30.3" />
+  <package name="antd" version="^6.2.1" />
+  <package name="@tanstack/react-query" version="^5.66.0" />
+  <package name="axios" version="^1.7.9" />
+  <package name="vitest" version="^4.0.18" />
+  <package name="@testing-library/react" version="^16.3.0" />
+</node>
+<frameworks>
+  <framework name="Wails desktop app (Go + WebView bindings)" location="wails_server.json" />
+  <framework name="React + TypeScript + Vite frontend" location="frontend/package.json" />
+  <framework name="SQLite persistence via repository adapters" location="go.mod" />
+  <framework name="Story-level Windows runtime validation (PowerShell)" location="docs/testing/windows-story-script-standard.md" />
+</frameworks></dependencies>
+  </artifacts>
+
+  <constraints><constraint>Keep recipe business logic in backend/domain layers (`internal/domain`, `internal/app`) and avoid UI-only business rules.</constraint>
+<constraint>Persist recipe components in normalized/base-unit quantities and enforce referential integrity and line-level uniqueness.</constraint>
+<constraint>Use transactional persistence for recipe header/details so partial writes cannot commit.</constraint>
+<constraint>Preserve existing `masters.recipes` route identity and module ownership from the RBAC navigation contract.</constraint>
+<constraint>Backend authorization is authoritative: recipe write operations must remain admin-restricted unless contract changes explicitly.</constraint>
+<constraint>Adopt existing error contract style (`validation_failed`, `forbidden`, `unauthorized`, `conflict`) for recipe operations.</constraint>
+<constraint>Include Windows validation script `scripts/s2-3-win-test.ps1` with explicit PASS/FAIL and non-zero failure exit.</constraint></constraints>
+  <interfaces><interface>
+  <name>Repository Interface (Inventory Domain)</name>
+  <kind>Go interface</kind>
+  <signature>type Repository interface { CreateItem(...); UpdateItem(...); ListItems(...); CreatePackagingProfile(...); ListPackagingProfiles(...); ... }</signature>
+  <path>internal/domain/inventory/repository.go</path>
+</interface>
+<interface>
+  <name>Inventory Service Auth Guard</name>
+  <kind>Go function contract</kind>
+  <signature>func (s *Service) requireMasterWriteAccess(authToken string) error</signature>
+  <path>internal/app/inventory/service.go</path>
+</interface>
+<interface>
+  <name>Server Inventory API Pattern</name>
+  <kind>REST endpoint pattern</kind>
+  <signature>mux.HandleFunc("/inventory/...", decode JSON -&gt; application call -&gt; writeMappedServerError/writeServerJSON)</signature>
+  <path>cmd/server/api_server.go</path>
+</interface>
+<interface>
+  <name>Wails Binding Pattern</name>
+  <kind>Go app binding methods</kind>
+  <signature>Server mode: inventoryService call; Client mode: postToServerAPI("/inventory/...", input, &amp;result)</signature>
+  <path>internal/app/app.go</path>
+</interface>
+<interface>
+  <name>Frontend MasterData Binding Contract</name>
+  <kind>TypeScript AppBinding</kind>
+  <signature>type AppBinding { CreateItemMaster?; UpdateItemMaster?; ListItems?; ... } with auth_token propagation</signature>
+  <path>frontend/src/services/masterDataApi.ts</path>
+</interface>
+<interface>
+  <name>Planned Recipe API Contract</name>
+  <kind>Technical spec service interface</kind>
+  <signature>RecipeService.CreateRecipe(input); RecipeService.UpdateRecipe(id, input); RecipeService.ListRecipes(filter)</signature>
+  <path>docs/tech-spec-epic-2.md</path>
+</interface>
+<interface>
+  <name>Route Contract for Recipe Module</name>
+  <kind>Navigation/RBAC route contract</kind>
+  <signature>route_id=masters.recipes, path=/masters/recipes, module=masters, minRole=operator</signature>
+  <path>docs/navigation-rbac-contract.md</path>
+</interface></interfaces>
+  <tests>
+    <standards>Follow Epic 2 testing strategy with layered coverage: unit validation, transactional repository integration, API contract tests, and backend RBAC enforcement. Reuse current Go test patterns for service and API status mapping, keep frontend route/UI tests role-safe, and include Windows runtime validation evidence via per-story PowerShell script before review.</standards>
+    <locations><location>internal/domain/inventory/*.go (new recipe entity/validation tests adjacent to domain models)</location>
+<location>internal/app/inventory/service_test.go</location>
+<location>internal/infrastructure/db/sqlite_inventory_repository_test.go</location>
+<location>cmd/server/api_server_test.go</location>
+<location>frontend/src/components/forms/__tests__/</location>
+<location>frontend/src/__tests__/AppShellRBAC.test.tsx</location>
+<location>frontend/vitest.config.ts</location>
+<location>scripts/s2-3-win-test.ps1</location>
+<location>docs/testing/windows-story-script-standard.md</location></locations>
+    <ideas><idea ac="1">Add service and repository tests for create/update recipe flows with one output item and multiple component lines, including persisted header/detail verification.</idea>
+<idea ac="2">Add validation tests for expected_wastage_pct bounds and persistence round-trip checks for wastage field behavior.</idea>
+<idea ac="3">Add transaction/FK tests that reject unknown component item IDs and ensure recipe header/detail rollback on child insert failure.</idea>
+<idea ac="4">Add list/query contract tests proving newly created recipes are discoverable through service and API list operations with expected filter behavior.</idea>
+<idea ac="1,2,3,4">Add `scripts/s2-3-win-test.ps1` Windows runtime checks for recipe CRUD and validation scenarios with explicit PASS/FAIL summary and non-zero failure exit.</idea></ideas>
+  </tests>
+</story-context>

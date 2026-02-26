@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -403,6 +404,498 @@ func (r *SqliteInventoryRepository) ListPackagingProfiles(filter domainInventory
 		profiles = append(profiles, *profileMap[id])
 	}
 	return profiles, nil
+}
+
+func (r *SqliteInventoryRepository) validateRecipeOutputItemTx(tx *sql.Tx, itemID int64) error {
+	var matches int
+	err := tx.QueryRowContext(
+		context.Background(),
+		`SELECT COUNT(1)
+		 FROM items
+		 WHERE id = ? AND is_active = 1 AND item_type = 'BULK_POWDER'`,
+		itemID,
+	).Scan(&matches)
+	if err != nil {
+		return err
+	}
+	if matches == 0 {
+		return fmt.Errorf("invalid output item type or inactive item: %d", itemID)
+	}
+	return nil
+}
+
+func (r *SqliteInventoryRepository) validateRecipeComponentItemTx(tx *sql.Tx, itemID int64) error {
+	var matches int
+	err := tx.QueryRowContext(
+		context.Background(),
+		`SELECT COUNT(1)
+		 FROM items
+		 WHERE id = ? AND is_active = 1`,
+		itemID,
+	).Scan(&matches)
+	if err != nil {
+		return err
+	}
+	if matches == 0 {
+		return fmt.Errorf("invalid recipe component item: %d", itemID)
+	}
+	return nil
+}
+
+func (r *SqliteInventoryRepository) CreateRecipe(recipe *domainInventory.Recipe) error {
+	if err := recipe.Validate(); err != nil {
+		return err
+	}
+	if recipe.CreatedAt.IsZero() {
+		recipe.CreatedAt = time.Now().UTC()
+	}
+	if recipe.UpdatedAt.IsZero() {
+		recipe.UpdatedAt = recipe.CreatedAt
+	}
+
+	tx, err := r.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	if err := r.validateRecipeOutputItemTx(tx, recipe.OutputItemID); err != nil {
+		return err
+	}
+
+	res, err := tx.ExecContext(
+		context.Background(),
+		`INSERT INTO recipes (recipe_code, output_item_id, output_qty_base, expected_wastage_pct, is_active, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		recipe.RecipeCode,
+		recipe.OutputItemID,
+		recipe.OutputQtyBase,
+		recipe.ExpectedWastagePct,
+		recipe.IsActive,
+		recipe.CreatedAt,
+		recipe.UpdatedAt,
+	)
+	if err != nil {
+		return err
+	}
+	recipeID, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+	recipe.ID = recipeID
+
+	for i := range recipe.Components {
+		component := &recipe.Components[i]
+		if err := r.validateRecipeComponentItemTx(tx, component.InputItemID); err != nil {
+			return err
+		}
+		componentRes, err := tx.ExecContext(
+			context.Background(),
+			`INSERT INTO recipe_components (recipe_id, input_item_id, input_qty_base, line_no)
+			 VALUES (?, ?, ?, ?)`,
+			recipeID,
+			component.InputItemID,
+			component.InputQtyBase,
+			component.LineNo,
+		)
+		if err != nil {
+			return err
+		}
+		componentID, err := componentRes.LastInsertId()
+		if err != nil {
+			return err
+		}
+		component.ID = componentID
+		component.RecipeID = recipeID
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+	return nil
+}
+
+func (r *SqliteInventoryRepository) UpdateRecipe(recipe *domainInventory.Recipe) error {
+	if recipe == nil || recipe.ID <= 0 {
+		return errors.New("recipe id is required")
+	}
+	if err := recipe.Validate(); err != nil {
+		return err
+	}
+
+	tx, err := r.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	if err := r.validateRecipeOutputItemTx(tx, recipe.OutputItemID); err != nil {
+		return err
+	}
+
+	res, err := tx.ExecContext(
+		context.Background(),
+		`UPDATE recipes
+		 SET recipe_code = ?, output_item_id = ?, output_qty_base = ?, expected_wastage_pct = ?, is_active = ?, updated_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')
+		 WHERE id = ? AND updated_at = ?`,
+		recipe.RecipeCode,
+		recipe.OutputItemID,
+		recipe.OutputQtyBase,
+		recipe.ExpectedWastagePct,
+		recipe.IsActive,
+		recipe.ID,
+		recipe.UpdatedAt,
+	)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return domainErrors.ErrConcurrencyConflict
+	}
+
+	if _, err := tx.ExecContext(context.Background(), "DELETE FROM recipe_components WHERE recipe_id = ?", recipe.ID); err != nil {
+		return err
+	}
+
+	for i := range recipe.Components {
+		component := &recipe.Components[i]
+		if err := r.validateRecipeComponentItemTx(tx, component.InputItemID); err != nil {
+			return err
+		}
+		componentRes, err := tx.ExecContext(
+			context.Background(),
+			`INSERT INTO recipe_components (recipe_id, input_item_id, input_qty_base, line_no)
+			 VALUES (?, ?, ?, ?)`,
+			recipe.ID,
+			component.InputItemID,
+			component.InputQtyBase,
+			component.LineNo,
+		)
+		if err != nil {
+			return err
+		}
+		componentID, err := componentRes.LastInsertId()
+		if err != nil {
+			return err
+		}
+		component.ID = componentID
+		component.RecipeID = recipe.ID
+	}
+
+	if err := tx.QueryRowContext(context.Background(), "SELECT updated_at FROM recipes WHERE id = ?", recipe.ID).Scan(&recipe.UpdatedAt); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+	return nil
+}
+
+func (r *SqliteInventoryRepository) ListRecipes(filter domainInventory.RecipeListFilter) ([]domainInventory.Recipe, error) {
+	args := make([]any, 0, 5)
+	clauses := make([]string, 0, 4)
+	if filter.ActiveOnly {
+		clauses = append(clauses, "r.is_active = 1")
+	}
+	if filter.OutputItemID != nil && *filter.OutputItemID > 0 {
+		clauses = append(clauses, "r.output_item_id = ?")
+		args = append(args, *filter.OutputItemID)
+	}
+	if strings.TrimSpace(filter.Search) != "" {
+		query := "%" + strings.TrimSpace(filter.Search) + "%"
+		clauses = append(clauses, "(r.recipe_code LIKE ? OR oi.name LIKE ?)")
+		args = append(args, query, query)
+	}
+
+	query := `SELECT
+		r.id,
+		r.recipe_code,
+		r.output_item_id,
+		r.output_qty_base,
+		r.expected_wastage_pct,
+		r.is_active,
+		r.created_at,
+		r.updated_at,
+		COALESCE(c.id, 0),
+		COALESCE(c.input_item_id, 0),
+		COALESCE(c.input_qty_base, 0),
+		COALESCE(c.line_no, 0)
+	FROM recipes r
+	INNER JOIN items oi ON oi.id = r.output_item_id
+	LEFT JOIN recipe_components c ON c.recipe_id = r.id`
+	if len(clauses) > 0 {
+		query += " WHERE " + strings.Join(clauses, " AND ")
+	}
+	query += " ORDER BY r.recipe_code COLLATE NOCASE ASC, c.line_no ASC"
+
+	rows, err := r.db.QueryContext(context.Background(), query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	recipeMap := make(map[int64]*domainInventory.Recipe)
+	order := make([]int64, 0)
+	for rows.Next() {
+		var (
+			recipeID      int64
+			recipeCode    string
+			outputItemID  int64
+			outputQtyBase float64
+			wastage       float64
+			isActive      bool
+			createdAt     time.Time
+			updatedAt     time.Time
+			componentID   int64
+			inputItemID   int64
+			inputQtyBase  float64
+			lineNo        int
+		)
+		if err := rows.Scan(
+			&recipeID,
+			&recipeCode,
+			&outputItemID,
+			&outputQtyBase,
+			&wastage,
+			&isActive,
+			&createdAt,
+			&updatedAt,
+			&componentID,
+			&inputItemID,
+			&inputQtyBase,
+			&lineNo,
+		); err != nil {
+			return nil, err
+		}
+
+		recipe, exists := recipeMap[recipeID]
+		if !exists {
+			recipe = &domainInventory.Recipe{
+				ID:                 recipeID,
+				RecipeCode:         recipeCode,
+				OutputItemID:       outputItemID,
+				OutputQtyBase:      outputQtyBase,
+				ExpectedWastagePct: wastage,
+				IsActive:           isActive,
+				CreatedAt:          createdAt,
+				UpdatedAt:          updatedAt,
+				Components:         make([]domainInventory.RecipeComponent, 0),
+			}
+			recipeMap[recipeID] = recipe
+			order = append(order, recipeID)
+		}
+		if componentID > 0 {
+			recipe.Components = append(recipe.Components, domainInventory.RecipeComponent{
+				ID:           componentID,
+				RecipeID:     recipeID,
+				InputItemID:  inputItemID,
+				InputQtyBase: inputQtyBase,
+				LineNo:       lineNo,
+			})
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	recipes := make([]domainInventory.Recipe, 0, len(order))
+	for _, id := range order {
+		recipes = append(recipes, *recipeMap[id])
+	}
+	return recipes, nil
+}
+
+func normalizeOptionalItemID(itemID *int64) interface{} {
+	if itemID == nil || *itemID <= 0 {
+		return nil
+	}
+	return *itemID
+}
+
+func (r *SqliteInventoryRepository) CreateUnitConversionRule(rule *domainInventory.UnitConversionRule) error {
+	if err := rule.Validate(); err != nil {
+		return err
+	}
+	if rule.CreatedAt.IsZero() {
+		rule.CreatedAt = time.Now().UTC()
+	}
+	if rule.UpdatedAt.IsZero() {
+		rule.UpdatedAt = rule.CreatedAt
+	}
+
+	result, err := r.db.ExecContext(
+		context.Background(),
+		`INSERT INTO unit_conversions (item_id, from_unit, to_unit, factor, precision_scale, rounding_mode, is_active, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		normalizeOptionalItemID(rule.ItemID),
+		rule.FromUnit,
+		rule.ToUnit,
+		rule.Factor,
+		rule.PrecisionScale,
+		string(rule.RoundingMode),
+		rule.IsActive,
+		rule.CreatedAt,
+		rule.UpdatedAt,
+	)
+	if err != nil {
+		return err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+	rule.ID = id
+	return nil
+}
+
+func (r *SqliteInventoryRepository) FindUnitConversionRule(lookup domainInventory.UnitConversionLookup) (*domainInventory.UnitConversionRule, error) {
+	if err := lookup.Validate(); err != nil {
+		return nil, err
+	}
+
+	var (
+		row *sql.Row
+	)
+	if lookup.ItemID != nil && *lookup.ItemID > 0 {
+		row = r.db.QueryRowContext(
+			context.Background(),
+			`SELECT id, item_id, from_unit, to_unit, factor, precision_scale, rounding_mode, is_active, created_at, updated_at
+			 FROM unit_conversions
+			 WHERE from_unit = ? AND to_unit = ? AND is_active = 1 AND (item_id = ? OR item_id IS NULL)
+			 ORDER BY CASE WHEN item_id = ? THEN 0 ELSE 1 END, id ASC
+			 LIMIT 1`,
+			lookup.FromUnit,
+			lookup.ToUnit,
+			*lookup.ItemID,
+			*lookup.ItemID,
+		)
+	} else {
+		row = r.db.QueryRowContext(
+			context.Background(),
+			`SELECT id, item_id, from_unit, to_unit, factor, precision_scale, rounding_mode, is_active, created_at, updated_at
+			 FROM unit_conversions
+			 WHERE from_unit = ? AND to_unit = ? AND is_active = 1 AND item_id IS NULL
+			 ORDER BY id ASC
+			 LIMIT 1`,
+			lookup.FromUnit,
+			lookup.ToUnit,
+		)
+	}
+
+	var (
+		rule         domainInventory.UnitConversionRule
+		itemID       sql.NullInt64
+		roundingMode string
+	)
+	if err := row.Scan(
+		&rule.ID,
+		&itemID,
+		&rule.FromUnit,
+		&rule.ToUnit,
+		&rule.Factor,
+		&rule.PrecisionScale,
+		&roundingMode,
+		&rule.IsActive,
+		&rule.CreatedAt,
+		&rule.UpdatedAt,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domainInventory.ErrConversionRuleNotFound
+		}
+		return nil, err
+	}
+	if itemID.Valid {
+		id := itemID.Int64
+		rule.ItemID = &id
+	}
+	rule.RoundingMode = domainInventory.ParseRoundingMode(roundingMode)
+	rule.Normalize()
+	return &rule, nil
+}
+
+func (r *SqliteInventoryRepository) ListUnitConversionRules(filter domainInventory.UnitConversionRuleFilter) ([]domainInventory.UnitConversionRule, error) {
+	filter.Normalize()
+
+	args := make([]interface{}, 0, 5)
+	clauses := make([]string, 0, 4)
+	if filter.ActiveOnly {
+		clauses = append(clauses, "is_active = 1")
+	}
+	if filter.ItemID != nil && *filter.ItemID > 0 {
+		clauses = append(clauses, "item_id = ?")
+		args = append(args, *filter.ItemID)
+	}
+	if filter.FromUnit != "" {
+		clauses = append(clauses, "from_unit = ?")
+		args = append(args, filter.FromUnit)
+	}
+	if filter.ToUnit != "" {
+		clauses = append(clauses, "to_unit = ?")
+		args = append(args, filter.ToUnit)
+	}
+
+	query := `SELECT id, item_id, from_unit, to_unit, factor, precision_scale, rounding_mode, is_active, created_at, updated_at
+		FROM unit_conversions`
+	if len(clauses) > 0 {
+		query += " WHERE " + strings.Join(clauses, " AND ")
+	}
+	query += " ORDER BY CASE WHEN item_id IS NULL THEN 1 ELSE 0 END, item_id, from_unit, to_unit"
+
+	rows, err := r.db.QueryContext(context.Background(), query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	rules := make([]domainInventory.UnitConversionRule, 0)
+	for rows.Next() {
+		var (
+			rule         domainInventory.UnitConversionRule
+			itemID       sql.NullInt64
+			roundingMode string
+		)
+		if err := rows.Scan(
+			&rule.ID,
+			&itemID,
+			&rule.FromUnit,
+			&rule.ToUnit,
+			&rule.Factor,
+			&rule.PrecisionScale,
+			&roundingMode,
+			&rule.IsActive,
+			&rule.CreatedAt,
+			&rule.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		if itemID.Valid {
+			id := itemID.Int64
+			rule.ItemID = &id
+		}
+		rule.RoundingMode = domainInventory.ParseRoundingMode(roundingMode)
+		rule.Normalize()
+		rules = append(rules, rule)
+	}
+
+	return rules, rows.Err()
 }
 
 func (r *SqliteInventoryRepository) CreateGRN(grn *domainInventory.GRN) error {

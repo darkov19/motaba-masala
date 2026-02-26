@@ -85,6 +85,68 @@ type ListPackagingProfilesInput struct {
 	AuthToken  string `json:"auth_token"`
 }
 
+type RecipeComponentInput struct {
+	InputItemID  int64   `json:"input_item_id"`
+	InputQtyBase float64 `json:"input_qty_base"`
+	LineNo       int     `json:"line_no"`
+}
+
+type CreateRecipeInput struct {
+	RecipeCode         string                 `json:"recipe_code"`
+	OutputItemID       int64                  `json:"output_item_id"`
+	OutputQtyBase      float64                `json:"output_qty_base"`
+	ExpectedWastagePct float64                `json:"expected_wastage_pct"`
+	IsActive           bool                   `json:"is_active"`
+	Components         []RecipeComponentInput `json:"components"`
+	AuthToken          string                 `json:"auth_token"`
+}
+
+type UpdateRecipeInput struct {
+	ID                 int64                  `json:"id"`
+	RecipeCode         string                 `json:"recipe_code"`
+	OutputItemID       int64                  `json:"output_item_id"`
+	OutputQtyBase      float64                `json:"output_qty_base"`
+	ExpectedWastagePct float64                `json:"expected_wastage_pct"`
+	IsActive           bool                   `json:"is_active"`
+	Components         []RecipeComponentInput `json:"components"`
+	UpdatedAt          string                 `json:"updated_at"`
+	AuthToken          string                 `json:"auth_token"`
+}
+
+type ListRecipesInput struct {
+	ActiveOnly   bool   `json:"active_only"`
+	OutputItemID *int64 `json:"output_item_id,omitempty"`
+	Search       string `json:"search"`
+	AuthToken    string `json:"auth_token"`
+}
+
+type CreateUnitConversionRuleInput struct {
+	ItemID         *int64  `json:"item_id,omitempty"`
+	FromUnit       string  `json:"from_unit"`
+	ToUnit         string  `json:"to_unit"`
+	Factor         float64 `json:"factor"`
+	PrecisionScale int     `json:"precision_scale"`
+	RoundingMode   string  `json:"rounding_mode"`
+	IsActive       *bool   `json:"is_active,omitempty"`
+	AuthToken      string  `json:"auth_token"`
+}
+
+type ListUnitConversionRulesInput struct {
+	ItemID     *int64 `json:"item_id,omitempty"`
+	FromUnit   string `json:"from_unit"`
+	ToUnit     string `json:"to_unit"`
+	ActiveOnly bool   `json:"active_only"`
+	AuthToken  string `json:"auth_token"`
+}
+
+type ConvertQuantityInput struct {
+	ItemID     *int64  `json:"item_id,omitempty"`
+	Quantity   float64 `json:"quantity"`
+	SourceUnit string  `json:"source_unit"`
+	TargetUnit string  `json:"target_unit"`
+	AuthToken  string  `json:"auth_token"`
+}
+
 func NewService(repo domainInventory.Repository, roleResolver func(authToken string) (domainAuth.Role, error)) *Service {
 	return &Service{
 		repo:         repo,
@@ -173,8 +235,114 @@ func mapValidationError(err error) error {
 		return &ServiceError{Code: "validation_failed", Message: "packaging profile validation failed", Fields: []FieldError{{Field: "components.packing_material_item_id", Message: domainInventory.ErrComponentItemID.Error()}}}
 	case errors.Is(err, domainInventory.ErrComponentQty):
 		return &ServiceError{Code: "validation_failed", Message: "packaging profile validation failed", Fields: []FieldError{{Field: "components.qty_per_unit", Message: domainInventory.ErrComponentQty.Error()}}}
+	case errors.Is(err, domainInventory.ErrRecipeCodeRequired):
+		return &ServiceError{Code: "validation_failed", Message: "recipe validation failed", Fields: []FieldError{{Field: "recipe_code", Message: domainInventory.ErrRecipeCodeRequired.Error()}}}
+	case errors.Is(err, domainInventory.ErrRecipeOutputItemRequired):
+		return &ServiceError{Code: "validation_failed", Message: "recipe validation failed", Fields: []FieldError{{Field: "output_item_id", Message: domainInventory.ErrRecipeOutputItemRequired.Error()}}}
+	case errors.Is(err, domainInventory.ErrRecipeOutputQtyInvalid):
+		return &ServiceError{Code: "validation_failed", Message: "recipe validation failed", Fields: []FieldError{{Field: "output_qty_base", Message: domainInventory.ErrRecipeOutputQtyInvalid.Error()}}}
+	case errors.Is(err, domainInventory.ErrRecipeWastageInvalid):
+		return &ServiceError{Code: "validation_failed", Message: "recipe validation failed", Fields: []FieldError{{Field: "expected_wastage_pct", Message: domainInventory.ErrRecipeWastageInvalid.Error()}}}
+	case errors.Is(err, domainInventory.ErrRecipeComponentsRequired):
+		return &ServiceError{Code: "validation_failed", Message: "recipe validation failed", Fields: []FieldError{{Field: "components", Message: domainInventory.ErrRecipeComponentsRequired.Error()}}}
+	case errors.Is(err, domainInventory.ErrRecipeComponentItemID):
+		return &ServiceError{Code: "validation_failed", Message: "recipe validation failed", Fields: []FieldError{{Field: "components.input_item_id", Message: domainInventory.ErrRecipeComponentItemID.Error()}}}
+	case errors.Is(err, domainInventory.ErrRecipeComponentQtyInvalid):
+		return &ServiceError{Code: "validation_failed", Message: "recipe validation failed", Fields: []FieldError{{Field: "components.input_qty_base", Message: domainInventory.ErrRecipeComponentQtyInvalid.Error()}}}
+	case errors.Is(err, domainInventory.ErrRecipeComponentLineNo):
+		return &ServiceError{Code: "validation_failed", Message: "recipe validation failed", Fields: []FieldError{{Field: "components.line_no", Message: domainInventory.ErrRecipeComponentLineNo.Error()}}}
+	case errors.Is(err, domainInventory.ErrRecipeComponentLineDup):
+		return &ServiceError{Code: "validation_failed", Message: "recipe validation failed", Fields: []FieldError{{Field: "components.line_no", Message: err.Error()}}}
+	case errors.Is(err, domainInventory.ErrConversionFromUnitRequired):
+		return &ServiceError{Code: "validation_failed", Message: "conversion rule validation failed", Fields: []FieldError{{Field: "from_unit", Message: domainInventory.ErrConversionFromUnitRequired.Error()}}}
+	case errors.Is(err, domainInventory.ErrConversionToUnitRequired):
+		return &ServiceError{Code: "validation_failed", Message: "conversion rule validation failed", Fields: []FieldError{{Field: "to_unit", Message: domainInventory.ErrConversionToUnitRequired.Error()}}}
+	case errors.Is(err, domainInventory.ErrConversionFactorInvalid):
+		return &ServiceError{Code: "validation_failed", Message: "conversion rule validation failed", Fields: []FieldError{{Field: "factor", Message: domainInventory.ErrConversionFactorInvalid.Error()}}}
+	case errors.Is(err, domainInventory.ErrConversionPrecisionInvalid):
+		return &ServiceError{Code: "validation_failed", Message: "conversion rule validation failed", Fields: []FieldError{{Field: "precision_scale", Message: domainInventory.ErrConversionPrecisionInvalid.Error()}}}
+	case errors.Is(err, domainInventory.ErrConversionRoundingInvalid):
+		return &ServiceError{Code: "validation_failed", Message: "conversion rule validation failed", Fields: []FieldError{{Field: "rounding_mode", Message: domainInventory.ErrConversionRoundingInvalid.Error()}}}
+	case errors.Is(err, domainInventory.ErrConversionSourceUnitMissing):
+		return &ServiceError{Code: "validation_failed", Message: "conversion request validation failed", Fields: []FieldError{{Field: "source_unit", Message: domainInventory.ErrConversionSourceUnitMissing.Error()}}}
+	case errors.Is(err, domainInventory.ErrConversionTargetUnitMissing):
+		return &ServiceError{Code: "validation_failed", Message: "conversion request validation failed", Fields: []FieldError{{Field: "target_unit", Message: domainInventory.ErrConversionTargetUnitMissing.Error()}}}
+	case errors.Is(err, domainInventory.ErrConversionQuantityInvalid):
+		return &ServiceError{Code: "validation_failed", Message: "conversion request validation failed", Fields: []FieldError{{Field: "quantity", Message: domainInventory.ErrConversionQuantityInvalid.Error()}}}
+	case errors.Is(err, domainInventory.ErrConversionItemIDInvalid):
+		return &ServiceError{Code: "validation_failed", Message: "conversion request validation failed", Fields: []FieldError{{Field: "item_id", Message: domainInventory.ErrConversionItemIDInvalid.Error()}}}
+	case errors.Is(err, domainInventory.ErrConversionRuleNotFound):
+		return &ServiceError{Code: "validation_failed", Message: "conversion rule not found for requested unit pair", Fields: []FieldError{{Field: "conversion_rule", Message: domainInventory.ErrConversionRuleNotFound.Error()}}}
+	case errors.Is(err, domainInventory.ErrConversionRuleMismatch):
+		return &ServiceError{Code: "validation_failed", Message: "conversion rule does not match source/target units", Fields: []FieldError{{Field: "conversion_rule", Message: domainInventory.ErrConversionRuleMismatch.Error()}}}
 	default:
 		return err
+	}
+}
+
+func mapConversionPersistenceError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	lowered := strings.ToLower(strings.TrimSpace(err.Error()))
+	switch {
+	case strings.Contains(lowered, "unique constraint failed"):
+		return &ServiceError{
+			Code:    "conflict",
+			Message: "conversion rule already exists for this unit pair",
+			Fields:  []FieldError{{Field: "from_unit", Message: "duplicate conversion rule"}},
+		}
+	case strings.Contains(lowered, "foreign key constraint failed"):
+		return &ServiceError{
+			Code:    "validation_failed",
+			Message: "conversion rule validation failed",
+			Fields:  []FieldError{{Field: "item_id", Message: "item_id does not reference an existing item"}},
+		}
+	default:
+		return mapValidationError(err)
+	}
+}
+
+func mapRecipePersistenceError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	lowered := strings.ToLower(strings.TrimSpace(err.Error()))
+	switch {
+	case strings.Contains(lowered, "unique constraint failed: recipes.recipe_code"):
+		return &ServiceError{
+			Code:    "conflict",
+			Message: "recipe_code already exists",
+			Fields:  []FieldError{{Field: "recipe_code", Message: "duplicate recipe_code"}},
+		}
+	case strings.Contains(lowered, "unique constraint failed: recipe_components.recipe_id, recipe_components.line_no"):
+		return &ServiceError{
+			Code:    "validation_failed",
+			Message: "recipe validation failed",
+			Fields:  []FieldError{{Field: "components.line_no", Message: "duplicate line number in recipe"}},
+		}
+	case strings.Contains(lowered, "foreign key constraint failed"):
+		return &ServiceError{
+			Code:    "validation_failed",
+			Message: "recipe validation failed",
+			Fields:  []FieldError{{Field: "components.input_item_id", Message: "item reference must exist"}},
+		}
+	case strings.Contains(lowered, "invalid output item type"):
+		return &ServiceError{
+			Code:    "validation_failed",
+			Message: "recipe validation failed",
+			Fields:  []FieldError{{Field: "output_item_id", Message: "output item must be an active BULK_POWDER item"}},
+		}
+	case strings.Contains(lowered, "invalid recipe component item"):
+		return &ServiceError{
+			Code:    "validation_failed",
+			Message: "recipe validation failed",
+			Fields:  []FieldError{{Field: "components.input_item_id", Message: "component item must be an active item"}},
+		}
+	default:
+		return mapValidationError(err)
 	}
 }
 
@@ -291,6 +459,178 @@ func (s *Service) ListPackagingProfiles(input ListPackagingProfilesInput) ([]dom
 		PackMode:   strings.TrimSpace(input.PackMode),
 	}
 	return s.repo.ListPackagingProfiles(filter)
+}
+
+func (s *Service) CreateRecipe(input CreateRecipeInput) (*domainInventory.Recipe, error) {
+	if err := s.requireMasterWriteAccess(input.AuthToken); err != nil {
+		return nil, err
+	}
+
+	recipe := &domainInventory.Recipe{
+		RecipeCode:         input.RecipeCode,
+		OutputItemID:       input.OutputItemID,
+		OutputQtyBase:      input.OutputQtyBase,
+		ExpectedWastagePct: input.ExpectedWastagePct,
+		IsActive:           input.IsActive,
+		Components:         make([]domainInventory.RecipeComponent, 0, len(input.Components)),
+	}
+	for _, component := range input.Components {
+		recipe.Components = append(recipe.Components, domainInventory.RecipeComponent{
+			InputItemID:  component.InputItemID,
+			InputQtyBase: component.InputQtyBase,
+			LineNo:       component.LineNo,
+		})
+	}
+
+	if err := recipe.Validate(); err != nil {
+		return nil, mapValidationError(err)
+	}
+	if err := s.repo.CreateRecipe(recipe); err != nil {
+		return nil, mapRecipePersistenceError(err)
+	}
+	return recipe, nil
+}
+
+func (s *Service) UpdateRecipe(input UpdateRecipeInput) (*domainInventory.Recipe, error) {
+	if err := s.requireMasterWriteAccess(input.AuthToken); err != nil {
+		return nil, err
+	}
+
+	updatedAt, err := parseUpdatedAt(input.UpdatedAt)
+	if err != nil {
+		return nil, &ServiceError{
+			Code:    "validation_failed",
+			Message: "recipe validation failed",
+			Fields:  []FieldError{{Field: "updated_at", Message: err.Error()}},
+		}
+	}
+
+	recipe := &domainInventory.Recipe{
+		ID:                 input.ID,
+		RecipeCode:         input.RecipeCode,
+		OutputItemID:       input.OutputItemID,
+		OutputQtyBase:      input.OutputQtyBase,
+		ExpectedWastagePct: input.ExpectedWastagePct,
+		IsActive:           input.IsActive,
+		UpdatedAt:          updatedAt,
+		Components:         make([]domainInventory.RecipeComponent, 0, len(input.Components)),
+	}
+	for _, component := range input.Components {
+		recipe.Components = append(recipe.Components, domainInventory.RecipeComponent{
+			InputItemID:  component.InputItemID,
+			InputQtyBase: component.InputQtyBase,
+			LineNo:       component.LineNo,
+		})
+	}
+
+	if err := recipe.Validate(); err != nil {
+		return nil, mapValidationError(err)
+	}
+	if err := s.repo.UpdateRecipe(recipe); err != nil {
+		if errors.Is(err, domainErrors.ErrConcurrencyConflict) {
+			return nil, errors.New(ErrRecordModified)
+		}
+		return nil, mapRecipePersistenceError(err)
+	}
+	return recipe, nil
+}
+
+func (s *Service) ListRecipes(input ListRecipesInput) ([]domainInventory.Recipe, error) {
+	if err := s.requireReadAccess(input.AuthToken); err != nil {
+		return nil, err
+	}
+	filter := domainInventory.RecipeListFilter{
+		ActiveOnly:   input.ActiveOnly,
+		OutputItemID: input.OutputItemID,
+		Search:       strings.TrimSpace(input.Search),
+	}
+	return s.repo.ListRecipes(filter)
+}
+
+func (s *Service) CreateUnitConversionRule(input CreateUnitConversionRuleInput) (*domainInventory.UnitConversionRule, error) {
+	if err := s.requireMasterWriteAccess(input.AuthToken); err != nil {
+		return nil, err
+	}
+
+	isActive := true
+	if input.IsActive != nil {
+		isActive = *input.IsActive
+	}
+
+	rule := &domainInventory.UnitConversionRule{
+		ItemID:         input.ItemID,
+		FromUnit:       input.FromUnit,
+		ToUnit:         input.ToUnit,
+		Factor:         input.Factor,
+		PrecisionScale: input.PrecisionScale,
+		RoundingMode:   domainInventory.ParseRoundingMode(input.RoundingMode),
+		IsActive:       isActive,
+	}
+	if err := rule.Validate(); err != nil {
+		return nil, mapValidationError(err)
+	}
+	if err := s.repo.CreateUnitConversionRule(rule); err != nil {
+		return nil, mapConversionPersistenceError(err)
+	}
+	return rule, nil
+}
+
+func (s *Service) ListUnitConversionRules(input ListUnitConversionRulesInput) ([]domainInventory.UnitConversionRule, error) {
+	if err := s.requireReadAccess(input.AuthToken); err != nil {
+		return nil, err
+	}
+	filter := domainInventory.UnitConversionRuleFilter{
+		ItemID:     input.ItemID,
+		FromUnit:   input.FromUnit,
+		ToUnit:     input.ToUnit,
+		ActiveOnly: input.ActiveOnly,
+	}
+	return s.repo.ListUnitConversionRules(filter)
+}
+
+func (s *Service) ConvertQuantity(input ConvertQuantityInput) (*domainInventory.UnitConversionResult, error) {
+	if err := s.requireReadAccess(input.AuthToken); err != nil {
+		return nil, err
+	}
+
+	request := domainInventory.UnitConversionRequest{
+		ItemID:     input.ItemID,
+		Quantity:   input.Quantity,
+		SourceUnit: input.SourceUnit,
+		TargetUnit: input.TargetUnit,
+	}
+	if err := request.Validate(); err != nil {
+		return nil, mapValidationError(err)
+	}
+
+	if request.SourceUnit == request.TargetUnit {
+		result := &domainInventory.UnitConversionResult{
+			QtyConverted: request.Quantity,
+			Precision: domainInventory.ConversionPrecisionMeta{
+				Scale:        0,
+				RoundingMode: string(domainInventory.RoundingModeHalfUp),
+			},
+			SourceUnit: request.SourceUnit,
+			TargetUnit: request.TargetUnit,
+			Factor:     1,
+		}
+		return result, nil
+	}
+
+	rule, err := s.repo.FindUnitConversionRule(domainInventory.UnitConversionLookup{
+		ItemID:   request.ItemID,
+		FromUnit: request.SourceUnit,
+		ToUnit:   request.TargetUnit,
+	})
+	if err != nil {
+		return nil, mapConversionPersistenceError(err)
+	}
+
+	result, err := domainInventory.ApplyUnitConversion(request, *rule)
+	if err != nil {
+		return nil, mapValidationError(err)
+	}
+	return &result, nil
 }
 
 func (s *Service) CreateItem(item *domainInventory.Item) error {

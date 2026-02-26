@@ -1,0 +1,268 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2</storyId>
+    <title>Unit Conversion Engine</title>
+    <status>drafted</status>
+    <generatedAt>2026-02-26T14:56:19+00:00</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-2-unit-conversion-engine.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Developer</asA>
+    <iWant>a deterministic unit conversion engine that converts operational quantities (for example grams) into canonical base units (for example KG)</iWant>
+    <soThat>inventory and production calculations remain accurate and auditable across workflows</soThat>
+    <tasks>- [ ] Implement backend/domain unit conversion service contract and core conversion flow (AC: 1, 3)
+  - [ ] Define conversion request/response model (source unit, target unit, quantity, precision metadata) in application/domain layer
+  - [ ] Implement factor-based conversion execution for supported units with canonical base-unit output path
+  - [ ] Integrate service usage into relevant master-data workflow boundary without duplicating conversion logic in UI code
+- [ ] Implement precision and rounding policy enforcement (AC: 2)
+  - [ ] Add precision-scale and rounding-mode handling to conversion computation path
+  - [ ] Enforce validation rules for invalid factors/precision inputs and return actionable errors
+  - [ ] Add deterministic rounding behavior tests for boundary values to prevent drift
+- [ ] Preserve authorization and RBAC boundaries for conversion operations (AC: 4)
+  - [ ] Ensure protected conversion-related operations use existing authenticated backend context/session
+  - [ ] Keep route/module contracts unchanged (`masters.*`) while wiring conversion capability
+  - [ ] Verify backend authorization remains authoritative for any conversion-management write path
+- [ ] Add automated test coverage for conversion accuracy, precision, and authorization boundaries (AC: 1, 2, 3, 4)
+  - [ ] Unit tests: conversion math scenarios (including `500 grams -> 0.5 KG`) and precision/rounding edge cases
+  - [ ] Integration tests: repository/service interactions for configured conversion rules and failure cases
+  - [ ] RBAC/authorization regression tests for denied write operations and trusted auth context handling
+- [ ] Add Windows validation automation for this story scope (AC: 1, 2, 3, 4)
+  - [ ] Create/update `scripts/s2-2-win-test.ps1` with PASS/FAIL summary and non-zero failure exit
+  - [ ] Include coverage for build/startup sanity and story-specific conversion behavior verification</tasks>
+  </story>
+
+  <acceptanceCriteria>1. The unit conversion engine converts usage quantities to base units accurately using configured conversion factors (for example `500 grams` converts to `0.5 KG`). [Source: docs/epics.md#Story 2.2: Unit Conversion Engine; docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative)]
+2. Conversion calculations enforce configured precision/rounding behavior and prevent rounding drift beyond the defined precision scale. [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative); docs/tech-spec-epic-2.md#Data Models and Contracts]
+3. Conversion logic is implemented in backend/domain services and consumed by workflows using canonical base-unit internal calculations (UI-only duplication is not allowed). [Source: docs/tech-spec-epic-2.md#Services and Modules; docs/tech-spec-epic-2.md#Data Models and Contracts; docs/architecture.md#Project Structure]
+4. Conversion capabilities integrate without violating existing navigation/RBAC contract boundaries, with backend authorization remaining authoritative for protected operations. [Source: docs/epics.md#Story 2.2: Unit Conversion Engine; docs/navigation-rbac-contract.md#Frontend vs Backend Authority (Canonical Rule); docs/tech-spec-epic-2.md#Security]</acceptanceCriteria>
+
+  <artifacts>
+    <docs><doc>
+  <path>docs/epics.md</path>
+  <title>masala_inventory_managment - Epic Breakdown</title>
+  <section>Story 2.2: Unit Conversion Engine</section>
+  <snippet>Given an item tracked in KG and a recipe requiring 500 grams, the system deducts 0.5 KG from stock and verifies precision to avoid rounding errors. Technical notes require base-unit internal storage and alignment with docs/navigation-rbac-contract.md.</snippet>
+</doc>
+<doc>
+  <path>docs/tech-spec-epic-2.md</path>
+  <title>Epic Technical Specification: Master Data &amp; Configuration</title>
+  <section>Services and Modules</section>
+  <snippet>UnitConversionService is defined to resolve and validate conversions between buying, usage, and display units with precision-safe math. Inputs include source unit, target unit, quantity, and item/base-unit metadata; outputs include converted quantity and precision/rounding validation results.</snippet>
+</doc>
+<doc>
+  <path>docs/tech-spec-epic-2.md</path>
+  <title>Epic Technical Specification: Master Data &amp; Configuration</title>
+  <section>Data Models and Contracts</section>
+  <snippet>Internal calculations should use base-unit quantities, with UI-level units converted via UnitConversionService. Planned unit_conversions contract includes factor, precision_scale, rounding_mode, and uniqueness over item_id/from_unit/to_unit.</snippet>
+</doc>
+<doc>
+  <path>docs/tech-spec-epic-2.md</path>
+  <title>Epic Technical Specification: Master Data &amp; Configuration</title>
+  <section>Acceptance Criteria (Authoritative)</section>
+  <snippet>The authoritative criteria include accurate conversion from usage units to base units using configured factors and preserving configured precision rules without rounding drift beyond defined scale.</snippet>
+</doc>
+<doc>
+  <path>docs/PRD.md</path>
+  <title>masala_inventory_managment - Product Requirements Document</title>
+  <section>Domain-Specific Requirements</section>
+  <snippet>Dual UOM behavior is required: buying in KGs, consuming in Grams, and packing in Pieces, with automatic conversion based on defined pack weight. This establishes conversion behavior as a core domain requirement.</snippet>
+</doc>
+<doc>
+  <path>docs/architecture.md</path>
+  <title>Architecture: Masala Inventory Management</title>
+  <section>Project Structure</section>
+  <snippet>The architecture uses hexagonal layering in the Go backend with internal/app, internal/domain, and internal/infrastructure modules. This aligns unit conversion implementation with domain/service placement instead of UI duplication.</snippet>
+</doc>
+<doc>
+  <path>docs/architecture.md</path>
+  <title>Architecture: Masala Inventory Management</title>
+  <section>0. Cohesive App Contract</section>
+  <snippet>Route IDs and module ownership come from the navigation RBAC contract and are shared across roles. Backend authorization remains the source of truth while frontend guards are UX-only.</snippet>
+</doc>
+<doc>
+  <path>docs/navigation-rbac-contract.md</path>
+  <title>Navigation and RBAC Contract (Story 2.2A)</title>
+  <section>Canonical Route Map (Stable IDs and Paths)</section>
+  <snippet>The contract defines stable masters routes including masters.items, masters.recipes, and masters.parties under the Masters module. Route IDs are immutable once consumed by implementation stories and tests.</snippet>
+</doc>
+<doc>
+  <path>docs/navigation-rbac-contract.md</path>
+  <title>Navigation and RBAC Contract (Story 2.2A)</title>
+  <section>Frontend vs Backend Authority (Canonical Rule)</section>
+  <snippet>Backend authorization is the security authority and must be enforced server-side. Hidden UI must never be treated as authorization, and mismatches resolve in favor of backend denial.</snippet>
+</doc>
+<doc>
+  <path>docs/ux-design-specification.md</path>
+  <title>Masala Inventory Management — UX Design Specification</title>
+  <section>4.1 Chosen Design Approach</section>
+  <snippet>The UX spec states both role variants are built on shared route IDs and module ownership defined in the navigation-RBAC contract, with shell behavior from Story 2.2B. This supports adding conversion capability without changing route identity.</snippet>
+</doc>
+<doc>
+  <path>docs/testing/windows-story-script-standard.md</path>
+  <title>Windows Story Script Standard</title>
+  <section>Script Contract (Mandatory)</section>
+  <snippet>Each story must provide a Windows validation script that builds relevant targets, validates acceptance-criteria runtime behavior, returns non-zero on failure, and prints explicit PASS/FAIL summary.</snippet>
+</doc></docs>
+    <code><artifact>
+  <path>internal/app/inventory/service.go</path>
+  <kind>application service</kind>
+  <symbol>func (s *Service) requireMasterWriteAccess; func (s *Service) CreateItemMaster; func (s *Service) ListItems</symbol>
+  <lines>142-257</lines>
+  <reason>Current master-data service boundary already enforces backend authorization and request validation; unit conversion service logic should be added in this backend layer, not UI code.</reason>
+</artifact>
+<artifact>
+  <path>internal/domain/inventory/entities.go</path>
+  <kind>domain entity and validation</kind>
+  <symbol>func (i *Item) NormalizeMasterFields; func (i *Item) ValidateMasterContract</symbol>
+  <lines>59-106</lines>
+  <reason>Domain model establishes canonical master-field normalization and required base-unit constraints, which conversion rules must align with.</reason>
+</artifact>
+<artifact>
+  <path>internal/domain/inventory/repository.go</path>
+  <kind>domain repository contract</kind>
+  <symbol>type Repository interface</symbol>
+  <lines>15-28</lines>
+  <reason>Canonical persistence interface for master-data operations; conversion persistence should extend this contract instead of bypassing repository boundaries.</reason>
+</artifact>
+<artifact>
+  <path>internal/infrastructure/db/sqlite_inventory_repository.go</path>
+  <kind>repository implementation</kind>
+  <symbol>func (r *SqliteInventoryRepository) CreateItem; func (r *SqliteInventoryRepository) ListItems</symbol>
+  <lines>52-168</lines>
+  <reason>Existing SQLite repository persists and queries item_type/base_unit and applies normalized reads, providing the persistence integration point for conversion entities.</reason>
+</artifact>
+<artifact>
+  <path>internal/infrastructure/db/migrations/000004_item_master_fields.up.sql</path>
+  <kind>database migration</kind>
+  <symbol>ALTER TABLE items ADD COLUMN base_unit; backfill base_unit from unit</symbol>
+  <lines>1-15</lines>
+  <reason>Schema baseline defines canonical base-unit storage, which conversion calculations must target.</reason>
+</artifact>
+<artifact>
+  <path>cmd/server/api_server.go</path>
+  <kind>HTTP API router</kind>
+  <symbol>POST /inventory/items/create; POST /inventory/items/update; POST /inventory/items/list</symbol>
+  <lines>146-207</lines>
+  <reason>Server API exposes inventory endpoints with centralized status/error mapping, providing the contract style to follow for new conversion APIs.</reason>
+</artifact>
+<artifact>
+  <path>internal/app/app.go</path>
+  <kind>Wails app binding</kind>
+  <symbol>func (a *App) CreateItemMaster; func (a *App) UpdateItemMaster; func (a *App) ListItems</symbol>
+  <lines>542-628</lines>
+  <reason>App binding bridges client/server mode with consistent payloads and should remain the integration pattern for conversion operations.</reason>
+</artifact>
+<artifact>
+  <path>frontend/src/services/masterDataApi.ts</path>
+  <kind>frontend service client</kind>
+  <symbol>type CreateItemPayload/UpdateItemPayload; listItems/createItem/updateItem</symbol>
+  <lines>19-175</lines>
+  <reason>Frontend already routes master-data operations through auth-token-backed bindings; conversion calls should be added here rather than embedded in UI components.</reason>
+</artifact>
+<artifact>
+  <path>frontend/src/shell/rbac.ts</path>
+  <kind>route and RBAC contract</kind>
+  <symbol>ROUTE_REGISTRY (masters.items/masters.recipes/masters.parties); canPerformAction; canAccessRoute</symbol>
+  <lines>18-112</lines>
+  <reason>Story requires keeping existing masters.* route/module contract unchanged while preserving role boundaries.</reason>
+</artifact>
+<artifact>
+  <path>frontend/src/App.tsx</path>
+  <kind>frontend auth/session guard</kind>
+  <symbol>trusted role resolution; route guard; guardedNavigate</symbol>
+  <lines>254-375,428-447</lines>
+  <reason>UI role checks are UX guards and rely on trusted backend session role; conversion feature wiring must keep backend authorization authoritative.</reason>
+</artifact>
+<artifact>
+  <path>internal/app/auth/middleware.go</path>
+  <kind>authorization middleware</kind>
+  <symbol>func (s *Service) CheckPermission</symbol>
+  <lines>17-44</lines>
+  <reason>Defines canonical token+role permission checks and reinforces that protected operations must be validated server-side.</reason>
+</artifact></code>
+    <dependencies><go>
+  <package name="go" version="1.26" />
+  <package name="github.com/wailsapp/wails/v2" version="v2.11.0" />
+  <package name="github.com/mattn/go-sqlite3" version="v1.14.34" />
+  <package name="github.com/golang-jwt/jwt/v5" version="v5.3.1" />
+  <package name="github.com/golang-migrate/migrate/v4" version="v4.18.2" />
+</go>
+<node path="frontend/package.json">
+  <package name="react" version="^19.0.0" />
+  <package name="react-dom" version="^19.0.0" />
+  <package name="react-router-dom" version="^6.30.3" />
+  <package name="antd" version="^6.2.1" />
+  <package name="@tanstack/react-query" version="^5.66.0" />
+  <package name="axios" version="^1.7.9" />
+  <package name="vitest" version="^4.0.18" />
+  <package name="@testing-library/react" version="^16.3.0" />
+</node>
+<frameworks>
+  <framework name="Wails desktop app (Go + web UI bindings)" location="wails_server.json" />
+  <framework name="React + TypeScript + Vite frontend" location="frontend/package.json" />
+  <framework name="SQLite persistence" location="go.mod" />
+  <framework name="Windows story validation automation (PowerShell)" location="scripts/story-win-test-template.ps1" />
+</frameworks></dependencies>
+  </artifacts>
+
+  <constraints><constraint>Implement conversion logic as backend/domain service within existing hexagonal layers (`internal/domain/*`, `internal/app/*`); do not duplicate business conversion logic in UI components.</constraint>
+<constraint>Keep canonical base-unit internal calculations for inventory and production math; UI-level units are consumers of backend conversion contracts.</constraint>
+<constraint>Preserve route/module identity and naming in the approved contract (`masters.*`) while integrating conversion capability.</constraint>
+<constraint>Maintain backend-authoritative authorization for protected conversion-management operations; frontend visibility/guards are UX-only.</constraint>
+<constraint>Reuse trusted session/token flow from existing auth plumbing (`GetSessionRole`, auth_token-backed service calls) for conversion endpoints.</constraint>
+<constraint>Apply deterministic precision-scale and rounding-mode rules and reject invalid factor/precision inputs with actionable errors.</constraint></constraints>
+  <interfaces><interface>
+  <name>Inventory Repository Contract</name>
+  <kind>Go interface</kind>
+  <signature>type Repository interface { CreateItem(*Item) error; UpdateItem(*Item) error; ListItems(ItemListFilter) ([]Item, error); ... }</signature>
+  <path>internal/domain/inventory/repository.go</path>
+</interface>
+<interface>
+  <name>App.CreateItemMaster</name>
+  <kind>Wails app binding</kind>
+  <signature>func (a *App) CreateItemMaster(input appInventory.CreateItemInput) (ItemMasterResult, error)</signature>
+  <path>internal/app/app.go</path>
+</interface>
+<interface>
+  <name>App.ListItems</name>
+  <kind>Wails app binding</kind>
+  <signature>func (a *App) ListItems(input appInventory.ListItemsInput) ([]ItemMasterResult, error)</signature>
+  <path>internal/app/app.go</path>
+</interface>
+<interface>
+  <name>Server Inventory API</name>
+  <kind>REST endpoints</kind>
+  <signature>POST /inventory/items/create, POST /inventory/items/update, POST /inventory/items/list</signature>
+  <path>cmd/server/api_server.go</path>
+</interface>
+<interface>
+  <name>Frontend Master Data Binding</name>
+  <kind>TypeScript binding contract</kind>
+  <signature>CreateItemMaster(input), UpdateItemMaster(input), ListItems(input) via window.go.app.App</signature>
+  <path>frontend/src/services/masterDataApi.ts</path>
+</interface>
+<interface>
+  <name>Planned Unit Conversion API Contract</name>
+  <kind>Technical spec contract</kind>
+  <signature>UnitService.CreateRule(input); UnitService.Convert(input) with qty_converted and precision_meta response</signature>
+  <path>docs/tech-spec-epic-2.md</path>
+</interface></interfaces>
+  <tests>
+    <standards>Follow Epic 2 test strategy across unit, integration, API-contract, and RBAC boundaries: verify deterministic conversion math and rounding precision, keep backend authorization as the enforcement layer, and extend existing Go+Vitest patterns with Windows runtime validation automation for story-level signoff.</standards>
+    <locations><location>internal/domain/inventory/entities_test.go</location>
+<location>internal/app/inventory/service_test.go</location>
+<location>internal/infrastructure/db/sqlite_inventory_repository_test.go</location>
+<location>frontend/src/components/forms/__tests__/ItemMasterForm.test.tsx</location>
+<location>frontend/src/__tests__/AppShellRBAC.test.tsx</location>
+<location>scripts/s2-2-win-test.ps1</location>
+<location>docs/testing/windows-story-script-standard.md</location></locations>
+    <ideas><idea ac="1">Add backend unit tests for conversion-rule application with canonical case `500 grams -> 0.5 KG` and table-driven scenarios for supported units.</idea>
+<idea ac="2">Add precision tests for configured `precision_scale` and `rounding_mode` edge cases (boundary fractions, repeated operations) and assert no drift beyond policy.</idea>
+<idea ac="3">Add service+API integration tests proving conversion execution lives in backend/domain path and frontend consumes returned converted values instead of local formulas.</idea>
+<idea ac="4">Add RBAC tests for conversion-management write paths (operator denied, admin allowed) and regression checks that trusted auth context, not client-supplied role fields, drives authorization.</idea>
+<idea ac="1,2,3,4">Create/update `scripts/s2-2-win-test.ps1` to run build/startup sanity and story conversion assertions with explicit PASS/FAIL summary and non-zero failure exit.</idea></ideas>
+  </tests>
+</story-context>

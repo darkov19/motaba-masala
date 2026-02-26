@@ -3,7 +3,7 @@ import type { AppMode } from "../context/ConnectionContext";
 export type UserRole = "admin" | "operator";
 export type ModuleKey = "dashboard" | "masters" | "procurement" | "production" | "packing" | "sales" | "reports" | "system";
 export type ActionKey = "view" | "create" | "edit" | "delete" | "approve" | "view_valuation" | "manage_system";
-export type ViewKey = "dashboard" | "grn" | "batch" | "item-master" | "packaging-profile" | "system-users" | "placeholder";
+export type ViewKey = "dashboard" | "grn" | "batch" | "item-master" | "recipe-master" | "packaging-profile" | "system-users" | "placeholder";
 
 export type AppRoute = {
     id: string;
@@ -18,7 +18,7 @@ export type AppRoute = {
 export const ROUTE_REGISTRY: AppRoute[] = [
     { id: "dashboard.home", path: "/dashboard", module: "dashboard", label: "Dashboard", minRole: "operator", viewKey: "dashboard" },
     { id: "masters.items", path: "/masters/items", module: "masters", label: "Item Master", minRole: "operator", legacyPaths: ["/item-master"], viewKey: "item-master" },
-    { id: "masters.recipes", path: "/masters/recipes", module: "masters", label: "Recipes", minRole: "operator", viewKey: "placeholder" },
+    { id: "masters.recipes", path: "/masters/recipes", module: "masters", label: "Recipes", minRole: "operator", viewKey: "recipe-master" },
     { id: "masters.parties", path: "/masters/parties", module: "masters", label: "Suppliers & Customers", minRole: "operator", viewKey: "placeholder" },
     { id: "procurement.grn", path: "/procurement/grn", module: "procurement", label: "GRN", minRole: "operator", legacyPaths: ["/grn"], viewKey: "grn" },
     { id: "procurement.lots", path: "/procurement/lots", module: "procurement", label: "Lots", minRole: "operator", viewKey: "placeholder" },

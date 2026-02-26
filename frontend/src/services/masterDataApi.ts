@@ -74,12 +74,99 @@ export type CreatePackagingProfilePayload = {
     auth_token?: string;
 };
 
+export type RecipeComponent = {
+    input_item_id: number;
+    input_qty_base: number;
+    line_no: number;
+};
+
+export type Recipe = {
+    id: number;
+    recipe_code: string;
+    output_item_id: number;
+    output_qty_base: number;
+    expected_wastage_pct: number;
+    is_active: boolean;
+    updated_at: string;
+    components: RecipeComponent[];
+};
+
+export type CreateRecipePayload = {
+    recipe_code: string;
+    output_item_id: number;
+    output_qty_base: number;
+    expected_wastage_pct?: number;
+    is_active?: boolean;
+    components: RecipeComponent[];
+    auth_token?: string;
+};
+
+export type UpdateRecipePayload = {
+    id: number;
+    recipe_code: string;
+    output_item_id: number;
+    output_qty_base: number;
+    expected_wastage_pct?: number;
+    is_active?: boolean;
+    components: RecipeComponent[];
+    updated_at: string;
+    auth_token?: string;
+};
+
+export type ConversionRule = {
+    id: number;
+    item_id?: number;
+    from_unit: string;
+    to_unit: string;
+    factor: number;
+    precision_scale: number;
+    rounding_mode: "HALF_UP" | "DOWN" | "UP";
+    is_active: boolean;
+    updated_at: string;
+};
+
+export type CreateConversionRulePayload = {
+    item_id?: number;
+    from_unit: string;
+    to_unit: string;
+    factor: number;
+    precision_scale: number;
+    rounding_mode: ConversionRule["rounding_mode"];
+    is_active?: boolean;
+    auth_token?: string;
+};
+
+export type ConvertQuantityPayload = {
+    item_id?: number;
+    quantity: number;
+    source_unit: string;
+    target_unit: string;
+    auth_token?: string;
+};
+
+export type ConvertQuantityResult = {
+    qty_converted: number;
+    precision_meta: {
+        scale: number;
+        rounding_mode: ConversionRule["rounding_mode"];
+    };
+    source_unit: string;
+    target_unit: string;
+    factor: number;
+};
+
 type AppBinding = {
     CreateItemMaster?: (input: CreateItemPayload) => Promise<ItemMaster>;
     UpdateItemMaster?: (input: UpdateItemPayload) => Promise<ItemMaster>;
     ListItems?: (input: { active_only?: boolean; item_type?: string; search?: string; auth_token?: string }) => Promise<ItemMaster[]>;
     CreatePackagingProfile?: (input: CreatePackagingProfilePayload) => Promise<PackagingProfile>;
     ListPackagingProfiles?: (input: { active_only?: boolean; search?: string; pack_mode?: string; auth_token?: string }) => Promise<PackagingProfile[]>;
+    CreateRecipe?: (input: CreateRecipePayload) => Promise<Recipe>;
+    UpdateRecipe?: (input: UpdateRecipePayload) => Promise<Recipe>;
+    ListRecipes?: (input: { active_only?: boolean; output_item_id?: number; search?: string; auth_token?: string }) => Promise<Recipe[]>;
+    CreateUnitConversionRule?: (input: CreateConversionRulePayload) => Promise<ConversionRule>;
+    ListUnitConversionRules?: (input: { active_only?: boolean; item_id?: number; from_unit?: string; to_unit?: string; auth_token?: string }) => Promise<ConversionRule[]>;
+    ConvertQuantity?: (input: ConvertQuantityPayload) => Promise<ConvertQuantityResult>;
 };
 
 function getBinding(): AppBinding {
@@ -167,6 +254,113 @@ export async function createPackagingProfile(payload: CreatePackagingProfilePayl
         return await fn({
             auth_token: resolveAuthToken(),
             is_active: true,
+            ...payload,
+        });
+    } catch (error) {
+        throw mapServiceError(error);
+    }
+}
+
+export async function listRecipes(params?: {
+    activeOnly?: boolean;
+    outputItemId?: number;
+    search?: string;
+}): Promise<Recipe[]> {
+    const fn = getBinding().ListRecipes;
+    if (typeof fn !== "function") {
+        return [];
+    }
+    try {
+        return await fn({
+            active_only: params?.activeOnly ?? true,
+            output_item_id: params?.outputItemId,
+            search: params?.search?.trim() || undefined,
+            auth_token: resolveAuthToken(),
+        });
+    } catch (error) {
+        throw mapServiceError(error);
+    }
+}
+
+export async function createRecipe(payload: CreateRecipePayload): Promise<Recipe> {
+    const fn = getBinding().CreateRecipe;
+    if (typeof fn !== "function") {
+        throw new Error("CreateRecipe binding is unavailable");
+    }
+    try {
+        return await fn({
+            auth_token: resolveAuthToken(),
+            is_active: true,
+            expected_wastage_pct: 0,
+            ...payload,
+        });
+    } catch (error) {
+        throw mapServiceError(error);
+    }
+}
+
+export async function updateRecipe(payload: UpdateRecipePayload): Promise<Recipe> {
+    const fn = getBinding().UpdateRecipe;
+    if (typeof fn !== "function") {
+        throw new Error("UpdateRecipe binding is unavailable");
+    }
+    try {
+        return await fn({
+            auth_token: resolveAuthToken(),
+            ...payload,
+        });
+    } catch (error) {
+        throw mapServiceError(error);
+    }
+}
+
+export async function createConversionRule(payload: CreateConversionRulePayload): Promise<ConversionRule> {
+    const fn = getBinding().CreateUnitConversionRule;
+    if (typeof fn !== "function") {
+        throw new Error("CreateUnitConversionRule binding is unavailable");
+    }
+    try {
+        return await fn({
+            auth_token: resolveAuthToken(),
+            is_active: true,
+            ...payload,
+        });
+    } catch (error) {
+        throw mapServiceError(error);
+    }
+}
+
+export async function listConversionRules(params?: {
+    activeOnly?: boolean;
+    itemId?: number;
+    fromUnit?: string;
+    toUnit?: string;
+}): Promise<ConversionRule[]> {
+    const fn = getBinding().ListUnitConversionRules;
+    if (typeof fn !== "function") {
+        return [];
+    }
+    try {
+        return await fn({
+            active_only: params?.activeOnly ?? true,
+            item_id: params?.itemId,
+            from_unit: params?.fromUnit?.trim() || undefined,
+            to_unit: params?.toUnit?.trim() || undefined,
+            auth_token: resolveAuthToken(),
+        });
+    } catch (error) {
+        throw mapServiceError(error);
+    }
+}
+
+export async function convertQuantity(payload: ConvertQuantityPayload): Promise<ConvertQuantityResult> {
+    const fn = getBinding().ConvertQuantity;
+    if (typeof fn !== "function") {
+        throw new Error("ConvertQuantity binding is unavailable");
+    }
+    try {
+        return await fn({
+            auth_token: resolveAuthToken(),
             ...payload,
         });
     } catch (error) {

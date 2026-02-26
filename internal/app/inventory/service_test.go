@@ -12,14 +12,20 @@ import (
 )
 
 type fakeInventoryRepo struct {
-	createItemErr  error
-	createBatchErr error
-	createGRNErr   error
-	updateItemErr  error
-	updateBatchErr error
-	updateGRNErr   error
-	items          []domainInventory.Item
-	profiles       []domainInventory.PackagingProfile
+	createItemErr       error
+	createBatchErr      error
+	createGRNErr        error
+	updateItemErr       error
+	updateBatchErr      error
+	updateGRNErr        error
+	createRecipeErr     error
+	updateRecipeErr     error
+	createConversionErr error
+	findConversionErr   error
+	items               []domainInventory.Item
+	profiles            []domainInventory.PackagingProfile
+	recipes             []domainInventory.Recipe
+	conversionRules     []domainInventory.UnitConversionRule
 }
 
 func (f *fakeInventoryRepo) CreateItem(*domainInventory.Item) error   { return f.createItemErr }
@@ -37,6 +43,77 @@ func (f *fakeInventoryRepo) CreatePackagingProfile(*domainInventory.PackagingPro
 }
 func (f *fakeInventoryRepo) ListPackagingProfiles(domainInventory.PackagingProfileListFilter) ([]domainInventory.PackagingProfile, error) {
 	return f.profiles, nil
+}
+func (f *fakeInventoryRepo) CreateRecipe(recipe *domainInventory.Recipe) error {
+	if f.createRecipeErr != nil {
+		return f.createRecipeErr
+	}
+	copyRecipe := *recipe
+	copyRecipe.ID = int64(len(f.recipes) + 1)
+	copyRecipe.Components = append([]domainInventory.RecipeComponent(nil), recipe.Components...)
+	f.recipes = append(f.recipes, copyRecipe)
+	recipe.ID = copyRecipe.ID
+	return nil
+}
+func (f *fakeInventoryRepo) UpdateRecipe(recipe *domainInventory.Recipe) error {
+	if f.updateRecipeErr != nil {
+		return f.updateRecipeErr
+	}
+	for i := range f.recipes {
+		if f.recipes[i].ID == recipe.ID {
+			copyRecipe := *recipe
+			copyRecipe.Components = append([]domainInventory.RecipeComponent(nil), recipe.Components...)
+			f.recipes[i] = copyRecipe
+			return nil
+		}
+	}
+	return domainErrors.ErrConcurrencyConflict
+}
+func (f *fakeInventoryRepo) ListRecipes(domainInventory.RecipeListFilter) ([]domainInventory.Recipe, error) {
+	return f.recipes, nil
+}
+func (f *fakeInventoryRepo) CreateUnitConversionRule(rule *domainInventory.UnitConversionRule) error {
+	if f.createConversionErr != nil {
+		return f.createConversionErr
+	}
+	copyRule := *rule
+	copyRule.ID = int64(len(f.conversionRules) + 1)
+	f.conversionRules = append(f.conversionRules, copyRule)
+	rule.ID = copyRule.ID
+	return nil
+}
+func (f *fakeInventoryRepo) FindUnitConversionRule(lookup domainInventory.UnitConversionLookup) (*domainInventory.UnitConversionRule, error) {
+	if f.findConversionErr != nil {
+		return nil, f.findConversionErr
+	}
+	if err := lookup.Validate(); err != nil {
+		return nil, err
+	}
+	for i := range f.conversionRules {
+		rule := f.conversionRules[i]
+		if !rule.IsActive {
+			continue
+		}
+		if lookup.ItemID != nil && rule.ItemID != nil && *lookup.ItemID == *rule.ItemID &&
+			rule.FromUnit == lookup.FromUnit && rule.ToUnit == lookup.ToUnit {
+			copyRule := rule
+			return &copyRule, nil
+		}
+	}
+	for i := range f.conversionRules {
+		rule := f.conversionRules[i]
+		if !rule.IsActive || rule.ItemID != nil {
+			continue
+		}
+		if rule.FromUnit == lookup.FromUnit && rule.ToUnit == lookup.ToUnit {
+			copyRule := rule
+			return &copyRule, nil
+		}
+	}
+	return nil, domainInventory.ErrConversionRuleNotFound
+}
+func (f *fakeInventoryRepo) ListUnitConversionRules(domainInventory.UnitConversionRuleFilter) ([]domainInventory.UnitConversionRule, error) {
+	return f.conversionRules, nil
 }
 
 func fixedRoleResolver(role domainAuth.Role, err error) func(string) (domainAuth.Role, error) {
@@ -272,5 +349,199 @@ func TestService_CreatePackagingProfile_OperatorDeniedByBackend(t *testing.T) {
 	}
 	if typed.Code != "forbidden" {
 		t.Fatalf("expected forbidden, got %s", typed.Code)
+	}
+}
+
+func TestService_CreateUnitConversionRule_OperatorDeniedByBackend(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+
+	_, err := svc.CreateUnitConversionRule(CreateUnitConversionRuleInput{
+		FromUnit:       "GRAM",
+		ToUnit:         "KG",
+		Factor:         0.001,
+		PrecisionScale: 4,
+		RoundingMode:   "HALF_UP",
+		AuthToken:      "operator-token",
+	})
+	if err == nil {
+		t.Fatalf("expected forbidden error")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok {
+		t.Fatalf("expected ServiceError, got %T", err)
+	}
+	if typed.Code != "forbidden" {
+		t.Fatalf("expected forbidden, got %s", typed.Code)
+	}
+}
+
+func TestService_CreateRecipe_ValidationErrorPayload(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+
+	_, err := svc.CreateRecipe(CreateRecipeInput{
+		RecipeCode:         "RCP-1",
+		OutputItemID:       10,
+		OutputQtyBase:      100,
+		ExpectedWastagePct: 101,
+		AuthToken:          "admin-token",
+		Components: []RecipeComponentInput{
+			{InputItemID: 1, InputQtyBase: 50, LineNo: 1},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected validation error")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok {
+		t.Fatalf("expected ServiceError, got %T", err)
+	}
+	if typed.Code != "validation_failed" {
+		t.Fatalf("expected validation_failed, got %s", typed.Code)
+	}
+	if len(typed.Fields) == 0 || typed.Fields[0].Field != "expected_wastage_pct" {
+		t.Fatalf("expected expected_wastage_pct field error, got %+v", typed.Fields)
+	}
+}
+
+func TestService_CreateRecipe_OperatorDeniedByBackend(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+
+	_, err := svc.CreateRecipe(CreateRecipeInput{
+		RecipeCode:         "RCP-2",
+		OutputItemID:       10,
+		OutputQtyBase:      100,
+		ExpectedWastagePct: 2.5,
+		AuthToken:          "operator-token",
+		Components: []RecipeComponentInput{
+			{InputItemID: 1, InputQtyBase: 50, LineNo: 1},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected forbidden error")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok {
+		t.Fatalf("expected ServiceError, got %T", err)
+	}
+	if typed.Code != "forbidden" {
+		t.Fatalf("expected forbidden, got %s", typed.Code)
+	}
+}
+
+func TestService_UpdateRecipe_MapsConcurrencyError(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{updateRecipeErr: domainErrors.ErrConcurrencyConflict}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+
+	_, err := svc.UpdateRecipe(UpdateRecipeInput{
+		ID:                 1,
+		RecipeCode:         "RCP-3",
+		OutputItemID:       10,
+		OutputQtyBase:      100,
+		ExpectedWastagePct: 2,
+		UpdatedAt:          "2026-02-26T12:00:00Z",
+		AuthToken:          "admin-token",
+		Components: []RecipeComponentInput{
+			{InputItemID: 1, InputQtyBase: 50, LineNo: 1},
+		},
+	})
+	if err == nil || err.Error() != ErrRecordModified {
+		t.Fatalf("expected %q, got %v", ErrRecordModified, err)
+	}
+}
+
+func TestService_ListRecipes_ReadAllowedForOperator(t *testing.T) {
+	svc := NewService(&fakeInventoryRepo{
+		recipes: []domainInventory.Recipe{
+			{ID: 1, RecipeCode: "RCP-1", OutputItemID: 10, OutputQtyBase: 100, ExpectedWastagePct: 2},
+		},
+	}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+
+	result, err := svc.ListRecipes(ListRecipesInput{AuthToken: "operator-token", ActiveOnly: true})
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if len(result) != 1 || result[0].RecipeCode != "RCP-1" {
+		t.Fatalf("unexpected recipes payload: %+v", result)
+	}
+}
+
+func TestService_CreateUnitConversionRule_ForgedActorRolePayloadIgnored(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+
+	var input CreateUnitConversionRuleInput
+	if err := json.Unmarshal(
+		[]byte(`{"from_unit":"GRAM","to_unit":"KG","factor":0.001,"precision_scale":4,"rounding_mode":"HALF_UP","actor_role":"ADMIN"}`),
+		&input,
+	); err != nil {
+		t.Fatalf("failed to unmarshal payload: %v", err)
+	}
+
+	_, err := svc.CreateUnitConversionRule(input)
+	if err == nil {
+		t.Fatalf("expected unauthorized error because auth_token is missing")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok {
+		t.Fatalf("expected ServiceError, got %T", err)
+	}
+	if typed.Code != "unauthorized" {
+		t.Fatalf("expected unauthorized, got %s", typed.Code)
+	}
+}
+
+func TestService_ConvertQuantity_UsesConfiguredRule(t *testing.T) {
+	repo := &fakeInventoryRepo{
+		conversionRules: []domainInventory.UnitConversionRule{
+			{
+				FromUnit:       "GRAM",
+				ToUnit:         "KG",
+				Factor:         0.001,
+				PrecisionScale: 4,
+				RoundingMode:   domainInventory.RoundingModeHalfUp,
+				IsActive:       true,
+			},
+		},
+	}
+	svc := NewService(repo, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+
+	result, err := svc.ConvertQuantity(ConvertQuantityInput{
+		Quantity:   500,
+		SourceUnit: "gram",
+		TargetUnit: "kg",
+		AuthToken:  "operator-token",
+	})
+	if err != nil {
+		t.Fatalf("ConvertQuantity failed: %v", err)
+	}
+	if result.QtyConverted != 0.5 {
+		t.Fatalf("expected 0.5, got %f", result.QtyConverted)
+	}
+	if result.Precision.Scale != 4 || result.Precision.RoundingMode != "HALF_UP" {
+		t.Fatalf("unexpected precision metadata: %+v", result.Precision)
+	}
+}
+
+func TestService_ConvertQuantity_MissingRuleReturnsValidationError(t *testing.T) {
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+
+	_, err := svc.ConvertQuantity(ConvertQuantityInput{
+		Quantity:   100,
+		SourceUnit: "GRAM",
+		TargetUnit: "KG",
+		AuthToken:  "admin-token",
+	})
+	if err == nil {
+		t.Fatalf("expected conversion rule not found error")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok {
+		t.Fatalf("expected ServiceError, got %T", err)
+	}
+	if typed.Code != "validation_failed" {
+		t.Fatalf("expected validation_failed, got %s", typed.Code)
 	}
 }

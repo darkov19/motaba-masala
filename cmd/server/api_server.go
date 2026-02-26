@@ -46,6 +46,12 @@ type serverAPIApplication interface {
 	ListItems(input appInventory.ListItemsInput) ([]app.ItemMasterResult, error)
 	CreatePackagingProfile(input appInventory.CreatePackagingProfileInput) (app.PackagingProfileResult, error)
 	ListPackagingProfiles(input appInventory.ListPackagingProfilesInput) ([]app.PackagingProfileResult, error)
+	CreateRecipe(input appInventory.CreateRecipeInput) (app.RecipeResult, error)
+	UpdateRecipe(input appInventory.UpdateRecipeInput) (app.RecipeResult, error)
+	ListRecipes(input appInventory.ListRecipesInput) ([]app.RecipeResult, error)
+	CreateUnitConversionRule(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error)
+	ListUnitConversionRules(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error)
+	ConvertQuantity(input appInventory.ConvertQuantityInput) (app.UnitConversionResult, error)
 }
 
 func startServerAuthAPIServer(application serverAPIApplication) (func(), error) {
@@ -354,6 +360,132 @@ func buildServerAPIRouter(application serverAPIApplication) *http.ServeMux {
 		writeServerJSON(w, http.StatusOK, result)
 	})
 
+	mux.HandleFunc("/inventory/recipes/create", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input appInventory.CreateRecipeInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.CreateRecipe(input)
+		if err != nil {
+			writeMappedServerError(w, "Server inventory create recipe failed", err)
+			return
+		}
+
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("/inventory/recipes/update", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input appInventory.UpdateRecipeInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.UpdateRecipe(input)
+		if err != nil {
+			writeMappedServerError(w, "Server inventory update recipe failed", err)
+			return
+		}
+
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("/inventory/recipes/list", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input appInventory.ListRecipesInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.ListRecipes(input)
+		if err != nil {
+			writeMappedServerError(w, "Server inventory list recipes failed", err)
+			return
+		}
+
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("/inventory/conversions/rules/create", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input appInventory.CreateUnitConversionRuleInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.CreateUnitConversionRule(input)
+		if err != nil {
+			writeMappedServerError(w, "Server inventory create conversion rule failed", err)
+			return
+		}
+
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("/inventory/conversions/rules/list", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input appInventory.ListUnitConversionRulesInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.ListUnitConversionRules(input)
+		if err != nil {
+			writeMappedServerError(w, "Server inventory list conversion rules failed", err)
+			return
+		}
+
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("/inventory/conversions/convert", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input appInventory.ConvertQuantityInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.ConvertQuantity(input)
+		if err != nil {
+			writeMappedServerError(w, "Server inventory convert quantity failed", err)
+			return
+		}
+
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
 	return mux
 }
 
@@ -421,6 +553,8 @@ func mapHTTPStatus(message string) int {
 		strings.Contains(msg, "not allowed"),
 		strings.Contains(msg, "disabled"):
 		return http.StatusForbidden
+	case strings.Contains(msg, "record modified"), strings.Contains(msg, "concurrency"):
+		return http.StatusConflict
 	case strings.Contains(msg, "validation"), strings.Contains(msg, "required"), strings.Contains(msg, "invalid "):
 		return http.StatusBadRequest
 	case strings.Contains(msg, "not found"):
@@ -428,8 +562,6 @@ func mapHTTPStatus(message string) int {
 	case strings.Contains(msg, "already exists"), strings.Contains(msg, "last active admin"), strings.Contains(msg, "cannot modify"):
 		return http.StatusConflict
 	case strings.Contains(msg, "cannot disable your own account"), strings.Contains(msg, "cannot delete your own account"):
-		return http.StatusConflict
-	case strings.Contains(msg, "record modified"), strings.Contains(msg, "concurrency"):
 		return http.StatusConflict
 	default:
 		return http.StatusInternalServerError

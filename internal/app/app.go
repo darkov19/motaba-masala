@@ -19,6 +19,7 @@ import (
 	appAuth "masala_inventory_managment/internal/app/auth"
 	appInventory "masala_inventory_managment/internal/app/inventory"
 	domainAuth "masala_inventory_managment/internal/domain/auth"
+	domainInventory "masala_inventory_managment/internal/domain/inventory"
 )
 
 type RecoveryState struct {
@@ -670,6 +671,43 @@ type PackagingProfileResult struct {
 	Components []appInventory.PackagingProfileComponentInput `json:"components"`
 }
 
+type RecipeComponentResult struct {
+	InputItemID  int64   `json:"input_item_id"`
+	InputQtyBase float64 `json:"input_qty_base"`
+	LineNo       int     `json:"line_no"`
+}
+
+type RecipeResult struct {
+	ID                 int64                   `json:"id"`
+	RecipeCode         string                  `json:"recipe_code"`
+	OutputItemID       int64                   `json:"output_item_id"`
+	OutputQtyBase      float64                 `json:"output_qty_base"`
+	ExpectedWastagePct float64                 `json:"expected_wastage_pct"`
+	IsActive           bool                    `json:"is_active"`
+	UpdatedAt          string                  `json:"updated_at"`
+	Components         []RecipeComponentResult `json:"components"`
+}
+
+type UnitConversionRuleResult struct {
+	ID             int64   `json:"id"`
+	ItemID         *int64  `json:"item_id,omitempty"`
+	FromUnit       string  `json:"from_unit"`
+	ToUnit         string  `json:"to_unit"`
+	Factor         float64 `json:"factor"`
+	PrecisionScale int     `json:"precision_scale"`
+	RoundingMode   string  `json:"rounding_mode"`
+	IsActive       bool    `json:"is_active"`
+	UpdatedAt      string  `json:"updated_at"`
+}
+
+type UnitConversionResult struct {
+	QtyConverted float64                                 `json:"qty_converted"`
+	Precision    domainInventory.ConversionPrecisionMeta `json:"precision_meta"`
+	SourceUnit   string                                  `json:"source_unit"`
+	TargetUnit   string                                  `json:"target_unit"`
+	Factor       float64                                 `json:"factor"`
+}
+
 func (a *App) CreateItemMaster(input appInventory.CreateItemInput) (ItemMasterResult, error) {
 	if !a.isServer && a.inventoryService == nil {
 		var result ItemMasterResult
@@ -826,4 +864,205 @@ func (a *App) ListPackagingProfiles(input appInventory.ListPackagingProfilesInpu
 		})
 	}
 	return result, nil
+}
+
+func (a *App) CreateRecipe(input appInventory.CreateRecipeInput) (RecipeResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result RecipeResult
+		if err := postToServerAPI("/inventory/recipes/create", input, &result); err != nil {
+			return RecipeResult{}, err
+		}
+		return result, nil
+	}
+	if a.inventoryService == nil {
+		return RecipeResult{}, fmt.Errorf("inventory service is not configured")
+	}
+
+	recipe, err := a.inventoryService.CreateRecipe(input)
+	if err != nil {
+		return RecipeResult{}, err
+	}
+	components := make([]RecipeComponentResult, 0, len(recipe.Components))
+	for _, component := range recipe.Components {
+		components = append(components, RecipeComponentResult{
+			InputItemID:  component.InputItemID,
+			InputQtyBase: component.InputQtyBase,
+			LineNo:       component.LineNo,
+		})
+	}
+
+	return RecipeResult{
+		ID:                 recipe.ID,
+		RecipeCode:         recipe.RecipeCode,
+		OutputItemID:       recipe.OutputItemID,
+		OutputQtyBase:      recipe.OutputQtyBase,
+		ExpectedWastagePct: recipe.ExpectedWastagePct,
+		IsActive:           recipe.IsActive,
+		UpdatedAt:          recipe.UpdatedAt.Format(time.RFC3339Nano),
+		Components:         components,
+	}, nil
+}
+
+func (a *App) UpdateRecipe(input appInventory.UpdateRecipeInput) (RecipeResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result RecipeResult
+		if err := postToServerAPI("/inventory/recipes/update", input, &result); err != nil {
+			return RecipeResult{}, err
+		}
+		return result, nil
+	}
+	if a.inventoryService == nil {
+		return RecipeResult{}, fmt.Errorf("inventory service is not configured")
+	}
+
+	recipe, err := a.inventoryService.UpdateRecipe(input)
+	if err != nil {
+		return RecipeResult{}, err
+	}
+	components := make([]RecipeComponentResult, 0, len(recipe.Components))
+	for _, component := range recipe.Components {
+		components = append(components, RecipeComponentResult{
+			InputItemID:  component.InputItemID,
+			InputQtyBase: component.InputQtyBase,
+			LineNo:       component.LineNo,
+		})
+	}
+
+	return RecipeResult{
+		ID:                 recipe.ID,
+		RecipeCode:         recipe.RecipeCode,
+		OutputItemID:       recipe.OutputItemID,
+		OutputQtyBase:      recipe.OutputQtyBase,
+		ExpectedWastagePct: recipe.ExpectedWastagePct,
+		IsActive:           recipe.IsActive,
+		UpdatedAt:          recipe.UpdatedAt.Format(time.RFC3339Nano),
+		Components:         components,
+	}, nil
+}
+
+func (a *App) ListRecipes(input appInventory.ListRecipesInput) ([]RecipeResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result []RecipeResult
+		if err := postToServerAPI("/inventory/recipes/list", input, &result); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+	if a.inventoryService == nil {
+		return nil, fmt.Errorf("inventory service is not configured")
+	}
+
+	recipes, err := a.inventoryService.ListRecipes(input)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]RecipeResult, 0, len(recipes))
+	for _, recipe := range recipes {
+		components := make([]RecipeComponentResult, 0, len(recipe.Components))
+		for _, component := range recipe.Components {
+			components = append(components, RecipeComponentResult{
+				InputItemID:  component.InputItemID,
+				InputQtyBase: component.InputQtyBase,
+				LineNo:       component.LineNo,
+			})
+		}
+		result = append(result, RecipeResult{
+			ID:                 recipe.ID,
+			RecipeCode:         recipe.RecipeCode,
+			OutputItemID:       recipe.OutputItemID,
+			OutputQtyBase:      recipe.OutputQtyBase,
+			ExpectedWastagePct: recipe.ExpectedWastagePct,
+			IsActive:           recipe.IsActive,
+			UpdatedAt:          recipe.UpdatedAt.Format(time.RFC3339Nano),
+			Components:         components,
+		})
+	}
+	return result, nil
+}
+
+func (a *App) CreateUnitConversionRule(input appInventory.CreateUnitConversionRuleInput) (UnitConversionRuleResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result UnitConversionRuleResult
+		if err := postToServerAPI("/inventory/conversions/rules/create", input, &result); err != nil {
+			return UnitConversionRuleResult{}, err
+		}
+		return result, nil
+	}
+	if a.inventoryService == nil {
+		return UnitConversionRuleResult{}, fmt.Errorf("inventory service is not configured")
+	}
+
+	rule, err := a.inventoryService.CreateUnitConversionRule(input)
+	if err != nil {
+		return UnitConversionRuleResult{}, err
+	}
+	return UnitConversionRuleResult{
+		ID:             rule.ID,
+		ItemID:         rule.ItemID,
+		FromUnit:       rule.FromUnit,
+		ToUnit:         rule.ToUnit,
+		Factor:         rule.Factor,
+		PrecisionScale: rule.PrecisionScale,
+		RoundingMode:   string(rule.RoundingMode),
+		IsActive:       rule.IsActive,
+		UpdatedAt:      rule.UpdatedAt.Format(time.RFC3339Nano),
+	}, nil
+}
+
+func (a *App) ListUnitConversionRules(input appInventory.ListUnitConversionRulesInput) ([]UnitConversionRuleResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result []UnitConversionRuleResult
+		if err := postToServerAPI("/inventory/conversions/rules/list", input, &result); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+	if a.inventoryService == nil {
+		return nil, fmt.Errorf("inventory service is not configured")
+	}
+
+	rules, err := a.inventoryService.ListUnitConversionRules(input)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]UnitConversionRuleResult, 0, len(rules))
+	for _, rule := range rules {
+		result = append(result, UnitConversionRuleResult{
+			ID:             rule.ID,
+			ItemID:         rule.ItemID,
+			FromUnit:       rule.FromUnit,
+			ToUnit:         rule.ToUnit,
+			Factor:         rule.Factor,
+			PrecisionScale: rule.PrecisionScale,
+			RoundingMode:   string(rule.RoundingMode),
+			IsActive:       rule.IsActive,
+			UpdatedAt:      rule.UpdatedAt.Format(time.RFC3339Nano),
+		})
+	}
+	return result, nil
+}
+
+func (a *App) ConvertQuantity(input appInventory.ConvertQuantityInput) (UnitConversionResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result UnitConversionResult
+		if err := postToServerAPI("/inventory/conversions/convert", input, &result); err != nil {
+			return UnitConversionResult{}, err
+		}
+		return result, nil
+	}
+	if a.inventoryService == nil {
+		return UnitConversionResult{}, fmt.Errorf("inventory service is not configured")
+	}
+
+	result, err := a.inventoryService.ConvertQuantity(input)
+	if err != nil {
+		return UnitConversionResult{}, err
+	}
+	return UnitConversionResult{
+		QtyConverted: result.QtyConverted,
+		Precision:    result.Precision,
+		SourceUnit:   result.SourceUnit,
+		TargetUnit:   result.TargetUnit,
+		Factor:       result.Factor,
+	}, nil
 }

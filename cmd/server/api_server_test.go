@@ -26,6 +26,9 @@ type stubServerAPIApplication struct {
 	listItemsFn              func(input appInventory.ListItemsInput) ([]app.ItemMasterResult, error)
 	createPackagingProfileFn func(input appInventory.CreatePackagingProfileInput) (app.PackagingProfileResult, error)
 	listPackagingProfilesFn  func(input appInventory.ListPackagingProfilesInput) ([]app.PackagingProfileResult, error)
+	createRecipeFn           func(input appInventory.CreateRecipeInput) (app.RecipeResult, error)
+	updateRecipeFn           func(input appInventory.UpdateRecipeInput) (app.RecipeResult, error)
+	listRecipesFn            func(input appInventory.ListRecipesInput) ([]app.RecipeResult, error)
 	createConversionRuleFn   func(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error)
 	listConversionRulesFn    func(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error)
 	convertQuantityFn        func(input appInventory.ConvertQuantityInput) (app.UnitConversionResult, error)
@@ -195,6 +198,27 @@ func (s stubServerAPIApplication) ListPackagingProfiles(input appInventory.ListP
 	return nil, errors.New("not implemented")
 }
 
+func (s stubServerAPIApplication) CreateRecipe(input appInventory.CreateRecipeInput) (app.RecipeResult, error) {
+	if s.createRecipeFn != nil {
+		return s.createRecipeFn(input)
+	}
+	return app.RecipeResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) UpdateRecipe(input appInventory.UpdateRecipeInput) (app.RecipeResult, error) {
+	if s.updateRecipeFn != nil {
+		return s.updateRecipeFn(input)
+	}
+	return app.RecipeResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) ListRecipes(input appInventory.ListRecipesInput) ([]app.RecipeResult, error) {
+	if s.listRecipesFn != nil {
+		return s.listRecipesFn(input)
+	}
+	return nil, errors.New("not implemented")
+}
+
 func (s stubServerAPIApplication) CreateUnitConversionRule(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error) {
 	if s.createConversionRuleFn != nil {
 		return s.createConversionRuleFn(input)
@@ -327,6 +351,175 @@ func TestServerAPI_ConvertQuantityMissingRuleReturnsBadRequest(t *testing.T) {
 		"auth_token":  "admin-token",
 	})
 	assertErrorStatusAndMessage(t, rec, http.StatusBadRequest, "conversion rule not found for requested unit pair")
+}
+
+func TestServerAPI_CreateRecipeSuccess(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		createRecipeFn: func(input appInventory.CreateRecipeInput) (app.RecipeResult, error) {
+			if input.RecipeCode != "RCP-GM-1" || input.OutputItemID != 20 || input.AuthToken != "admin-token" {
+				t.Fatalf("unexpected create recipe input: %+v", input)
+			}
+			return app.RecipeResult{
+				ID:                 200,
+				RecipeCode:         "RCP-GM-1",
+				OutputItemID:       20,
+				OutputQtyBase:      100,
+				ExpectedWastagePct: 2.5,
+				IsActive:           true,
+				Components: []app.RecipeComponentResult{
+					{InputItemID: 1, InputQtyBase: 60, LineNo: 1},
+				},
+			}, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/recipes/create", map[string]interface{}{
+		"recipe_code":          "RCP-GM-1",
+		"output_item_id":       20,
+		"output_qty_base":      100,
+		"expected_wastage_pct": 2.5,
+		"is_active":            true,
+		"auth_token":           "admin-token",
+		"components":           []map[string]interface{}{{"input_item_id": 1, "input_qty_base": 60, "line_no": 1}},
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var payload app.RecipeResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.ID != 200 || payload.RecipeCode != "RCP-GM-1" {
+		t.Fatalf("unexpected response payload: %#v", payload)
+	}
+}
+
+func TestServerAPI_UpdateRecipeConflictReturnsConflict(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		updateRecipeFn: func(_ appInventory.UpdateRecipeInput) (app.RecipeResult, error) {
+			return app.RecipeResult{}, errors.New("Record modified by another user. Reload required.")
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/recipes/update", map[string]interface{}{
+		"id":                   200,
+		"recipe_code":          "RCP-GM-1",
+		"output_item_id":       20,
+		"output_qty_base":      110,
+		"expected_wastage_pct": 2.0,
+		"updated_at":           "2026-02-26T10:00:00Z",
+		"is_active":            true,
+		"auth_token":           "admin-token",
+		"components":           []map[string]interface{}{{"input_item_id": 1, "input_qty_base": 70, "line_no": 1}},
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusConflict, "Record modified by another user. Reload required.")
+}
+
+func TestServerAPI_UpdateRecipeSuccess(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		updateRecipeFn: func(input appInventory.UpdateRecipeInput) (app.RecipeResult, error) {
+			if input.ID != 200 || input.RecipeCode != "RCP-GM-1" || input.AuthToken != "admin-token" {
+				t.Fatalf("unexpected update recipe input: %+v", input)
+			}
+			return app.RecipeResult{
+				ID:                 200,
+				RecipeCode:         "RCP-GM-1",
+				OutputItemID:       20,
+				OutputQtyBase:      110,
+				ExpectedWastagePct: 2,
+				IsActive:           true,
+				UpdatedAt:          "2026-02-26T10:01:00Z",
+				Components: []app.RecipeComponentResult{
+					{InputItemID: 1, InputQtyBase: 70, LineNo: 1},
+				},
+			}, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/recipes/update", map[string]interface{}{
+		"id":                   200,
+		"recipe_code":          "RCP-GM-1",
+		"output_item_id":       20,
+		"output_qty_base":      110,
+		"expected_wastage_pct": 2.0,
+		"updated_at":           "2026-02-26T10:00:00Z",
+		"is_active":            true,
+		"auth_token":           "admin-token",
+		"components":           []map[string]interface{}{{"input_item_id": 1, "input_qty_base": 70, "line_no": 1}},
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var payload app.RecipeResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.ID != 200 || payload.OutputQtyBase != 110 || len(payload.Components) != 1 {
+		t.Fatalf("unexpected response payload: %#v", payload)
+	}
+}
+
+func TestServerAPI_ListRecipesUnauthorizedReturnsUnauthorized(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		listRecipesFn: func(_ appInventory.ListRecipesInput) ([]app.RecipeResult, error) {
+			return nil, &appInventory.ServiceError{
+				Code:    "unauthorized",
+				Message: "invalid or expired authentication token",
+			}
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/recipes/list", map[string]interface{}{
+		"active_only": true,
+		"auth_token":  "stale-token",
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusUnauthorized, "invalid or expired authentication token")
+}
+
+func TestServerAPI_ListRecipesSuccess(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		listRecipesFn: func(input appInventory.ListRecipesInput) ([]app.RecipeResult, error) {
+			if input.ActiveOnly != true || input.Search != "RCP" || input.AuthToken != "admin-token" {
+				t.Fatalf("unexpected list recipes input: %+v", input)
+			}
+			return []app.RecipeResult{
+				{
+					ID:                 200,
+					RecipeCode:         "RCP-GM-1",
+					OutputItemID:       20,
+					OutputQtyBase:      100,
+					ExpectedWastagePct: 2.5,
+					IsActive:           true,
+					UpdatedAt:          "2026-02-26T10:00:00Z",
+					Components: []app.RecipeComponentResult{
+						{InputItemID: 1, InputQtyBase: 60, LineNo: 1},
+					},
+				},
+			}, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/recipes/list", map[string]interface{}{
+		"active_only": true,
+		"search":      "RCP",
+		"auth_token":  "admin-token",
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var payload []app.RecipeResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if len(payload) != 1 || payload[0].RecipeCode != "RCP-GM-1" || len(payload[0].Components) != 1 {
+		t.Fatalf("unexpected response payload: %#v", payload)
+	}
 }
 
 func TestServerAPI_CreateUnitConversionRuleSuccess(t *testing.T) {

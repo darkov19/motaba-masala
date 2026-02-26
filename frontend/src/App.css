@@ -382,6 +382,7 @@
 .shell-nav__scroll,
 .app-content,
 .item-master-split__table .ant-table-body,
+.recipe-master-split__table .ant-table-body,
 .packaging-profile-split__table .ant-table-body {
     scrollbar-width: thin;
     scrollbar-color: rgba(15, 23, 42, 0.16) transparent;
@@ -390,6 +391,7 @@
 .shell-nav__scroll::-webkit-scrollbar,
 .app-content::-webkit-scrollbar,
 .item-master-split__table .ant-table-body::-webkit-scrollbar,
+.recipe-master-split__table .ant-table-body::-webkit-scrollbar,
 .packaging-profile-split__table .ant-table-body::-webkit-scrollbar {
     width: 4px;
     height: 4px;
@@ -398,6 +400,7 @@
 .shell-nav__scroll::-webkit-scrollbar-track,
 .app-content::-webkit-scrollbar-track,
 .item-master-split__table .ant-table-body::-webkit-scrollbar-track,
+.recipe-master-split__table .ant-table-body::-webkit-scrollbar-track,
 .packaging-profile-split__table .ant-table-body::-webkit-scrollbar-track {
     background: transparent;
 }
@@ -405,6 +408,7 @@
 .shell-nav__scroll::-webkit-scrollbar-thumb,
 .app-content::-webkit-scrollbar-thumb,
 .item-master-split__table .ant-table-body::-webkit-scrollbar-thumb,
+.recipe-master-split__table .ant-table-body::-webkit-scrollbar-thumb,
 .packaging-profile-split__table .ant-table-body::-webkit-scrollbar-thumb {
     background: rgba(15, 23, 42, 0.16);
     border-radius: 999px;
@@ -650,6 +654,29 @@
     grid-template-columns: 1fr;
 }
 
+.recipe-master-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+.recipe-master-split__table,
+.recipe-master-split__form {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+}
+
+.recipe-master-split__table .ant-table-wrapper {
+    width: 100%;
+}
+
+.recipe-master-split--readonly {
+    grid-template-columns: 1fr;
+}
+
 .packaging-profile-split {
     display: grid;
     grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr);
@@ -811,6 +838,10 @@
 
 @media (max-width: 1200px) {
     .item-master-split {
+        grid-template-columns: 1fr;
+    }
+
+    .recipe-master-split {
         grid-template-columns: 1fr;
     }
 
