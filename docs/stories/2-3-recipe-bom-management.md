@@ -1,6 +1,6 @@
 # Story 2.3: Recipe (BOM) Management
 
-Status: review
+Status: done
 
 ## Story
 
@@ -192,6 +192,7 @@ GPT-5 Codex
 - 2026-02-26: Implemented recipe domain/service/repository/API/frontend flow with migrations and automated test coverage for AC1-AC4.
 - 2026-02-26: Added Windows validation automation script `scripts/s2-3-win-test.ps1` for story-specific build/runtime checks.
 - 2026-02-26: Senior Developer Review notes appended.
+- 2026-02-26: Addressed AI review follow-ups (transaction rollback safety + recipe API success-path tests) and moved story status to done.
 
 ## Senior Developer Review (AI)
 
