@@ -208,6 +208,58 @@ func TestGetSessionRole_ClientMode_UsesNetworkAuthAPI(t *testing.T) {
 	}
 }
 
+func TestListUsers_ClientMode_UsesNetworkAuthAPI(t *testing.T) {
+	server := newTestHTTPServerOrSkip(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/admin/users/list" {
+			t.Fatalf("expected /admin/users/list path, got %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Fatalf("expected POST method, got %s", r.Method)
+		}
+
+		_ = json.NewEncoder(w).Encode([]UserAccountResult{
+			{Username: "admin", Role: "Admin", IsActive: true},
+		})
+	}))
+	defer server.Close()
+
+	t.Setenv(envServerProbeAddr, server.URL)
+
+	a := NewApp(false)
+	users, err := a.ListUsers(ListUsersInput{AuthToken: "admin-token"})
+	if err != nil {
+		t.Fatalf("expected list users success, got %v", err)
+	}
+	if len(users) != 1 || users[0].Username != "admin" {
+		t.Fatalf("unexpected users response: %#v", users)
+	}
+}
+
+func TestSetUserActive_ClientMode_UsesNetworkErrorMessage(t *testing.T) {
+	server := newTestHTTPServerOrSkip(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/admin/users/active" {
+			t.Fatalf("expected /admin/users/active path, got %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusConflict)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"message": "cannot modify the last active admin",
+		})
+	}))
+	defer server.Close()
+
+	t.Setenv(envServerProbeAddr, server.URL)
+
+	a := NewApp(false)
+	err := a.SetUserActive(SetUserActiveInput{
+		AuthToken: "admin-token",
+		Username:  "admin",
+		IsActive:  false,
+	})
+	if err == nil || err.Error() != "cannot modify the last active admin" {
+		t.Fatalf("expected conflict message from API, got %v", err)
+	}
+}
+
 func newTestHTTPServerOrSkip(t *testing.T, handler http.Handler) (server *httptest.Server) {
 	t.Helper()
 	defer func() {

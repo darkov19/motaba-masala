@@ -1,6 +1,7 @@
 package report_test
 
 import (
+	"database/sql"
 	"testing"
 
 	appAuth "masala_inventory_managment/internal/app/auth"
@@ -23,6 +24,18 @@ func (m *mockUserRepo) Count() (int, error) {
 	}
 	return 1, nil
 }
+func (m *mockUserRepo) List() ([]domainAuth.User, error) { return nil, nil }
+func (m *mockUserRepo) UpdateRole(username string, role domainAuth.Role) error {
+	return sql.ErrNoRows
+}
+func (m *mockUserRepo) SetActive(username string, isActive bool) error {
+	return sql.ErrNoRows
+}
+func (m *mockUserRepo) UpdatePasswordHash(username, passwordHash string) error {
+	return sql.ErrNoRows
+}
+func (m *mockUserRepo) DeleteByUsername(username string) error { return sql.ErrNoRows }
+func (m *mockUserRepo) CountActiveAdmins() (int, error)        { return 0, nil }
 
 func TestReportService_GetValuation_Security(t *testing.T) {
 	bcrypt := infraAuth.NewBcryptService()

@@ -16,6 +16,11 @@ type stubServerAPIApplication struct {
 	loginFn                  func(username, password string) (app.AuthTokenResult, error)
 	getSessionRoleFn         func(authToken string) (string, error)
 	createUserFn             func(input app.CreateUserInput) error
+	listUsersFn              func(input app.ListUsersInput) ([]app.UserAccountResult, error)
+	updateUserRoleFn         func(input app.UpdateUserRoleInput) error
+	setUserActiveFn          func(input app.SetUserActiveInput) error
+	resetUserPasswordFn      func(input app.ResetUserPasswordInput) error
+	deleteUserFn             func(input app.DeleteUserInput) error
 	createItemMasterFn       func(input appInventory.CreateItemInput) (app.ItemMasterResult, error)
 	updateItemMasterFn       func(input appInventory.UpdateItemInput) (app.ItemMasterResult, error)
 	listItemsFn              func(input appInventory.ListItemsInput) ([]app.ItemMasterResult, error)
@@ -44,11 +49,89 @@ func (s stubServerAPIApplication) CreateUser(input app.CreateUserInput) error {
 	return errors.New("not implemented")
 }
 
+func (s stubServerAPIApplication) ListUsers(input app.ListUsersInput) ([]app.UserAccountResult, error) {
+	if s.listUsersFn != nil {
+		return s.listUsersFn(input)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) UpdateUserRole(input app.UpdateUserRoleInput) error {
+	if s.updateUserRoleFn != nil {
+		return s.updateUserRoleFn(input)
+	}
+	return errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) SetUserActive(input app.SetUserActiveInput) error {
+	if s.setUserActiveFn != nil {
+		return s.setUserActiveFn(input)
+	}
+	return errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) ResetUserPassword(input app.ResetUserPasswordInput) error {
+	if s.resetUserPasswordFn != nil {
+		return s.resetUserPasswordFn(input)
+	}
+	return errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) DeleteUser(input app.DeleteUserInput) error {
+	if s.deleteUserFn != nil {
+		return s.deleteUserFn(input)
+	}
+	return errors.New("not implemented")
+}
+
 func (s stubServerAPIApplication) CreateItemMaster(input appInventory.CreateItemInput) (app.ItemMasterResult, error) {
 	if s.createItemMasterFn != nil {
 		return s.createItemMasterFn(input)
 	}
 	return app.ItemMasterResult{}, errors.New("not implemented")
+}
+
+func TestServerAPI_ListUsersSuccess(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		listUsersFn: func(input app.ListUsersInput) ([]app.UserAccountResult, error) {
+			if input.AuthToken != "admin-token" {
+				t.Fatalf("unexpected auth token: %s", input.AuthToken)
+			}
+			return []app.UserAccountResult{
+				{Username: "admin", Role: "Admin", IsActive: true},
+			}, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/admin/users/list", map[string]string{
+		"auth_token": "admin-token",
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var payload []app.UserAccountResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if len(payload) != 1 || payload[0].Username != "admin" {
+		t.Fatalf("unexpected response payload: %#v", payload)
+	}
+}
+
+func TestServerAPI_DeleteUserNotFoundReturnsNotFound(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		deleteUserFn: func(_ app.DeleteUserInput) error {
+			return errors.New("user not found")
+		},
+	})
+
+	rec := postJSON(t, router, "/admin/users/delete", map[string]string{
+		"auth_token": "admin-token",
+		"username":   "ghost",
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusNotFound, "user not found")
 }
 
 func (s stubServerAPIApplication) UpdateItemMaster(input appInventory.UpdateItemInput) (app.ItemMasterResult, error) {

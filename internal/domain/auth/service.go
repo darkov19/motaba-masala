@@ -10,4 +10,9 @@ type AuthToken struct {
 type AuthService interface {
 	Login(username, password string) (*AuthToken, error)
 	CreateUser(token, username, password string, role Role) error
+	ListUsers(token string) ([]User, error)
+	SetUserActive(token, username string, isActive bool) error
+	UpdateUserRole(token, username string, role Role) error
+	ResetUserPassword(token, username, newPassword string) error
+	DeleteUser(token, username string) error
 }

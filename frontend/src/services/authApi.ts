@@ -10,6 +10,38 @@ export type CreateUserPayload = {
     auth_token?: string;
 };
 
+export type UserAccount = {
+    id: string;
+    username: string;
+    role: "Admin" | "DataEntryOperator";
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+export type UpdateUserRolePayload = {
+    username: string;
+    role: "admin" | "operator";
+    auth_token?: string;
+};
+
+export type SetUserActivePayload = {
+    username: string;
+    is_active: boolean;
+    auth_token?: string;
+};
+
+export type ResetUserPasswordPayload = {
+    username: string;
+    new_password: string;
+    auth_token?: string;
+};
+
+export type DeleteUserPayload = {
+    username: string;
+    auth_token?: string;
+};
+
 type SessionExpiredDetail = {
     message?: string;
 };
@@ -22,6 +54,28 @@ type AppBinding = {
         username: string;
         password: string;
         role: string;
+    }) => Promise<void>;
+    ListUsers?: (input: {
+        auth_token?: string;
+    }) => Promise<UserAccount[]>;
+    UpdateUserRole?: (input: {
+        auth_token?: string;
+        username: string;
+        role: string;
+    }) => Promise<void>;
+    SetUserActive?: (input: {
+        auth_token?: string;
+        username: string;
+        is_active: boolean;
+    }) => Promise<void>;
+    ResetUserPassword?: (input: {
+        auth_token?: string;
+        username: string;
+        new_password: string;
+    }) => Promise<void>;
+    DeleteUser?: (input: {
+        auth_token?: string;
+        username: string;
     }) => Promise<void>;
 };
 
@@ -160,6 +214,98 @@ export async function createUser(payload: CreateUserPayload): Promise<void> {
             username: payload.username,
             password: payload.password,
             role: payload.role,
+        });
+    } catch (error) {
+        if (isSessionAuthError(error)) {
+            notifyAuthSessionExpired("Your session is no longer valid. Please sign in again.");
+        }
+        throw error;
+    }
+}
+
+export async function listUsers(): Promise<UserAccount[]> {
+    const fn = getBinding().ListUsers;
+    if (typeof fn !== "function") {
+        return [];
+    }
+    try {
+        return await fn({
+            auth_token: resolveAuthToken(),
+        });
+    } catch (error) {
+        if (isSessionAuthError(error)) {
+            notifyAuthSessionExpired("Your session is no longer valid. Please sign in again.");
+        }
+        throw error;
+    }
+}
+
+export async function updateUserRole(payload: UpdateUserRolePayload): Promise<void> {
+    const fn = getBinding().UpdateUserRole;
+    if (typeof fn !== "function") {
+        throw new Error("UpdateUserRole binding is unavailable");
+    }
+    try {
+        await fn({
+            auth_token: payload.auth_token || resolveAuthToken(),
+            username: payload.username,
+            role: payload.role,
+        });
+    } catch (error) {
+        if (isSessionAuthError(error)) {
+            notifyAuthSessionExpired("Your session is no longer valid. Please sign in again.");
+        }
+        throw error;
+    }
+}
+
+export async function setUserActive(payload: SetUserActivePayload): Promise<void> {
+    const fn = getBinding().SetUserActive;
+    if (typeof fn !== "function") {
+        throw new Error("SetUserActive binding is unavailable");
+    }
+    try {
+        await fn({
+            auth_token: payload.auth_token || resolveAuthToken(),
+            username: payload.username,
+            is_active: payload.is_active,
+        });
+    } catch (error) {
+        if (isSessionAuthError(error)) {
+            notifyAuthSessionExpired("Your session is no longer valid. Please sign in again.");
+        }
+        throw error;
+    }
+}
+
+export async function resetUserPassword(payload: ResetUserPasswordPayload): Promise<void> {
+    const fn = getBinding().ResetUserPassword;
+    if (typeof fn !== "function") {
+        throw new Error("ResetUserPassword binding is unavailable");
+    }
+    try {
+        await fn({
+            auth_token: payload.auth_token || resolveAuthToken(),
+            username: payload.username,
+            new_password: payload.new_password,
+        });
+    } catch (error) {
+        if (isSessionAuthError(error)) {
+            notifyAuthSessionExpired("Your session is no longer valid. Please sign in again.");
+        }
+        throw error;
+    }
+}
+
+export async function deleteUser(payload: DeleteUserPayload): Promise<void> {
+    const fn = getBinding().DeleteUser;
+    if (typeof fn !== "function") {
+        throw new Error("DeleteUser binding is unavailable");
+    }
+    try {
+        await fn({
+            auth_token: payload.auth_token || resolveAuthToken(),
+            username: payload.username,
         });
     } catch (error) {
         if (isSessionAuthError(error)) {

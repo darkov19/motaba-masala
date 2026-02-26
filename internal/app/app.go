@@ -368,6 +368,42 @@ type CreateUserInput struct {
 	Role      string `json:"role"`
 }
 
+type ListUsersInput struct {
+	AuthToken string `json:"auth_token"`
+}
+
+type UpdateUserRoleInput struct {
+	AuthToken string `json:"auth_token"`
+	Username  string `json:"username"`
+	Role      string `json:"role"`
+}
+
+type SetUserActiveInput struct {
+	AuthToken string `json:"auth_token"`
+	Username  string `json:"username"`
+	IsActive  bool   `json:"is_active"`
+}
+
+type ResetUserPasswordInput struct {
+	AuthToken   string `json:"auth_token"`
+	Username    string `json:"username"`
+	NewPassword string `json:"new_password"`
+}
+
+type DeleteUserInput struct {
+	AuthToken string `json:"auth_token"`
+	Username  string `json:"username"`
+}
+
+type UserAccountResult struct {
+	ID        string `json:"id"`
+	Username  string `json:"username"`
+	Role      string `json:"role"`
+	IsActive  bool   `json:"is_active"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
 func normalizeRole(raw string) (domainAuth.Role, error) {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "admin":
@@ -515,6 +551,101 @@ func (a *App) CreateUser(input CreateUserInput) error {
 		strings.TrimSpace(input.Username),
 		input.Password,
 		role,
+	)
+}
+
+func (a *App) ListUsers(input ListUsersInput) ([]UserAccountResult, error) {
+	if !a.isServer && a.authService == nil {
+		var result []UserAccountResult
+		if err := postToServerAPI("/admin/users/list", input, &result); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+	if a.authService == nil {
+		return nil, fmt.Errorf("auth service is not configured")
+	}
+
+	users, err := a.authService.ListUsers(strings.TrimSpace(input.AuthToken))
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]UserAccountResult, 0, len(users))
+	for _, user := range users {
+		result = append(result, UserAccountResult{
+			ID:        user.ID,
+			Username:  user.Username,
+			Role:      string(user.Role),
+			IsActive:  user.IsActive,
+			CreatedAt: user.CreatedAt.Format(time.RFC3339Nano),
+			UpdatedAt: user.UpdatedAt.Format(time.RFC3339Nano),
+		})
+	}
+	return result, nil
+}
+
+func (a *App) UpdateUserRole(input UpdateUserRoleInput) error {
+	if !a.isServer && a.authService == nil {
+		return postToServerAPI("/admin/users/role", input, nil)
+	}
+	if a.authService == nil {
+		return fmt.Errorf("auth service is not configured")
+	}
+
+	role, err := normalizeRole(input.Role)
+	if err != nil {
+		return err
+	}
+
+	return a.authService.UpdateUserRole(
+		strings.TrimSpace(input.AuthToken),
+		strings.TrimSpace(input.Username),
+		role,
+	)
+}
+
+func (a *App) SetUserActive(input SetUserActiveInput) error {
+	if !a.isServer && a.authService == nil {
+		return postToServerAPI("/admin/users/active", input, nil)
+	}
+	if a.authService == nil {
+		return fmt.Errorf("auth service is not configured")
+	}
+
+	return a.authService.SetUserActive(
+		strings.TrimSpace(input.AuthToken),
+		strings.TrimSpace(input.Username),
+		input.IsActive,
+	)
+}
+
+func (a *App) ResetUserPassword(input ResetUserPasswordInput) error {
+	if !a.isServer && a.authService == nil {
+		return postToServerAPI("/admin/users/password-reset", input, nil)
+	}
+	if a.authService == nil {
+		return fmt.Errorf("auth service is not configured")
+	}
+
+	return a.authService.ResetUserPassword(
+		strings.TrimSpace(input.AuthToken),
+		strings.TrimSpace(input.Username),
+		input.NewPassword,
+	)
+}
+
+func (a *App) DeleteUser(input DeleteUserInput) error {
+	if !a.isServer && a.authService == nil {
+		return postToServerAPI("/admin/users/delete", input, nil)
+	}
+	if a.authService == nil {
+		return fmt.Errorf("auth service is not configured")
+	}
+
+	return a.authService.DeleteUser(
+		strings.TrimSpace(input.AuthToken),
+		strings.TrimSpace(input.Username),
 	)
 }
 

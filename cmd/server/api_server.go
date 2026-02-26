@@ -36,6 +36,11 @@ type serverAPIApplication interface {
 	Login(username, password string) (app.AuthTokenResult, error)
 	GetSessionRole(authToken string) (string, error)
 	CreateUser(input app.CreateUserInput) error
+	ListUsers(input app.ListUsersInput) ([]app.UserAccountResult, error)
+	UpdateUserRole(input app.UpdateUserRoleInput) error
+	SetUserActive(input app.SetUserActiveInput) error
+	ResetUserPassword(input app.ResetUserPasswordInput) error
+	DeleteUser(input app.DeleteUserInput) error
 	CreateItemMaster(input appInventory.CreateItemInput) (app.ItemMasterResult, error)
 	UpdateItemMaster(input appInventory.UpdateItemInput) (app.ItemMasterResult, error)
 	ListItems(input appInventory.ListItemsInput) ([]app.ItemMasterResult, error)
@@ -137,6 +142,107 @@ func buildServerAPIRouter(application serverAPIApplication) *http.ServeMux {
 
 		if err := application.CreateUser(input); err != nil {
 			writeMappedServerError(w, "Server admin create-user failed", err)
+			return
+		}
+
+		writeServerJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	})
+
+	mux.HandleFunc("/admin/users/list", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input app.ListUsersInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.ListUsers(input)
+		if err != nil {
+			writeMappedServerError(w, "Server admin list-users failed", err)
+			return
+		}
+
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("/admin/users/role", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input app.UpdateUserRoleInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		if err := application.UpdateUserRole(input); err != nil {
+			writeMappedServerError(w, "Server admin update-user-role failed", err)
+			return
+		}
+
+		writeServerJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	})
+
+	mux.HandleFunc("/admin/users/active", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input app.SetUserActiveInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		if err := application.SetUserActive(input); err != nil {
+			writeMappedServerError(w, "Server admin set-user-active failed", err)
+			return
+		}
+
+		writeServerJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	})
+
+	mux.HandleFunc("/admin/users/password-reset", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input app.ResetUserPasswordInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		if err := application.ResetUserPassword(input); err != nil {
+			writeMappedServerError(w, "Server admin reset-user-password failed", err)
+			return
+		}
+
+		writeServerJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	})
+
+	mux.HandleFunc("/admin/users/delete", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input app.DeleteUserInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		if err := application.DeleteUser(input); err != nil {
+			writeMappedServerError(w, "Server admin delete-user failed", err)
 			return
 		}
 
@@ -312,10 +418,15 @@ func mapHTTPStatus(message string) int {
 		return http.StatusUnauthorized
 	case strings.HasPrefix(msg, "forbidden:"),
 		strings.Contains(msg, "forbidden"),
-		strings.Contains(msg, "not allowed"):
+		strings.Contains(msg, "not allowed"),
+		strings.Contains(msg, "disabled"):
 		return http.StatusForbidden
 	case strings.Contains(msg, "validation"), strings.Contains(msg, "required"), strings.Contains(msg, "invalid "):
 		return http.StatusBadRequest
+	case strings.Contains(msg, "not found"):
+		return http.StatusNotFound
+	case strings.Contains(msg, "already exists"), strings.Contains(msg, "last active admin"), strings.Contains(msg, "cannot modify"):
+		return http.StatusConflict
 	case strings.Contains(msg, "record modified"), strings.Contains(msg, "concurrency"):
 		return http.StatusConflict
 	default:

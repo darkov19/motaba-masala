@@ -5,5 +5,10 @@ type UserRepository interface {
 	Save(user *User) error
 	FindByUsername(username string) (*User, error)
 	Count() (int, error)
-	// Add other methods as needed, e.g., List, Delete
+	List() ([]User, error)
+	UpdateRole(username string, role Role) error
+	SetActive(username string, isActive bool) error
+	UpdatePasswordHash(username, passwordHash string) error
+	DeleteByUsername(username string) error
+	CountActiveAdmins() (int, error)
 }

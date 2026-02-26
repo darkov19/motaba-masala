@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -16,6 +17,10 @@ type Service struct {
 	bcryptService *infraAuth.BcryptService
 	tokenService  *infraAuth.TokenService
 }
+
+const (
+	ErrLastActiveAdmin = "cannot modify the last active admin"
+)
 
 // NewService creates a new AuthService.
 func NewService(repo domainAuth.UserRepository, bcrypt *infraAuth.BcryptService, token *infraAuth.TokenService) *Service {
@@ -43,6 +48,10 @@ func (s *Service) Login(username, password string) (*domainAuth.AuthToken, error
 		slog.Warn("Auth login failed", "username", normalizedUsername, "reason", "user-not-found")
 		return nil, errors.New("invalid credentials")
 	}
+	if !user.IsActive {
+		slog.Warn("Auth login rejected", "username", normalizedUsername, "reason", "inactive-account")
+		return nil, errors.New("account is disabled")
+	}
 
 	err = s.bcryptService.CheckPasswordHash(password, user.PasswordHash)
 	if err != nil {
@@ -62,6 +71,14 @@ func (s *Service) Login(username, password string) (*domainAuth.AuthToken, error
 
 // CreateUser registers a new user. It is restricted to Admin users unless no users exist (bootstrap).
 func (s *Service) CreateUser(token, username, password string, role domainAuth.Role) error {
+	normalizedUsername := strings.TrimSpace(username)
+	if normalizedUsername == "" {
+		return errors.New("username is required")
+	}
+	if err := validateManagedRole(role); err != nil {
+		return err
+	}
+
 	// Bootstrap Logic: Check if any users exist
 	count, err := s.userRepo.Count()
 	if err != nil {
@@ -75,7 +92,7 @@ func (s *Service) CreateUser(token, username, password string, role domainAuth.R
 		}
 	}
 
-	existingUser, err := s.userRepo.FindByUsername(username)
+	existingUser, err := s.userRepo.FindByUsername(normalizedUsername)
 	if err != nil {
 		return fmt.Errorf("lookup failed: %w", err)
 	}
@@ -88,9 +105,201 @@ func (s *Service) CreateUser(token, username, password string, role domainAuth.R
 		return fmt.Errorf("hashing failed: %w", err)
 	}
 
-	newUser := domainAuth.NewUser(username, hashedPassword, role)
+	newUser := domainAuth.NewUser(normalizedUsername, hashedPassword, role)
 	if err := s.userRepo.Save(newUser); err != nil {
 		return fmt.Errorf("save failed: %w", err)
 	}
 	return nil
+}
+
+func (s *Service) ListUsers(token string) ([]domainAuth.User, error) {
+	if err := s.CheckPermission(token, domainAuth.RoleAdmin); err != nil {
+		return nil, err
+	}
+	users, err := s.userRepo.List()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list users: %w", err)
+	}
+	return users, nil
+}
+
+func (s *Service) SetUserActive(token, username string, isActive bool) error {
+	actor, err := s.CurrentUser(token)
+	if err != nil {
+		return fmt.Errorf("unauthorized: %w", err)
+	}
+	if actor.Role != domainAuth.RoleAdmin {
+		return errors.New("forbidden: insufficient permissions")
+	}
+
+	targetUsername := strings.TrimSpace(username)
+	if targetUsername == "" {
+		return errors.New("username is required")
+	}
+	if strings.EqualFold(actor.Username, targetUsername) && !isActive {
+		return errors.New("cannot disable your own account")
+	}
+
+	target, err := s.userRepo.FindByUsername(targetUsername)
+	if err != nil {
+		return fmt.Errorf("lookup failed: %w", err)
+	}
+	if target == nil {
+		return errors.New("user not found")
+	}
+
+	if !isActive && target.Role == domainAuth.RoleAdmin && target.IsActive {
+		if err := s.ensureAnotherActiveAdminExists(); err != nil {
+			return err
+		}
+	}
+
+	if err := s.userRepo.SetActive(targetUsername, isActive); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errors.New("user not found")
+		}
+		return fmt.Errorf("failed to update user active state: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) UpdateUserRole(token, username string, role domainAuth.Role) error {
+	if err := validateManagedRole(role); err != nil {
+		return err
+	}
+
+	actor, err := s.CurrentUser(token)
+	if err != nil {
+		return fmt.Errorf("unauthorized: %w", err)
+	}
+	if actor.Role != domainAuth.RoleAdmin {
+		return errors.New("forbidden: insufficient permissions")
+	}
+
+	targetUsername := strings.TrimSpace(username)
+	if targetUsername == "" {
+		return errors.New("username is required")
+	}
+
+	target, err := s.userRepo.FindByUsername(targetUsername)
+	if err != nil {
+		return fmt.Errorf("lookup failed: %w", err)
+	}
+	if target == nil {
+		return errors.New("user not found")
+	}
+	if target.Role == role {
+		return nil
+	}
+
+	if target.Role == domainAuth.RoleAdmin && target.IsActive && role != domainAuth.RoleAdmin {
+		if err := s.ensureAnotherActiveAdminExists(); err != nil {
+			return err
+		}
+	}
+
+	if err := s.userRepo.UpdateRole(targetUsername, role); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errors.New("user not found")
+		}
+		return fmt.Errorf("failed to update user role: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) ResetUserPassword(token, username, newPassword string) error {
+	actor, err := s.CurrentUser(token)
+	if err != nil {
+		return fmt.Errorf("unauthorized: %w", err)
+	}
+	if actor.Role != domainAuth.RoleAdmin {
+		return errors.New("forbidden: insufficient permissions")
+	}
+
+	targetUsername := strings.TrimSpace(username)
+	if targetUsername == "" {
+		return errors.New("username is required")
+	}
+	if len(strings.TrimSpace(newPassword)) < 8 {
+		return errors.New("password must be at least 8 characters")
+	}
+
+	target, err := s.userRepo.FindByUsername(targetUsername)
+	if err != nil {
+		return fmt.Errorf("lookup failed: %w", err)
+	}
+	if target == nil {
+		return errors.New("user not found")
+	}
+
+	hashedPassword, err := s.bcryptService.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("hashing failed: %w", err)
+	}
+	if err := s.userRepo.UpdatePasswordHash(targetUsername, hashedPassword); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errors.New("user not found")
+		}
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) DeleteUser(token, username string) error {
+	actor, err := s.CurrentUser(token)
+	if err != nil {
+		return fmt.Errorf("unauthorized: %w", err)
+	}
+	if actor.Role != domainAuth.RoleAdmin {
+		return errors.New("forbidden: insufficient permissions")
+	}
+
+	targetUsername := strings.TrimSpace(username)
+	if targetUsername == "" {
+		return errors.New("username is required")
+	}
+	if strings.EqualFold(actor.Username, targetUsername) {
+		return errors.New("cannot delete your own account")
+	}
+
+	target, err := s.userRepo.FindByUsername(targetUsername)
+	if err != nil {
+		return fmt.Errorf("lookup failed: %w", err)
+	}
+	if target == nil {
+		return errors.New("user not found")
+	}
+	if target.Role == domainAuth.RoleAdmin && target.IsActive {
+		if err := s.ensureAnotherActiveAdminExists(); err != nil {
+			return err
+		}
+	}
+
+	if err := s.userRepo.DeleteByUsername(targetUsername); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errors.New("user not found")
+		}
+		return fmt.Errorf("failed to delete user: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) ensureAnotherActiveAdminExists() error {
+	activeAdmins, err := s.userRepo.CountActiveAdmins()
+	if err != nil {
+		return fmt.Errorf("failed to count active admins: %w", err)
+	}
+	if activeAdmins <= 1 {
+		return errors.New(ErrLastActiveAdmin)
+	}
+	return nil
+}
+
+func validateManagedRole(role domainAuth.Role) error {
+	switch role {
+	case domainAuth.RoleAdmin, domainAuth.RoleDataEntryOperator:
+		return nil
+	default:
+		return fmt.Errorf("invalid role: %s", role)
+	}
 }
