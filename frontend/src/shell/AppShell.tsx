@@ -30,12 +30,12 @@ export function AppShell({
     children,
 }: AppShellProps) {
     return (
-        <Layout className={`app-shell app-shell--${role}`}>
+        <Layout className={`app-shell app-shell--${role}`} data-testid="app-shell-root">
             {titleBar}
 
             {licenseBanner ? <div className="app-license-banner">{licenseBanner}</div> : null}
 
-            <Layout className="app-shell__body">
+            <Layout className="app-shell__body" data-testid="app-shell-body">
                 <Sider width={260} className="app-shell__sider" theme="light">
                     {role === "admin" ? (
                         <AdminShell activeRouteId={activeRouteId} onNavigate={onNavigate} />
@@ -44,7 +44,7 @@ export function AppShell({
                     )}
                 </Sider>
 
-                <Content className={`app-content app-content--${contentDensity}`}>
+                <Content className={`app-content app-content--${contentDensity}`} data-testid="app-shell-scroll-region">
                     <Card className={`app-card app-card--workspace app-card--${contentDensity}`} variant="borderless">
                         <Space orientation="vertical" size={16} style={{ width: "100%" }}>
                             {automationNode}

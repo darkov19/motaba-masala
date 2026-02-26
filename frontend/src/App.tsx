@@ -201,7 +201,7 @@ function WindowTitleBar() {
     const { appMode } = useConnection();
     const appTitle = appMode === "server" ? "Motaba Inventory Server" : "Motaba Inventory Client";
     return (
-        <div className="window-titlebar">
+        <div className="window-titlebar" data-testid="app-shell-fixed-titlebar">
             <div className="window-titlebar__brand">
                 <img src={logo} className="window-titlebar__logo" alt="logo" />
                 <span className="window-titlebar__text">{appTitle}</span>

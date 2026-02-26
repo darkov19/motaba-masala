@@ -1,6 +1,6 @@
 # Story 2.2D: AppShell UX Conformance Hardening
 
-Status: review
+Status: done
 
 ## Story
 
@@ -107,7 +107,7 @@ Note: All items are code-fixed and test/lint validated. Fresh runtime screenshot
 ### Validation Runs
 
 - `npm --prefix frontend run build` -> PASS
-- `npm --prefix frontend run test:run` -> PASS (30 tests)
+- `npm --prefix frontend run test:run` -> PASS (31 tests)
 - `npm --prefix frontend run lint` -> PASS
 - `go test ./internal/infrastructure/system` -> PASS
 - `GOCACHE=/tmp/go-cache go test ./cmd/server` -> PASS
@@ -125,6 +125,7 @@ Note: All items are code-fixed and test/lint validated. Fresh runtime screenshot
 - frontend/src/components/forms/ItemMasterForm.tsx
 - frontend/src/components/forms/PackagingProfileForm.tsx
 - frontend/src/__tests__/AppShellRBAC.test.tsx
+- frontend/src/__tests__/AppShellLayout.test.tsx
 - frontend/src/__tests__/AppNavigationBlocker.test.tsx
 - frontend/src/__tests__/AppLicenseStatus.test.tsx
 - frontend/src/components/forms/__tests__/ItemMasterForm.test.tsx
@@ -142,3 +143,105 @@ Note: All items are code-fixed and test/lint validated. Fresh runtime screenshot
 - 2026-02-26: Applied additional UX remediation from stakeholder validation and audit loop (`d4987bb9`, `71b4d41f`, `050050f2`, `b10cb928`, `fb84177f`, `631ae241`).
 - 2026-02-26: Added server tray reopen/focus reliability hardening from runtime validation (`ca5efe24`).
 - 2026-02-26: Added Windows console-log build support for server/client troubleshooting in native runs (`9b2998e5`).
+- 2026-02-26: Senior Developer Review remediation applied (quit-flow force-quit isolation, fixed-shell regression test, runtime-derived shell footer user label).
+
+## Senior Developer Review (AI)
+
+### Reviewer
+
+darko
+
+### Date
+
+2026-02-26
+
+### Outcome
+
+Approve
+
+Justification: All code-level findings raised during review were remediated and verified in-session. Screenshot evidence for AC6 was explicitly waived by stakeholder approval during this review session.
+
+### Summary
+
+The story now meets shell UX conformance objectives and preserves role/RBAC contract behavior. Critical quit-flow safety risk identified during review was fixed, a dedicated layout regression test was added for fixed chrome/content scroll structure, and hardcoded user identity text in shell footer was removed.
+
+### Key Findings (by severity - HIGH/MEDIUM/LOW)
+
+#### HIGH
+
+- Resolved: Force-quit state no longer leaks from route-navigation confirmation flows into app-exit behavior.
+  - Evidence: `frontend/src/hooks/useUnsavedChanges.ts:75-92`, `frontend/src/hooks/useUnsavedChanges.ts:167-187`
+
+#### MEDIUM
+
+- Resolved: Added explicit regression coverage for fixed titlebar outside workspace scroll container (AC1 layout contract).
+  - Evidence: `frontend/src/__tests__/AppShellLayout.test.tsx:66-89`, `frontend/src/shell/AppShell.tsx:33-48`, `frontend/src/App.tsx:204-210`
+
+#### LOW
+
+- Resolved: Removed hardcoded shell footer identity and replaced with runtime-derived display name + role fallback.
+  - Evidence: `frontend/src/shell/RoleShellNavigation.tsx:13-37`, `frontend/src/shell/RoleShellNavigation.tsx:98-103`
+
+### Acceptance Criteria Coverage
+
+| AC# | Description | Status | Evidence |
+| --- | --- | --- | --- |
+| 1 | Window title bar/app shell chrome fixed; content scroll isolated | IMPLEMENTED | `frontend/src/App.css:1-7`, `frontend/src/App.css:183-188`, `frontend/src/App.css:392-403`, `frontend/src/shell/AppShell.tsx:33-48`, `frontend/src/App.tsx:204-210`, `frontend/src/__tests__/AppShellLayout.test.tsx:66-89` |
+| 2 | Admin dashboard reflects command-center intent | IMPLEMENTED | `frontend/src/App.tsx:434-459`, `frontend/src/App.tsx:534-543` |
+| 3 | Operator dashboard reflects speed-hub intent and distinct density | IMPLEMENTED | `frontend/src/App.tsx:461-484`, `frontend/src/App.tsx:534-543` |
+| 4 | Shell density/polish aligns with UX direction | IMPLEMENTED | `frontend/src/App.css:202-359`, `frontend/src/App.css:361-390`, `frontend/src/App.css:80-181` |
+| 5 | Startup/request failure feedback deduped and actionable | IMPLEMENTED | `frontend/src/App.tsx:486-531`, `frontend/src/components/layout/ReconnectionOverlay.tsx:17-27`, `frontend/src/context/ConnectionContext.tsx:148-153` |
+| 6 | Regression coverage and screenshot evidence for review | IMPLEMENTED (WAIVED EVIDENCE) | Regression coverage: `frontend/src/__tests__/AppShellRBAC.test.tsx`, `frontend/src/__tests__/AppNavigationBlocker.test.tsx`, `frontend/src/context/__tests__/ConnectionContext.test.tsx`; Screenshot evidence explicitly waived by stakeholder during this review session |
+
+Summary: 6 of 6 acceptance criteria accepted for this review.
+
+### Task Completion Validation
+
+| Task | Marked As | Verified As | Evidence |
+| --- | --- | --- | --- |
+| Update shell layout/CSS for fixed titlebar/header and content-only scrolling | `[x]` | VERIFIED COMPLETE | `frontend/src/shell/AppShell.tsx:33-48`, `frontend/src/App.css:1-7`, `frontend/src/App.css:392-403` |
+| Replace placeholder dashboard with Admin/Operator role landing cues | `[x]` | VERIFIED COMPLETE | `frontend/src/App.tsx:434-484`, `frontend/src/App.tsx:534-543` |
+| Refine shell visual tokens/navigation density/polish | `[x]` | VERIFIED COMPLETE | `frontend/src/App.css:202-359`, `frontend/src/App.css:361-390` |
+| Improve startup/request feedback dedupe/actionability | `[x]` | VERIFIED COMPLETE | `frontend/src/App.tsx:486-531`, `frontend/src/components/layout/ReconnectionOverlay.tsx:10-27`, `frontend/src/context/ConnectionContext.tsx:148-153` |
+| Update/add frontend regression tests for shell behavior and role surfaces | `[x]` | VERIFIED COMPLETE | `frontend/src/__tests__/AppShellRBAC.test.tsx`, `frontend/src/__tests__/AppNavigationBlocker.test.tsx`, `frontend/src/__tests__/AppShellLayout.test.tsx`, `frontend/src/context/__tests__/ConnectionContext.test.tsx` |
+| Capture updated server/client screenshot evidence | `[ ]` | WAIVED BY STAKEHOLDER | Waiver recorded during this review session on 2026-02-26 |
+
+Summary: 5 of 5 completed tasks verified, 0 questionable, 0 falsely marked complete.
+
+### Test Coverage and Gaps
+
+- Executed:
+  - `npm --prefix frontend run test:run` -> PASS (31 tests)
+  - `npm --prefix frontend run lint` -> PASS
+  - `npm --prefix frontend run build` -> PASS
+  - `go test ./internal/infrastructure/system` -> PASS
+  - `GOCACHE=/tmp/go-cache go test ./cmd/server` -> PASS
+- Remaining gap accepted by stakeholder waiver:
+  - Fresh server/client screenshot capture not required for approval in this review cycle.
+
+### Architectural Alignment
+
+Implementation remains aligned to navigation/RBAC contract and backend-authoritative access model.
+
+- Evidence: `frontend/src/shell/rbac.ts:18-37`, `frontend/src/shell/rbac.ts:80-82`, `frontend/src/App.tsx:349-360`
+
+### Security Notes
+
+No critical auth/authz or injection findings in reviewed scope.
+
+### Best-Practices and References
+
+- React Conditional Rendering: https://react.dev/learn/conditional-rendering
+- React Router v6.30.3 Overview: https://reactrouter.com/6.30.3/start/overview
+- Ant Design ConfigProvider: https://ant.design/components/config-provider/
+- Wails Runtime Window API: https://wails.io/docs/reference/runtime/window/
+- Wails Frameless/Drag Regions: https://wails.io/docs/guides/frameless/
+- MDN `scrollbar-width`: https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/scrollbar-width
+
+### Action Items
+
+**Code Changes Required:**
+- None. All review findings requiring code changes were resolved in-session.
+
+**Advisory Notes:**
+- Note: Fresh screenshot evidence was waived for this review cycle; capture can still be done later for archival UX evidence.

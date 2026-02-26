@@ -10,8 +10,31 @@ type RoleShellNavigationProps = {
     onNavigate: (routeId: string) => void;
 };
 
+function resolveDisplayName(role: UserRole): string {
+    const fallback = role === "admin" ? "Admin User" : "Operator User";
+    const candidateKeys = ["display_name", "full_name", "username", "user_name", "name"];
+
+    try {
+        for (const key of candidateKeys) {
+            const localValue = window.localStorage.getItem(key)?.trim();
+            if (localValue) {
+                return localValue;
+            }
+            const sessionValue = window.sessionStorage.getItem(key)?.trim();
+            if (sessionValue) {
+                return sessionValue;
+            }
+        }
+    } catch {
+        return fallback;
+    }
+
+    return fallback;
+}
+
 export function RoleShellNavigation({ role, activeRouteId, onNavigate }: RoleShellNavigationProps) {
     const sections = getNavigationByRole(role);
+    const displayName = resolveDisplayName(role);
 
     const routeMarks: Record<string, string> = {
         "dashboard.home": "DB",
@@ -75,7 +98,7 @@ export function RoleShellNavigation({ role, activeRouteId, onNavigate }: RoleShe
             <div className="shell-nav__footer">
                 <div className="shell-nav__avatar">{role === "admin" ? "A" : "O"}</div>
                 <div className="shell-nav__footer-text">
-                    <div className="shell-nav__footer-name">Darko</div>
+                    <div className="shell-nav__footer-name">{displayName}</div>
                     <div className="shell-nav__footer-role">{role === "admin" ? "Admin" : "Operator"}</div>
                 </div>
             </div>

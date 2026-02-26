@@ -83,9 +83,7 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
             okText: "Leave anyway",
             cancelText: "Stay",
             onOk: () => {
-                void setForceQuit(true).finally(() => {
-                    blocker.proceed();
-                });
+                blocker.proceed();
             },
             onCancel: () => {
                 blocker.reset();
@@ -168,7 +166,6 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
 
     const confirmIfUnsaved = async (onConfirm: () => void): Promise<boolean> => {
         if (!isDirty) {
-            await setForceQuit(true);
             onConfirm();
             return true;
         }
@@ -180,10 +177,8 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
                 okText: "Leave anyway",
                 cancelText: "Stay",
                 onOk: () => {
-                    return setForceQuit(true).finally(() => {
-                        onConfirm();
-                        resolve(true);
-                    });
+                    onConfirm();
+                    resolve(true);
                 },
                 onCancel: () => {
                     resolve(false);
