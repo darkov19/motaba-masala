@@ -256,8 +256,11 @@ Based on the [PRD](./PRD.md) and [Product Brief](./product-brief.md), the system
 - **Given** the Item Master screen
 - **When** I create a new Raw Material "Coriander Seeds" with Base Unit "KG"
 - **Then** it is saved to the database
+- **And** the same `masters.items` route provides separate type-specific views for Raw, Bulk Powder, Packing Material, and Finished Goods records
 - **And** when I create Packing Material items, I can assign a subtype (e.g., `JAR_BODY`, `JAR_LID`, `CUP_STICKER`) for operational grouping
 - **And** I can define a reusable Packaging Profile (e.g., `Jar Pack`) that maps one packing selection to multiple packing-material components and per-unit quantities
+
+**Source Mapping:** PRD `FR-001A` (Item Master canonical structure + type-specific views), PRD `FR-009A` (composite packing profile behavior).
 
 ### Story 2.2: Unit Conversion Engine
 

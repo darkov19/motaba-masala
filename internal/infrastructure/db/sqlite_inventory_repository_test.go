@@ -35,6 +35,19 @@ func setupInventoryRepo(t *testing.T) (*SqliteInventoryRepository, *DatabaseMana
 	return NewSqliteInventoryRepository(manager.GetDB()), manager
 }
 
+func assertItemDetailsRow(t *testing.T, db *DatabaseManager, table string, itemID int64) {
+	t.Helper()
+
+	var count int
+	query := "SELECT COUNT(1) FROM " + table + " WHERE item_id = ?"
+	if err := db.GetDB().QueryRow(query, itemID).Scan(&count); err != nil {
+		t.Fatalf("failed to query %s: %v", table, err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 details row in %s for item %d, got %d", table, itemID, count)
+	}
+}
+
 func TestSqliteInventoryRepository_UpdateItem_ConcurrencyConflict(t *testing.T) {
 	repo, manager := setupInventoryRepo(t)
 
@@ -177,6 +190,81 @@ func TestSqliteInventoryRepository_CreateItem_PersistsItemMasterFields(t *testin
 	if unit != "pcs" {
 		t.Fatalf("expected unit alias pcs, got %q", unit)
 	}
+	assertItemDetailsRow(t, manager, "packing_material_item_details", item.ID)
+}
+
+func TestSqliteInventoryRepository_CreateItem_CreatesTypeSpecificDetailsRows(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	items := []struct {
+		item  *domainInventory.Item
+		table string
+	}{
+		{
+			item: &domainInventory.Item{
+				SKU:      "SKU-RAW-DETAIL",
+				Name:     "Raw Coriander",
+				ItemType: domainInventory.ItemTypeRaw,
+				BaseUnit: "kg",
+				IsActive: true,
+			},
+			table: "raw_item_details",
+		},
+		{
+			item: &domainInventory.Item{
+				SKU:      "SKU-BULK-DETAIL",
+				Name:     "Bulk Garam",
+				ItemType: domainInventory.ItemTypeBulkPowder,
+				BaseUnit: "kg",
+				IsActive: true,
+			},
+			table: "bulk_powder_item_details",
+		},
+		{
+			item: &domainInventory.Item{
+				SKU:      "SKU-FG-DETAIL",
+				Name:     "FG Garam 100g",
+				ItemType: domainInventory.ItemTypeFinishedGood,
+				BaseUnit: "pcs",
+				IsActive: true,
+			},
+			table: "finished_good_item_details",
+		},
+	}
+
+	for _, tc := range items {
+		if err := repo.CreateItem(tc.item); err != nil {
+			t.Fatalf("CreateItem failed: %v", err)
+		}
+		assertItemDetailsRow(t, manager, tc.table, tc.item.ID)
+	}
+}
+
+func TestSqliteInventoryRepository_UpdateItem_EnsuresTargetTypeDetailsRow(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	item := &domainInventory.Item{
+		SKU:      "SKU-SWITCH-TYPE",
+		Name:     "Switch Type",
+		ItemType: domainInventory.ItemTypeRaw,
+		BaseUnit: "kg",
+		IsActive: true,
+	}
+	if err := repo.CreateItem(item); err != nil {
+		t.Fatalf("CreateItem failed: %v", err)
+	}
+	if err := manager.GetDB().QueryRow("SELECT updated_at FROM items WHERE id = ?", item.ID).Scan(&item.UpdatedAt); err != nil {
+		t.Fatalf("failed to load updated_at: %v", err)
+	}
+
+	item.ItemType = domainInventory.ItemTypeFinishedGood
+	item.BaseUnit = "pcs"
+	if err := repo.UpdateItem(item); err != nil {
+		t.Fatalf("UpdateItem failed: %v", err)
+	}
+
+	assertItemDetailsRow(t, manager, "raw_item_details", item.ID)
+	assertItemDetailsRow(t, manager, "finished_good_item_details", item.ID)
 }
 
 func TestSqliteInventoryRepository_ListItems_FilterByTypeAndActive(t *testing.T) {

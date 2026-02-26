@@ -111,7 +111,8 @@ This process is used as a **backup** to avoid stock-outs when in-house productio
 
 ### Masters to Maintain
 
-- Item Master (with unit, type, pack size)
+- Item Master (single canonical item registry with type-specific views: Raw, Bulk Powder, Packing Material, Finished Goods)
+- Type-specific item extensions (details per type, linked to the canonical item record)
 - Supplier Master
 - Customer / Channel Master
 - Packaging structure (pcs per box, etc.)

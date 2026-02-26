@@ -140,10 +140,11 @@ export default function App() {
 
 ### Core Models
 
-- `Item`: Base entity (ID, Name, Type [RAW/BULK/FG], BaseUnit, AvgCost).
+- `Item`: Canonical master entity (ID, SKU, Name, Type [`RAW`, `BULK_POWDER`, `PACKING_MATERIAL`, `FINISHED_GOOD`], BaseUnit, MinimumStock, Active, timestamps).
+- `Item Type Details`: Extension tables keyed by `item_id` for type-specific metadata (`raw_item_details`, `bulk_powder_item_details`, `packing_material_item_details`, `finished_good_item_details`).
 - `Batch`: Traceability unit (ID, ItemID, Qty, Cost, SourceBatchID [Parent]).
 - `StockLedger`: Immutable transaction log (Date, Type [GRN/PROD/SALE], QtyChange, ValueChange).
-- `PackagingProfile`: Reusable pack mapping (ID, Code, OutputPackItemID, IsActive) that links one pack mode to multiple packing-material components.
+- `PackagingProfile`: Reusable pack mapping (ID, Name, PackMode, IsActive) that links one pack mode to multiple packing-material components.
 - `PackagingProfileComponent`: Child rows (ProfileID, PackingMaterialItemID, QtyPerUnit) consumed atomically during packing execution.
 
 ### Deployment Strategy (Thick Client)

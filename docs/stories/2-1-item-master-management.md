@@ -10,9 +10,9 @@ so that I can maintain a reliable inventory catalog that downstream procurement,
 
 ## Acceptance Criteria
 
-1. The system allows creation of item master records with required fields (`name`, `item_type`, `base_unit`) and persists them successfully. [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative)]
-2. Item type assignment is restricted to supported categories (`RAW`, `BULK_POWDER`, `PACKING_MATERIAL`, `FINISHED_GOOD`) and rejects unsupported values. [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative)]
-3. Packing-material item masters support subtype tags for operational grouping (for example `JAR_BODY`, `JAR_LID`, `CUP_STICKER`) without changing item-level stock ownership. [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative); docs/epics.md#Story 2.1: Item Master Management]
+1. The system allows creation of item master records with required fields (`name`, `item_type`, `base_unit`) and persists them successfully. [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative); docs/PRD.md#FR-001A: Item Master Structure]
+2. Item type assignment is restricted to supported categories (`RAW`, `BULK_POWDER`, `PACKING_MATERIAL`, `FINISHED_GOOD`) and rejects unsupported values. [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative); docs/PRD.md#FR-001A: Item Master Structure]
+3. Packing-material item masters support subtype tags for operational grouping (for example `JAR_BODY`, `JAR_LID`, `CUP_STICKER`) without changing item-level stock ownership. [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative); docs/epics.md#Story 2.1: Item Master Management; docs/PRD.md#FR-001A: Item Master Structure]
 4. Packaging consumption profiles can map one pack mode to multiple packing-material components and per-unit quantities for atomic deduction in packing workflows. [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative); docs/PRD.md#FR-009A: Composite Packing Consumption Profiles]
 5. Master data created in this story is discoverable by downstream modules through list/query interfaces. [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative)]
 
@@ -24,7 +24,7 @@ so that I can maintain a reliable inventory catalog that downstream procurement,
 - [x] Implement packaging profile domain/persistence model and create/list service paths with component mapping (`packing_material_item_id`, `qty_per_unit`) (AC: 4)
 - [x] Enforce referential integrity and type constraints for packaging profile components so only active `PACKING_MATERIAL` items are assignable (AC: 4)
 - [x] Implement list/query endpoints used by downstream workflows to fetch active items and packaging profiles (AC: 5)
-- [x] Frontend: add/administer Item Master CRUD UI with keyboard-first form flow and inline validation for required fields, enum types, and subtype fields where relevant (AC: 1, 2, 3)
+- [x] Frontend: add/administer Item Master CRUD UI with keyboard-first form flow, separate type-specific views (Raw/Bulk/Packing/FG), and subtype fields where relevant (AC: 1, 2, 3)
 - [x] Frontend: add Packaging Profile UI to create and maintain multi-component mappings with per-unit quantities and clear validation feedback (AC: 4)
 - [x] Tests: add backend unit tests for item type validation, required-field enforcement, subtype rules, and packaging profile component constraints (AC: 1, 2, 3, 4)
 - [x] Tests: add integration tests for item/profile persistence, FK integrity, and list/query discoverability behavior (AC: 4, 5)
@@ -69,6 +69,7 @@ so that I can maintain a reliable inventory catalog that downstream procurement,
 - [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative)]
 - [Source: docs/tech-spec-epic-2.md#Test Strategy Summary]
 - [Source: docs/epics.md#Story 2.1: Item Master Management]
+- [Source: docs/PRD.md#FR-001A: Item Master Structure]
 - [Source: docs/PRD.md#FR-009A: Composite Packing Consumption Profiles]
 - [Source: docs/architecture.md#Project Structure]
 - [Source: docs/architecture.md#Epic to Architecture Mapping]
@@ -91,17 +92,27 @@ so that I can maintain a reliable inventory catalog that downstream procurement,
 - 2026-02-25: Added Wails App bindings for Create/Update/List Items and Create/List Packaging Profiles; wired inventory service into server startup.
 - 2026-02-25: Added Item Master and Packaging Profile frontend forms, integrated workspace navigation/views, and added frontend component tests for validation and submit paths.
 - 2026-02-25: Validation run completed - `go test ./...`, `npm run test:run`, `npm run lint`, and `npm run build` all passed in WSL environment.
+- 2026-02-26: Follow-up enhancement implemented: added item type extension tables (`000006`) and updated Item Master UI to provide separate type-specific views (Raw, Bulk Powder, Packing Material, Finished Goods) under the same `masters.items` route.
 
 ### Completion Notes List
 
 - Implemented item master contract fields (`item_type`, `base_unit`, `item_subtype`) with supported enum validation and backward-compatible normalization from legacy `category`/`unit`.
 - Added migration set for item master schema evolution (`000004`) and packaging profile tables (`000005`) with component constraints and indexes.
+- Added item extension-table migration (`000006`) for type-specific details while preserving one canonical `items` master.
 - Delivered validation-first app-service methods with explicit service error payload shape, role-aware access checks, and list/query interfaces for downstream consumers.
 - Implemented packaging profile persistence and transactional component checks enforcing assignable active `PACKING_MATERIAL` references.
 - Added frontend Item Master CRUD and Packaging Profile management forms with inline validation, keyboard-friendly Antd flow, and list visibility.
+- Refined Item Master UX into separate type-specific views (Raw, Bulk Powder, Packing Material, Finished Goods) while keeping single-route contract and backend canonical item identity.
 - Added backend unit/integration tests and frontend component tests for validation and successful submit behavior.
 - Added Windows validation script `scripts/s2-1-win-test.ps1` with automated probe scenario coverage (`item-master-packaging`).
 - Resolved Senior Review findings: switched inventory authZ to token-derived server-side role resolution, removed client role claims, fixed packaging profile `is_active` persistence behavior, added missing FK-negative integration test, and expanded frontend boundary/authZ-regression tests.
+
+### Post-Completion Addendum (2026-02-26)
+
+- Added `000006_item_extension_tables` migration introducing `raw_item_details`, `bulk_powder_item_details`, `packing_material_item_details`, and `finished_good_item_details`.
+- Updated SQLite inventory repository to auto-initialize the correct extension row on item create/update based on `item_type`.
+- Updated Item Master UI to provide separate type-specific views (Raw/Bulk/Packing/Finished) within the same `masters.items` route.
+- Updated tests to cover extension-row creation and the new type-specific Item Master UI behavior.
 
 ### File List
 
@@ -128,6 +139,8 @@ so that I can maintain a reliable inventory catalog that downstream procurement,
 - internal/infrastructure/db/migrations/000004_item_master_fields.up.sql (NEW)
 - internal/infrastructure/db/migrations/000005_packaging_profiles.down.sql (NEW)
 - internal/infrastructure/db/migrations/000005_packaging_profiles.up.sql (NEW)
+- internal/infrastructure/db/migrations/000006_item_extension_tables.down.sql (NEW)
+- internal/infrastructure/db/migrations/000006_item_extension_tables.up.sql (NEW)
 - internal/infrastructure/db/migrations_test.go (MODIFIED)
 - internal/infrastructure/db/sqlite_inventory_repository.go (MODIFIED)
 - internal/infrastructure/db/sqlite_inventory_repository_test.go (MODIFIED)
@@ -149,6 +162,7 @@ so that I can maintain a reliable inventory catalog that downstream procurement,
 - 2026-02-25: Implemented Story 2.1 item master and packaging profile backend/frontend slices, added migrations/tests, and marked story Ready for Review.
 - 2026-02-25: Senior Developer Review notes appended.
 - 2026-02-25: Addressed Senior Developer Review action items (authZ redesign, inactive-profile persistence fix, missing FK test, and expanded frontend/backend regression tests).
+- 2026-02-26: Added item extension-table migration (`000006`), repository auto-initialization of extension rows, and separate Item Master type views within `masters.items`; reran Go/frontend tests and build.
 
 ## Senior Developer Review (AI)
 

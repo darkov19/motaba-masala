@@ -104,13 +104,18 @@ function resolveAuthToken(): string | undefined {
     }
 }
 
-export async function listItems(activeOnly = true): Promise<ItemMaster[]> {
+export async function listItems(activeOnly = true, itemType?: ItemMaster["item_type"], search?: string): Promise<ItemMaster[]> {
     const fn = getBinding().ListItems;
     if (typeof fn !== "function") {
         return [];
     }
     try {
-        return await fn({ active_only: activeOnly, auth_token: resolveAuthToken() });
+        return await fn({
+            active_only: activeOnly,
+            item_type: itemType,
+            search: search?.trim() || undefined,
+            auth_token: resolveAuthToken(),
+        });
     } catch (error) {
         throw mapServiceError(error);
     }

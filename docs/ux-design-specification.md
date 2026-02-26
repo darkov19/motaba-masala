@@ -294,6 +294,7 @@ These components provide visual feedback and recovery options for system stabili
 - **Admin:** Collapsible Sidebar (Left) with full menu tree.
 - **Data Entry:** Simplified Sidebar (Icons only or limited menu) to reduce cognitive load.
 - **Shared Contract:** Both variants use the same underlying route IDs and RBAC checks; the difference is presentation density, not route ownership.
+- **Item Master Behavior:** `masters.items` remains a single route, but the page uses four explicit type views (`Raw Master`, `Bulk Powder Master`, `Packing Material Master`, `Finished Goods Master`) to provide separate operational workflows without fragmenting canonical item identity.
 
 **Data Display:**
 
@@ -314,6 +315,7 @@ These components provide visual feedback and recovery options for system stabili
 - **Auto-focus:** First field focuses on page load.
 - **Tab Order:** Logical flow (Top-Left → Bottom-Right).
 - **Scanner:** Input fields for items must accept rapid barcode input (simulated keystrokes).
+- **Conditional Fields:** Packing-material subtype fields appear only in the `Packing Material Master` view and are hidden for other item-type views.
 
 ---
 

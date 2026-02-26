@@ -39,32 +39,85 @@ It aligns specifically with the architecture mapping for Epic 2 (`internal/domai
 
 ### Services and Modules
 
-| Service/Module | Responsibilities | Inputs | Outputs/Side Effects | Owner |
-| --- | --- | --- | --- | --- |
-| `ItemMasterService` | Create/update/archive item masters; enforce type/base-unit constraints and uniqueness checks | Item DTO (name, code, type, base_unit, thresholds, flags) | Persisted item records; validation errors; audit events | Backend (Go app layer) |
-| `UnitConversionService` | Resolve and validate conversions between buying/usage/display units with precision-safe math | Source unit, target unit, quantity, item/base unit metadata | Converted quantity, precision/rounding validation results | Domain service |
-| `RecipeService` | Manage BOM headers/details for bulk products and expected wastage percentages | Recipe header + component lines (item refs, quantities, units, wastage%) | Persisted recipe and components; version/update audit | Backend (Go app layer) |
-| `PackagingProfileService` | Create/update profile definitions that map one packing mode to multiple packing-material components and per-unit quantities | Profile header + component lines (packing material item refs, qty per unit) | Persisted profile mappings used by packing deduction flows | Backend (Go app layer) |
-| `PartyMasterService` | CRUD for suppliers/customers and operational metadata | Party DTO (type, name, contacts, lead_time, status) | Persisted party records; searchable listings | Backend (Go app layer) |
-| `MasterValidationPolicy` | Shared cross-entity rules (mandatory fields, status constraints, referential integrity) | Candidate mutations across master entities | Consistent validation outcomes and normalized error payloads | Domain policy |
-| `MasterAdminUI` | Role-aware CRUD screens and keyboard-first data-entry forms for masters | Wails binding/RPC responses + operator input | Ant Design tables/forms, inline validation, optimistic feedback | Frontend |
+| Service/Module            | Responsibilities                                                                                                            | Inputs                                                                      | Outputs/Side Effects                                            | Owner                  |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------- |
+| `ItemMasterService`       | Create/update/archive item masters; enforce type/base-unit constraints and uniqueness checks                                | Item DTO (name, code, type, base_unit, thresholds, flags)                   | Persisted item records; validation errors; audit events         | Backend (Go app layer) |
+| `UnitConversionService`   | Resolve and validate conversions between buying/usage/display units with precision-safe math                                | Source unit, target unit, quantity, item/base unit metadata                 | Converted quantity, precision/rounding validation results       | Domain service         |
+| `RecipeService`           | Manage BOM headers/details for bulk products and expected wastage percentages                                               | Recipe header + component lines (item refs, quantities, units, wastage%)    | Persisted recipe and components; version/update audit           | Backend (Go app layer) |
+| `PackagingProfileService` | Create/update profile definitions that map one packing mode to multiple packing-material components and per-unit quantities | Profile header + component lines (packing material item refs, qty per unit) | Persisted profile mappings used by packing deduction flows      | Backend (Go app layer) |
+| `PartyMasterService`      | CRUD for suppliers/customers and operational metadata                                                                       | Party DTO (type, name, contacts, lead_time, status)                         | Persisted party records; searchable listings                    | Backend (Go app layer) |
+| `MasterValidationPolicy`  | Shared cross-entity rules (mandatory fields, status constraints, referential integrity)                                     | Candidate mutations across master entities                                  | Consistent validation outcomes and normalized error payloads    | Domain policy          |
+| `MasterAdminUI`           | Role-aware CRUD screens and keyboard-first data-entry forms for masters                                                     | Wails binding/RPC responses + operator input                                | Ant Design tables/forms, inline validation, optimistic feedback | Frontend               |
 
 ### Data Models and Contracts
 
-Normalized entities derived from Epic 2 stories and architecture mapping:
+Current implemented schema (Story 2.1 baseline in this repository):
 
 `items`
-- `id` (UUID, PK)
-- `item_code` (TEXT, UNIQUE, required)
+
+- `id` (INTEGER, PK, autoincrement)
+- `sku` (TEXT, UNIQUE, required)
 - `name` (TEXT, required)
 - `item_type` (TEXT enum: `RAW`, `BULK_POWDER`, `PACKING_MATERIAL`, `FINISHED_GOOD`)
 - `item_subtype` (TEXT, nullable; used primarily when `item_type = PACKING_MATERIAL`, e.g., `JAR_BODY`, `JAR_LID`, `CUP_STICKER`)
 - `base_unit` (TEXT, required; canonical storage unit)
+- `minimum_stock` (REAL, default `0`)
 - `is_active` (BOOLEAN, default true)
-- `reorder_level` (DECIMAL(18,4), nullable)
-- `created_at`, `updated_at` (TIMESTAMP)
+- `created_at`, `updated_at` (DATETIME)
+- Legacy compatibility aliases still persisted:
+    - `category` (TEXT alias of `item_type`)
+    - `unit` (TEXT alias of `base_unit`)
+
+`raw_item_details`
+
+- `item_id` (INTEGER, PK, FK -> `items.id`, cascade delete)
+- `handling_notes` (TEXT, default empty string)
+- `created_at`, `updated_at` (DATETIME)
+
+`bulk_powder_item_details`
+
+- `item_id` (INTEGER, PK, FK -> `items.id`, cascade delete)
+- `processing_notes` (TEXT, default empty string)
+- `created_at`, `updated_at` (DATETIME)
+
+`packing_material_item_details`
+
+- `item_id` (INTEGER, PK, FK -> `items.id`, cascade delete)
+- `packaging_notes` (TEXT, default empty string)
+- `created_at`, `updated_at` (DATETIME)
+
+`finished_good_item_details`
+
+- `item_id` (INTEGER, PK, FK -> `items.id`, cascade delete)
+- `sales_notes` (TEXT, default empty string)
+- `created_at`, `updated_at` (DATETIME)
+
+`packaging_profiles`
+
+- `id` (INTEGER, PK, autoincrement)
+- `name` (TEXT, UNIQUE, required)
+- `pack_mode` (TEXT, required)
+- `is_active` (BOOLEAN, default true)
+- `created_at`, `updated_at` (DATETIME)
+
+`packaging_profile_components`
+
+- `id` (INTEGER, PK, autoincrement)
+- `profile_id` (INTEGER, FK -> `packaging_profiles.id`, required, cascade delete)
+- `packing_material_item_id` (INTEGER, FK -> `items.id`, required; expected item type `PACKING_MATERIAL`)
+- `qty_per_unit` (REAL, required, check `> 0`)
+- `created_at` (DATETIME)
+- Unique constraint on (`profile_id`, `packing_material_item_id`)
+
+Planned Epic 2 entities (not yet implemented in current schema):
+
+- `unit_conversions`
+- `recipes`
+- `recipe_components`
+- `parties`
 
 `unit_conversions`
+
 - `id` (UUID, PK)
 - `item_id` (UUID, FK -> `items.id`, nullable when global conversion applies)
 - `from_unit` (TEXT, required)
@@ -75,6 +128,7 @@ Normalized entities derived from Epic 2 stories and architecture mapping:
 - Unique constraint on (`item_id`, `from_unit`, `to_unit`)
 
 `recipes`
+
 - `id` (UUID, PK)
 - `recipe_code` (TEXT, UNIQUE, required)
 - `output_item_id` (UUID, FK -> `items.id`, required; should reference `BULK_POWDER`)
@@ -84,6 +138,7 @@ Normalized entities derived from Epic 2 stories and architecture mapping:
 - `created_at`, `updated_at` (TIMESTAMP)
 
 `recipe_components`
+
 - `id` (UUID, PK)
 - `recipe_id` (UUID, FK -> `recipes.id`, required)
 - `input_item_id` (UUID, FK -> `items.id`, required)
@@ -92,6 +147,7 @@ Normalized entities derived from Epic 2 stories and architecture mapping:
 - Unique constraint on (`recipe_id`, `line_no`)
 
 `parties`
+
 - `id` (UUID, PK)
 - `party_type` (TEXT enum: `SUPPLIER`, `CUSTOMER`)
 - `name` (TEXT, required)
@@ -102,78 +158,74 @@ Normalized entities derived from Epic 2 stories and architecture mapping:
 - `is_active` (BOOLEAN, default true)
 - `created_at`, `updated_at` (TIMESTAMP)
 
-`packaging_profiles`
-- `id` (UUID, PK)
-- `profile_code` (TEXT, UNIQUE, required)
-- `name` (TEXT, required)
-- `pack_output_item_id` (UUID, FK -> `items.id`, required; expected item type `FINISHED_GOOD`)
-- `is_active` (BOOLEAN, default true)
-- `created_at`, `updated_at` (TIMESTAMP)
-
-`packaging_profile_components`
-- `id` (UUID, PK)
-- `profile_id` (UUID, FK -> `packaging_profiles.id`, required)
-- `packing_material_item_id` (UUID, FK -> `items.id`, required; expected item type `PACKING_MATERIAL`)
-- `qty_per_unit` (DECIMAL(18,4), required)
-- `line_no` (INTEGER, required)
-- Unique constraint on (`profile_id`, `line_no`)
-
 Contract notes:
+
 - Internal calculations should use base-unit quantities; UI-level units are converted via `UnitConversionService`.
 - Recipe components should be stored in normalized quantities to avoid repeated conversion drift.
 - Packaging profile components should be persisted as normalized per-unit quantities and consumed atomically in packing transactions.
 - Foreign-key enforcement and unique constraints are mandatory to prevent orphaned BOM lines and duplicate masters.
+- Current implementation intentionally uses one canonical `items` master plus type-specific extension tables for category-specific metadata growth.
+- Current `packaging_profiles` does not yet include explicit `pack_output_item_id`; this remains a planned enhancement for later packing/sales stories.
 
 ### APIs and Interfaces
 
 Primary application interfaces (Wails bindings / RPC service contracts):
 
-| Method | Signature / Path | Request Model (summary) | Response Model (summary) | Error Cases |
-| --- | --- | --- | --- | --- |
-| `CreateItem` | `ItemService.CreateItem(input)` | `name, item_code, item_type, base_unit, reorder_level` | `item_id, created_at` | validation failed, duplicate code/name, unauthorized |
-| `UpdateItem` | `ItemService.UpdateItem(id, patch)` | mutable fields + optimistic lock token (`updated_at`) | updated item snapshot | not found, optimistic conflict, validation failed |
-| `ListItems` | `ItemService.ListItems(filter)` | type/status/search/paging | paged items list | unauthorized |
-| `CreateConversionRule` | `UnitService.CreateRule(input)` | `item_id?`, `from_unit`, `to_unit`, `factor`, precision | conversion rule id | invalid factor, duplicate rule |
-| `ConvertQuantity` | `UnitService.Convert(input)` | `item_id?`, `qty`, `from_unit`, `to_unit` | `qty_converted`, `precision_meta` | rule missing, precision overflow |
-| `CreateRecipe` | `RecipeService.CreateRecipe(input)` | header + components array | `recipe_id` | invalid output item type, duplicate line, missing component item |
-| `UpdateRecipe` | `RecipeService.UpdateRecipe(id, input)` | updated header/components + lock token | updated recipe snapshot | not found, optimistic conflict |
-| `ListRecipes` | `RecipeService.ListRecipes(filter)` | output item/status/search | paged recipes | unauthorized |
-| `CreateParty` | `PartyService.CreateParty(input)` | `party_type`, `name`, contact, lead_time | `party_id` | validation failed, duplicate name policy violation |
-| `ListParties` | `PartyService.ListParties(filter)` | type/status/search/paging | paged parties list | unauthorized |
-| `CreatePackagingProfile` | `PackagingProfileService.CreateProfile(input)` | header + component array (`packing_material_item_id`, `qty_per_unit`) | `profile_id` | invalid component type, duplicate line, missing component |
-| `ListPackagingProfiles` | `PackagingProfileService.ListProfiles(filter)` | status/search/output item | paged profiles list | unauthorized |
+| Method                   | Signature / Path                                 | Request Model (summary)                                                                  | Response Model (summary)          | Error Cases                                                                            |
+| ------------------------ | ------------------------------------------------ | ---------------------------------------------------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------- |
+| `CreateItemMaster`       | `InventoryService.CreateItemMaster(input)`       | `name, sku, item_type, base_unit, item_subtype?, minimum_stock?, is_active?`             | persisted item snapshot           | validation failed, duplicate SKU, unauthorized/forbidden                               |
+| `UpdateItemMaster`       | `InventoryService.UpdateItemMaster(input)`       | mutable fields + optimistic lock token (`updated_at`)                                    | updated item snapshot             | not found, optimistic conflict, validation failed, unauthorized/forbidden              |
+| `ListItems`              | `InventoryService.ListItems(filter)`             | `active_only?, item_type?, search?`                                                      | item list                         | unauthorized/forbidden                                                                 |
+| `CreateConversionRule`   | `UnitService.CreateRule(input)`                  | `item_id?`, `from_unit`, `to_unit`, `factor`, precision                                  | conversion rule id                | invalid factor, duplicate rule                                                         |
+| `ConvertQuantity`        | `UnitService.Convert(input)`                     | `item_id?`, `qty`, `from_unit`, `to_unit`                                                | `qty_converted`, `precision_meta` | rule missing, precision overflow                                                       |
+| `CreateRecipe`           | `RecipeService.CreateRecipe(input)`              | header + components array                                                                | `recipe_id`                       | invalid output item type, duplicate line, missing component item                       |
+| `UpdateRecipe`           | `RecipeService.UpdateRecipe(id, input)`          | updated header/components + lock token                                                   | updated recipe snapshot           | not found, optimistic conflict                                                         |
+| `ListRecipes`            | `RecipeService.ListRecipes(filter)`              | output item/status/search                                                                | paged recipes                     | unauthorized                                                                           |
+| `CreateParty`            | `PartyService.CreateParty(input)`                | `party_type`, `name`, contact, lead_time                                                 | `party_id`                        | validation failed, duplicate name policy violation                                     |
+| `ListParties`            | `PartyService.ListParties(filter)`               | type/status/search/paging                                                                | paged parties list                | unauthorized                                                                           |
+| `CreatePackagingProfile` | `InventoryService.CreatePackagingProfile(input)` | `name, pack_mode, is_active?, components[]` (`packing_material_item_id`, `qty_per_unit`) | persisted profile snapshot        | invalid component type, duplicate component, missing component, unauthorized/forbidden |
+| `ListPackagingProfiles`  | `InventoryService.ListPackagingProfiles(filter)` | `active_only?, search?, pack_mode?`                                                      | profile list                      | unauthorized/forbidden                                                                 |
 
 Authorization interface expectations:
+
 - Admin: full CRUD on all master domains.
-- Data Entry Operator: read access to masters needed for operational forms; create/update scope per policy.
+- Data Entry Operator: read access to masters needed for operational forms; master-data writes are backend-denied in current implementation.
 
 ### Workflows and Sequencing
 
 Master setup sequencing for Epic 2:
 
 1. Item master configuration
-- Admin/Data Entry opens Item Master screen.
+
+- Admin manages item writes through one route (`masters.items`) with separate type-specific views: Raw, Bulk Powder, Packing Material, and Finished Goods.
+- Data Entry role uses the same route for read/list lookup only.
 - Create each item with canonical `item_type` and `base_unit`.
+- Type-specific extension rows are initialized in their corresponding details table during create/update flows.
 - System validates uniqueness and enum constraints before commit.
 
 2. Conversion rule setup
+
 - For applicable items, define unit conversion from operational units (for example grams) to base units (KG).
 - System validates non-zero factors and bidirectional consistency rules where configured.
 
 3. Packaging profile setup (for composite pack consumption)
+
 - Define reusable pack profiles (for example `Jar Pack`) with required packing-material components and per-unit quantities.
 - System validates that all referenced components are active `PACKING_MATERIAL` items.
 
 4. Recipe/BOM definition
+
 - User selects bulk output item and defines standard output quantity.
 - User adds component lines (raw items + normalized quantities) and expected wastage %.
 - System validates component references and persists recipe header/details transactionally.
 
 5. Supplier/customer registration
+
 - Admin creates supplier/customer records with contacts and optional supplier lead-time.
 - Records become available as references for inbound/outbound workflows in later epics.
 
 6. Operational consumption readiness check
+
 - Downstream modules query active items, conversions, recipes, and parties.
 - Missing masters block dependent transaction creation with actionable validation errors.
 
@@ -211,22 +263,23 @@ Master setup sequencing for Epic 2:
 
 Primary dependencies and integration points discovered from repository manifests:
 
-| Dependency / Integration | Version / Constraint | Purpose in Epic 2 | Integration Notes |
-| --- | --- | --- | --- |
-| Go toolchain | `1.26` | Backend domain/app services for master data | Defined in `go.mod`; server-side validation and transactions |
-| Wails | `github.com/wailsapp/wails/v2 v2.11.0` | Desktop shell + frontend/backend bridge | Master CRUD exposed through Wails bindings and LAN client proxy pattern |
-| SQLite driver | `github.com/mattn/go-sqlite3 v1.14.34` | Persistence for items, recipes, parties, conversion rules | Single source of truth on server node |
-| DB migrations | `github.com/golang-migrate/migrate/v4 v4.18.2` | Versioned schema evolution for master tables | Migration-first schema management |
-| JWT library | `github.com/golang-jwt/jwt/v5 v5.3.1` | Session/auth token support for role-aware access | Supports RBAC enforcement boundaries |
-| Crypto primitives | `golang.org/x/crypto v0.35.0` | Password hashing/security primitives | Shared security baseline from core architecture |
-| React | `^19.0.0` | Master-data UI screens | Frontend consumes backend interfaces via bindings |
-| React Router | `^6.30.3` | Navigation across master modules | Route-level role gating and form flows |
-| Ant Design | `^6.2.1` | Form/table components for data-heavy CRUD | Keyboard-first data-entry UX support |
-| TanStack Query | `^5.66.0` | Server-state caching/invalidation for master lists | Improves responsiveness for repeated master lookups |
-| Axios | `^1.7.9` | HTTP transport utility (where applicable in client networking) | Used in frontend data-access utilities |
-| Vitest + Testing Library | `^4.0.18`, `^16.3.0` | Unit/component test harness for master forms/services | Supports AC verification for validation and error UX |
+| Dependency / Integration | Version / Constraint                           | Purpose in Epic 2                                              | Integration Notes                                                       |
+| ------------------------ | ---------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Go toolchain             | `1.26`                                         | Backend domain/app services for master data                    | Defined in `go.mod`; server-side validation and transactions            |
+| Wails                    | `github.com/wailsapp/wails/v2 v2.11.0`         | Desktop shell + frontend/backend bridge                        | Master CRUD exposed through Wails bindings and LAN client proxy pattern |
+| SQLite driver            | `github.com/mattn/go-sqlite3 v1.14.34`         | Persistence for items, recipes, parties, conversion rules      | Single source of truth on server node                                   |
+| DB migrations            | `github.com/golang-migrate/migrate/v4 v4.18.2` | Versioned schema evolution for master tables                   | Migration-first schema management                                       |
+| JWT library              | `github.com/golang-jwt/jwt/v5 v5.3.1`          | Session/auth token support for role-aware access               | Supports RBAC enforcement boundaries                                    |
+| Crypto primitives        | `golang.org/x/crypto v0.35.0`                  | Password hashing/security primitives                           | Shared security baseline from core architecture                         |
+| React                    | `^19.0.0`                                      | Master-data UI screens                                         | Frontend consumes backend interfaces via bindings                       |
+| React Router             | `^6.30.3`                                      | Navigation across master modules                               | Route-level role gating and form flows                                  |
+| Ant Design               | `^6.2.1`                                       | Form/table components for data-heavy CRUD                      | Keyboard-first data-entry UX support                                    |
+| TanStack Query           | `^5.66.0`                                      | Server-state caching/invalidation for master lists             | Improves responsiveness for repeated master lookups                     |
+| Axios                    | `^1.7.9`                                       | HTTP transport utility (where applicable in client networking) | Used in frontend data-access utilities                                  |
+| Vitest + Testing Library | `^4.0.18`, `^16.3.0`                           | Unit/component test harness for master forms/services          | Supports AC verification for validation and error UX                    |
 
 External integrations in scope for this epic:
+
 - No third-party SaaS/internet integrations required.
 - Internal integrations are with existing authentication/RBAC middleware, migration pipeline, and audit logging infrastructure established in Epic 1.
 
@@ -247,25 +300,29 @@ External integrations in scope for this epic:
 
 ## Traceability Mapping
 
-| AC | Spec Section(s) | Component(s)/API(s) | Test Idea |
-| --- | --- | --- | --- |
-| AC1 | Detailed Design -> Services and Modules; Data Models and Contracts | `ItemMasterService.CreateItem`, `items` table | Create valid item and verify DB row + response payload |
-| AC2 | Data Models and Contracts; APIs and Interfaces | `CreateItem` validation policy | Attempt create with invalid `item_type`; expect validation error |
-| AC3 | Detailed Design -> Services; APIs and Interfaces | `UnitConversionService.ConvertQuantity` | Convert 500 g to KG and assert `0.5` |
-| AC4 | Non-Functional Requirements -> Performance/Reliability; Data Models | `UnitConversionService`, `unit_conversions` precision fields | Execute edge conversions and assert scale/rounding bounds |
-| AC5 | Detailed Design -> Data Models; Workflows and Sequencing | `RecipeService.CreateRecipe`, `recipes`, `recipe_components` | Create BOM header+lines and verify transactional persistence |
-| AC6 | Data Models and Contracts | `recipes.expected_wastage_pct` | Save recipe with wastage % and validate stored value/range |
-| AC7 | Detailed Design -> Party service and models | `PartyService.CreateParty` (`SUPPLIER`) | Create supplier with lead time/contact and verify retrieval |
-| AC8 | Detailed Design -> Party service and models | `PartyService.CreateParty` (`CUSTOMER`) | Create customer with contact and verify retrieval |
-| AC9 | Data Models and Contracts; Reliability | DB FK constraints + validation policy | Submit recipe component with unknown item id; expect rejection |
-| AC10 | APIs and Interfaces; Workflows and Sequencing | `ListItems`, `ListRecipes`, `ListParties` | Query masters and confirm results available for dependent modules |
-| AC11 | Data Models and Contracts | `items.item_subtype` | Create packing-material item with subtype and verify persistence/query |
-| AC12 | Services and Modules; APIs and Interfaces | `PackagingProfileService.CreatePackagingProfile`, `packaging_profiles`, `packaging_profile_components` | Create jar profile with 3 components and verify mapping integrity |
+| AC   | Spec Section(s)                                                     | Component(s)/API(s)                                                                             | Test Idea                                                              |
+| ---- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| AC1  | Detailed Design -> Services and Modules; Data Models and Contracts  | `InventoryService.CreateItemMaster`, `items` table                                              | Create valid item and verify DB row + response payload                 |
+| AC2  | Data Models and Contracts; APIs and Interfaces                      | `CreateItemMaster` validation policy                                                            | Attempt create with invalid `item_type`; expect validation error       |
+| AC3  | Detailed Design -> Services; APIs and Interfaces                    | `UnitConversionService.ConvertQuantity`                                                         | Convert 500 g to KG and assert `0.5`                                   |
+| AC4  | Non-Functional Requirements -> Performance/Reliability; Data Models | `UnitConversionService`, `unit_conversions` precision fields                                    | Execute edge conversions and assert scale/rounding bounds              |
+| AC5  | Detailed Design -> Data Models; Workflows and Sequencing            | `RecipeService.CreateRecipe`, `recipes`, `recipe_components`                                    | Create BOM header+lines and verify transactional persistence           |
+| AC6  | Data Models and Contracts                                           | `recipes.expected_wastage_pct`                                                                  | Save recipe with wastage % and validate stored value/range             |
+| AC7  | Detailed Design -> Party service and models                         | `PartyService.CreateParty` (`SUPPLIER`)                                                         | Create supplier with lead time/contact and verify retrieval            |
+| AC8  | Detailed Design -> Party service and models                         | `PartyService.CreateParty` (`CUSTOMER`)                                                         | Create customer with contact and verify retrieval                      |
+| AC9  | Data Models and Contracts; Reliability                              | DB FK constraints + validation policy                                                           | Submit recipe component with unknown item id; expect rejection         |
+| AC10 | APIs and Interfaces; Workflows and Sequencing                       | `ListItems`, `ListRecipes`, `ListParties`                                                       | Query masters and confirm results available for dependent modules      |
+| AC11 | Data Models and Contracts                                           | `items.item_subtype`                                                                            | Create packing-material item with subtype and verify persistence/query |
+| AC12 | Services and Modules; APIs and Interfaces                           | `InventoryService.CreatePackagingProfile`, `packaging_profiles`, `packaging_profile_components` | Create jar profile with 3 components and verify mapping integrity      |
+
+PRD traceability notes:
+- `FR-001A (Item Master Structure)` maps primarily to AC1, AC2, and AC11 plus Item Master workflow sequencing (single canonical item master with type-specific views).
+- `FR-009A (Composite Packing Consumption Profiles)` maps primarily to AC12 and related packaging-profile data contracts.
 
 ## Risks, Assumptions, Open Questions
 
 - Risk: Inconsistent or duplicate item definitions (same material entered under variant names/codes) could degrade downstream stock and valuation accuracy.
-  Mitigation/Next step: Enforce uniqueness policies (`item_code`, normalized-name checks), introduce controlled vocab where needed, and add duplicate-detection validation tests.
+  Mitigation/Next step: Enforce uniqueness policies (`sku`, normalized-name checks), introduce controlled vocab where needed, and add duplicate-detection validation tests.
 - Risk: Incorrect conversion factors can silently corrupt quantity calculations across procurement/production/packing.
   Mitigation/Next step: Require explicit conversion-rule review at setup, add boundary/unit tests for common conversions, and expose conversion audit logs.
 - Risk: Recipe/BOM changes without governance may cause operational confusion and mismatch between expected and actual yield.
@@ -285,7 +342,7 @@ External integrations in scope for this epic:
 - Recipe validation tests for header/detail coherence, minimum component count, and expected wastage range.
 
 - Integration tests:
-- Repository and migration tests for `items`, `unit_conversions`, `recipes`, `recipe_components`, and `parties` schema constraints.
+- Repository and migration tests for implemented master tables (`items`, `packaging_profiles`, `packaging_profile_components`, and item extension tables) plus future Epic 2 tables (`unit_conversions`, `recipes`, `recipe_components`, `parties`) as they are introduced.
 - Transactional tests ensuring recipe header/details persist atomically and rollback on invalid component references.
 - RBAC tests for master CRUD/list API authorization boundaries.
 
@@ -310,3 +367,4 @@ External integrations in scope for this epic:
 - Story 2.2B: [Med][Bug][Resolved 2026-02-25] Source frontend guard role from trusted authenticated context/session binding instead of local/session storage role keys. Ref: `internal/app/app.go`, `cmd/server/main.go`, `frontend/src/App.tsx`, `frontend/src/shell/rbac.ts`
 - Story 2.2B: [Med][Bug][Resolved 2026-02-25] Add regression test that tampered storage role values do not elevate effective frontend guard role beyond authenticated session context. Ref: `frontend/src/__tests__/AppShellRBAC.test.tsx`
 - Story 2.2B: [Low][TechDebt][Resolved 2026-02-25] Replace deprecated Ant Design prop usage (`Space direction`, `Alert message`) with supported API to reduce warning noise and upgrade risk. Ref: `frontend/src/shell/AppShell.tsx`, `frontend/src/App.tsx`, `frontend/src/shell/RoleShellNavigation.tsx`
+- Story 2.1: [Med][Enhancement][Resolved 2026-02-26] Added type-specific item extension tables and separated Item Master UI views by item type while retaining one canonical `items` master. Ref: `internal/infrastructure/db/migrations/000006_item_extension_tables.up.sql`, `internal/infrastructure/db/sqlite_inventory_repository.go`, `frontend/src/components/forms/ItemMasterForm.tsx`

@@ -15,6 +15,36 @@ type SqliteInventoryRepository struct {
 	db *sql.DB
 }
 
+func itemDetailsTable(itemType domainInventory.ItemType) string {
+	switch itemType {
+	case domainInventory.ItemTypeRaw:
+		return "raw_item_details"
+	case domainInventory.ItemTypeBulkPowder:
+		return "bulk_powder_item_details"
+	case domainInventory.ItemTypePackingMaterial:
+		return "packing_material_item_details"
+	case domainInventory.ItemTypeFinishedGood:
+		return "finished_good_item_details"
+	default:
+		return ""
+	}
+}
+
+func (r *SqliteInventoryRepository) ensureItemDetailsRow(item *domainInventory.Item) error {
+	if item == nil || item.ID <= 0 {
+		return nil
+	}
+
+	table := itemDetailsTable(item.ItemType)
+	if table == "" {
+		return nil
+	}
+
+	statement := fmt.Sprintf("INSERT OR IGNORE INTO %s (item_id) VALUES (?)", table)
+	_, err := r.db.ExecContext(context.Background(), statement, item.ID)
+	return err
+}
+
 func NewSqliteInventoryRepository(db *sql.DB) *SqliteInventoryRepository {
 	return &SqliteInventoryRepository{db: db}
 }
@@ -46,7 +76,8 @@ func (r *SqliteInventoryRepository) CreateItem(item *domainInventory.Item) error
 		return err
 	}
 	item.ID = id
-	return nil
+
+	return r.ensureItemDetailsRow(item)
 }
 
 func (r *SqliteInventoryRepository) UpdateItem(item *domainInventory.Item) error {
@@ -73,7 +104,11 @@ func (r *SqliteInventoryRepository) UpdateItem(item *domainInventory.Item) error
 		return domainErrors.ErrConcurrencyConflict
 	}
 
-	return r.db.QueryRowContext(context.Background(), "SELECT updated_at FROM items WHERE id = ?", item.ID).Scan(&item.UpdatedAt)
+	if err := r.db.QueryRowContext(context.Background(), "SELECT updated_at FROM items WHERE id = ?", item.ID).Scan(&item.UpdatedAt); err != nil {
+		return err
+	}
+
+	return r.ensureItemDetailsRow(item)
 }
 
 func (r *SqliteInventoryRepository) ListItems(filter domainInventory.ItemListFilter) ([]domainInventory.Item, error) {

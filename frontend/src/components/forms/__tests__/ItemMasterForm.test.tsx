@@ -35,36 +35,41 @@ describe("ItemMasterForm", () => {
         const onDirty = vi.fn();
         render(<ItemMasterForm onDirtyChange={onDirty} />);
 
+        fireEvent.click(screen.getByText("Packing Material Master"));
         fireEvent.click(screen.getByRole("button", { name: "Create Item" }));
         expect(await screen.findByText("Item name is required")).toBeInTheDocument();
 
         fireEvent.change(screen.getByPlaceholderText("Enter item name"), { target: { value: "Jar Lid" } });
-        fireEvent.mouseDown(screen.getByRole("combobox"));
-        fireEvent.click(await screen.findByTitle("PACKING_MATERIAL"));
         fireEvent.change(screen.getByPlaceholderText("kg, g, pcs, ltr..."), { target: { value: "pcs" } });
         fireEvent.change(screen.getByPlaceholderText("JAR_BODY / JAR_LID / CUP_STICKER"), { target: { value: "JAR_LID" } });
 
         fireEvent.click(screen.getByRole("button", { name: "Create Item" }));
         await waitFor(() => {
             expect(createItemMock).toHaveBeenCalledTimes(1);
+            expect(createItemMock).toHaveBeenCalledWith(expect.objectContaining({
+                name: "Jar Lid",
+                item_type: "PACKING_MATERIAL",
+            }));
         });
     }, 15000);
 
     it("loads existing row and submits update flow", async () => {
         const updatedAt = new Date().toISOString();
-        listItemsMock.mockResolvedValue([
-            {
-                id: 22,
-                sku: "SKU-22",
-                name: "Jar Body",
-                item_type: "PACKING_MATERIAL",
-                base_unit: "pcs",
-                item_subtype: "JAR_BODY",
-                minimum_stock: 0,
-                is_active: true,
-                updated_at: updatedAt,
-            },
-        ]);
+        listItemsMock.mockImplementation((_: unknown, itemType: unknown) => Promise.resolve(
+            itemType === "PACKING_MATERIAL"
+                ? [{
+                    id: 22,
+                    sku: "SKU-22",
+                    name: "Jar Body",
+                    item_type: "PACKING_MATERIAL",
+                    base_unit: "pcs",
+                    item_subtype: "JAR_BODY",
+                    minimum_stock: 0,
+                    is_active: true,
+                    updated_at: updatedAt,
+                }]
+                : [],
+        ));
         updateItemMock.mockResolvedValue({
             id: 22,
             sku: "SKU-22",
@@ -80,6 +85,7 @@ describe("ItemMasterForm", () => {
         const onDirty = vi.fn();
         render(<ItemMasterForm onDirtyChange={onDirty} />);
 
+        fireEvent.click(screen.getByText("Packing Material Master"));
         fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
         const nameInput = screen.getByPlaceholderText("Enter item name");
         fireEvent.change(nameInput, { target: { value: "Jar Body Updated" } });

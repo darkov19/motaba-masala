@@ -3,8 +3,8 @@
     <epicId>2</epicId>
     <storyId>1</storyId>
     <title>Item Master Management</title>
-    <status>drafted</status>
-    <generatedAt>2026-02-25</generatedAt>
+    <status>done</status>
+    <generatedAt>2026-02-26</generatedAt>
     <generator>BMAD Story Context Workflow</generator>
     <sourceStoryPath>docs/stories/2-1-item-master-management.md</sourceStoryPath>
   </metadata>
@@ -13,17 +13,17 @@
     <asA>Store Keeper</asA>
     <iWant>to create and manage items with specific types, base units, and packing-material classifications</iWant>
     <soThat>I can maintain a reliable inventory catalog that downstream procurement, production, and packing workflows can use.</soThat>
-    <tasks>- [ ] Implement Item Master domain and persistence contracts for required fields and supported type enums (AC: 1, 2)
-- [ ] Add create/update/list application service methods for item masters with validation-first flow and explicit error payloads (AC: 1, 2, 5)
-- [ ] Extend item model and storage for optional `item_subtype` used by packing-material classification (AC: 3)
-- [ ] Implement packaging profile domain/persistence model and create/list service paths with component mapping (`packing_material_item_id`, `qty_per_unit`) (AC: 4)
-- [ ] Enforce referential integrity and type constraints for packaging profile components so only active `PACKING_MATERIAL` items are assignable (AC: 4)
-- [ ] Implement list/query endpoints used by downstream workflows to fetch active items and packaging profiles (AC: 5)
-- [ ] Frontend: add/administer Item Master CRUD UI with keyboard-first form flow and inline validation for required fields, enum types, and subtype fields where relevant (AC: 1, 2, 3)
-- [ ] Frontend: add Packaging Profile UI to create and maintain multi-component mappings with per-unit quantities and clear validation feedback (AC: 4)
-- [ ] Tests: add backend unit tests for item type validation, required-field enforcement, subtype rules, and packaging profile component constraints (AC: 1, 2, 3, 4)
-- [ ] Tests: add integration tests for item/profile persistence, FK integrity, and list/query discoverability behavior (AC: 4, 5)
-- [ ] Tests: add frontend component tests for Item Master and Packaging Profile forms, including validation error states and successful submit flows (AC: 1, 2, 3, 4)</tasks>
+    <tasks>- [x] Implement Item Master domain and persistence contracts for required fields and supported type enums (AC: 1, 2)
+- [x] Add create/update/list application service methods for item masters with validation-first flow and explicit error payloads (AC: 1, 2, 5)
+- [x] Extend item model and storage for optional `item_subtype` used by packing-material classification (AC: 3)
+- [x] Implement packaging profile domain/persistence model and create/list service paths with component mapping (`packing_material_item_id`, `qty_per_unit`) (AC: 4)
+- [x] Enforce referential integrity and type constraints for packaging profile components so only active `PACKING_MATERIAL` items are assignable (AC: 4)
+- [x] Implement list/query endpoints used by downstream workflows to fetch active items and packaging profiles (AC: 5)
+- [x] Frontend: add/administer Item Master CRUD UI with keyboard-first form flow, separate type-specific views (Raw/Bulk/Packing/FG), and subtype fields where relevant (AC: 1, 2, 3)
+- [x] Frontend: add Packaging Profile UI to create and maintain multi-component mappings with per-unit quantities and clear validation feedback (AC: 4)
+- [x] Tests: add backend unit tests for item type validation, required-field enforcement, subtype rules, and packaging profile component constraints (AC: 1, 2, 3, 4)
+- [x] Tests: add integration tests for item/profile persistence, FK integrity, and list/query discoverability behavior (AC: 4, 5)
+- [x] Tests: add frontend component tests for Item Master and Packaging Profile forms, including validation error states and successful submit flows (AC: 1, 2, 3, 4)</tasks>
   </story>
 
   <acceptanceCriteria>1. The system allows creation of item master records with required fields (`name`, `item_type`, `base_unit`) and persists them successfully.
@@ -50,13 +50,13 @@
         <path>docs/tech-spec-epic-2.md</path>
         <title>Epic 2 Technical Specification</title>
         <section>Data Models and Contracts</section>
-        <snippet>The `items` model requires enum-constrained `item_type`, required `base_unit`, and nullable `item_subtype` primarily for PACKING_MATERIAL classifications. Packaging profile components are defined as normalized per-unit mappings tied to packing-material item references.</snippet>
+        <snippet>The `items` model requires enum-constrained `item_type`, required `base_unit`, and nullable `item_subtype` primarily for PACKING_MATERIAL classifications. The current implementation uses one canonical `items` master plus type-specific extension tables (`raw_item_details`, `bulk_powder_item_details`, `packing_material_item_details`, `finished_good_item_details`). Packaging profile components are normalized per-unit mappings tied to packing-material item references.</snippet>
       </doc>
       <doc>
         <path>docs/tech-spec-epic-2.md</path>
         <title>Epic 2 Technical Specification</title>
         <section>APIs and Interfaces</section>
-        <snippet>The API contract includes `CreateItem`, `UpdateItem`, and `ListItems` for master data lifecycle and discoverability. It also includes `CreatePackagingProfile` and `ListPackagingProfiles` with explicit error cases for invalid component type, duplicate lines, and missing components.</snippet>
+        <snippet>The current API contract includes `CreateItemMaster`, `UpdateItemMaster`, and `ListItems` for item-master lifecycle and discoverability, plus `CreatePackagingProfile` and `ListPackagingProfiles` with explicit validation/error handling for component-type, duplicates, and missing-item scenarios.</snippet>
       </doc>
       <doc>
         <path>docs/PRD.md</path>
@@ -113,9 +113,9 @@
       <artifact>
         <path>internal/app/inventory/service.go</path>
         <kind>application service</kind>
-        <symbol>func (s *Service) CreateItem / UpdateItem</symbol>
+        <symbol>func (s *Service) CreateItemMaster / UpdateItemMaster / ListItems</symbol>
         <lines>21-42</lines>
-        <reason>Implements validation gateway behavior via write-access enforcement and maps concurrency conflicts to user-safe errors; new master-data commands should preserve this application-layer mediation pattern.</reason>
+        <reason>Implements validation gateway behavior via token-derived role checks, admin-only master writes, and user-safe error mapping; master-data commands should preserve this application-layer mediation pattern.</reason>
       </artifact>
       <artifact>
         <path>internal/infrastructure/db/sqlite_inventory_repository.go</path>
@@ -132,6 +132,13 @@
         <reason>Current `items` schema is authoritative starting point and must be evolved through new migrations for enum-constrained types, base-unit semantics, and subtype support.</reason>
       </artifact>
       <artifact>
+        <path>internal/infrastructure/db/migrations/000006_item_extension_tables.up.sql</path>
+        <kind>database migration</kind>
+        <symbol>CREATE TABLE raw_item_details / bulk_powder_item_details / packing_material_item_details / finished_good_item_details</symbol>
+        <lines>1-31</lines>
+        <reason>Defines extension-table pattern for type-specific item metadata while keeping one canonical `items` master identity.</reason>
+      </artifact>
+      <artifact>
         <path>internal/app/auth/middleware.go</path>
         <kind>authorization policy</kind>
         <symbol>func (s *Service) CheckPermission</symbol>
@@ -139,11 +146,11 @@
         <reason>Role hierarchy (Admin > DataEntryOperator) already exists and should be reused when exposing Item Master and Packaging Profile create/update/list methods.</reason>
       </artifact>
       <artifact>
-        <path>frontend/src/components/forms/GRNForm.tsx</path>
+        <path>frontend/src/components/forms/ItemMasterForm.tsx</path>
         <kind>frontend form pattern</kind>
-        <symbol>GRNForm component (Antd Form rules + submit/reset)</symbol>
-        <lines>59-93</lines>
-        <reason>Demonstrates keyboard-first Ant Design form workflow with inline validation and write-disable behavior, matching UX constraints for new Item Master and Packaging Profile forms.</reason>
+        <symbol>ItemMasterForm component (type-specific segmented views + CRUD form + filtered list)</symbol>
+        <lines>1-243</lines>
+        <reason>Defines the current Item Master UX contract: one route with separate type-specific views (Raw, Bulk Powder, Packing Material, Finished Goods), conditional subtype capture for packing material, and keyboard-first create/update flows.</reason>
       </artifact>
       <artifact>
         <path>internal/infrastructure/db/sqlite_inventory_repository_test.go</path>
@@ -194,7 +201,7 @@
     <constraint>Backend validation is authoritative: required fields and allowed item-type categories must be enforced server-side; frontend validation mirrors UX feedback but cannot replace backend checks.</constraint>
     <constraint>Schema evolution must use embedded migrations; do not mutate existing tables outside migration files.</constraint>
     <constraint>Packaging profile components must reference only active packing-material items and persist per-unit normalized quantities for atomic deduction readiness.</constraint>
-    <constraint>Role boundaries must follow existing RBAC hierarchy (Admin full CRUD, Data Entry constrained operational access) when exposing new master-data operations.</constraint>
+    <constraint>Role boundaries must follow existing RBAC hierarchy (Admin master-data writes; Data Entry read/list access for master lookup) when exposing new master-data operations.</constraint>
     <constraint>Master data must be discoverable through list/query service paths for downstream modules; avoid direct UI-to-repository shortcuts that bypass app services.</constraint>
     <constraint>Update paths should preserve optimistic concurrency semantics (stale-write detection via `updated_at` guards and consistent user-safe conflict errors).</constraint>
     <constraint>Windows story validation script contract is mandatory for this story (`scripts/s2-1-win-test.ps1`) before review handoff.</constraint>
@@ -209,7 +216,7 @@
     <interface>
       <name>inventory.Service</name>
       <kind>application service methods</kind>
-      <signature>CreateItem(item *domainInventory.Item) error; UpdateItem(item *domainInventory.Item) error</signature>
+      <signature>CreateItemMaster(input CreateItemInput) (*domainInventory.Item, error); UpdateItemMaster(input UpdateItemInput) (*domainInventory.Item, error); ListItems(input ListItemsInput) ([]domainInventory.Item, error)</signature>
       <path>internal/app/inventory/service.go</path>
     </interface>
     <interface>
@@ -225,10 +232,10 @@
       <path>internal/app/auth/middleware.go</path>
     </interface>
     <interface>
-      <name>Item Service API (target from spec)</name>
-      <kind>planned service contract</kind>
-      <signature>CreateItem(input); UpdateItem(id, patch); ListItems(filter)</signature>
-      <path>docs/tech-spec-epic-2.md</path>
+      <name>Inventory Service API (implemented master-data contract)</name>
+      <kind>current service contract</kind>
+      <signature>CreateItemMaster(input); UpdateItemMaster(input); ListItems(filter)</signature>
+      <path>internal/app/inventory/service.go</path>
     </interface>
     <interface>
       <name>PackagingProfile Service API (target from spec)</name>

@@ -37,6 +37,9 @@ This document defines the canonical navigation and RBAC contract for the shared 
 2. Path changes require explicit changelog entry and migration note.
 3. Menu composition must bind to `route_id` (not display labels).
 
+Route-specific UI note:
+- `masters.items` hosts four type-specific Item Master views (`RAW`, `BULK_POWDER`, `PACKING_MATERIAL`, `FINISHED_GOOD`) within the same route contract.
+
 ## Module Naming and Route Ownership
 
 | Module Name | Module Key | Owned Routes (IDs) | Primary Story Consumers |

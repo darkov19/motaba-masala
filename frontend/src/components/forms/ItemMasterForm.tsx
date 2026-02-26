@@ -1,5 +1,5 @@
-import { Button, Form, Input, InputNumber, Select, Space, Switch, Table, Tag, message } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { Button, Form, Input, InputNumber, Segmented, Space, Switch, Table, message } from "antd";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createItem, ItemMaster, listItems, updateItem } from "../../services/masterDataApi";
 
 type ItemMasterFormValues = {
@@ -19,16 +19,24 @@ type ItemMasterFormProps = {
     writeDisabled?: boolean;
 };
 
-const itemTypeOptions = [
-    { label: "RAW", value: "RAW" },
-    { label: "BULK_POWDER", value: "BULK_POWDER" },
-    { label: "PACKING_MATERIAL", value: "PACKING_MATERIAL" },
-    { label: "FINISHED_GOOD", value: "FINISHED_GOOD" },
-] as const;
+const typeViews: Array<{ label: string; value: ItemMaster["item_type"] }> = [
+    { label: "Raw Master", value: "RAW" },
+    { label: "Bulk Powder Master", value: "BULK_POWDER" },
+    { label: "Packing Material Master", value: "PACKING_MATERIAL" },
+    { label: "Finished Goods Master", value: "FINISHED_GOOD" },
+];
+
+const typeTitles: Record<ItemMaster["item_type"], string> = {
+    RAW: "Raw Item Master",
+    BULK_POWDER: "Bulk Powder Master",
+    PACKING_MATERIAL: "Packing Material Master",
+    FINISHED_GOOD: "Finished Goods Master",
+};
 
 export function ItemMasterForm({ onDirtyChange, writeDisabled = false }: ItemMasterFormProps) {
     const [form] = Form.useForm<ItemMasterFormValues>();
     const watchedValues = Form.useWatch([], form);
+    const [activeType, setActiveType] = useState<ItemMaster["item_type"]>("RAW");
     const [items, setItems] = useState<ItemMaster[]>([]);
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -38,7 +46,14 @@ export function ItemMasterForm({ onDirtyChange, writeDisabled = false }: ItemMas
         if (!watchedValues) {
             return false;
         }
-        return Object.values(watchedValues).some(value => {
+        const candidateValues = {
+            ...watchedValues,
+            item_type: undefined,
+            is_active: undefined,
+            id: undefined,
+            updated_at: undefined,
+        };
+        return Object.values(candidateValues).some(value => {
             if (typeof value === "number") {
                 return value > 0;
             }
@@ -50,56 +65,57 @@ export function ItemMasterForm({ onDirtyChange, writeDisabled = false }: ItemMas
         onDirtyChange(hasContent);
     }, [hasContent, onDirtyChange]);
 
-    const refresh = async () => {
+    const refresh = useCallback(async () => {
         setLoading(true);
         try {
-            const rows = await listItems(true);
+            const rows = await listItems(true, activeType);
             setItems(rows);
         } catch (error) {
             message.error(error instanceof Error ? error.message : "Failed to load items");
         } finally {
             setLoading(false);
         }
-    };
+    }, [activeType]);
 
     useEffect(() => {
         void refresh();
-    }, []);
+    }, [refresh]);
 
     const resetForm = () => {
         form.resetFields();
-        form.setFieldsValue({ is_active: true, item_type: "RAW", minimum_stock: 0 });
+        form.setFieldsValue({ is_active: true, item_type: activeType, minimum_stock: 0 });
         setEditingId(null);
         onDirtyChange(false);
     };
 
     const onFinish = async (values: ItemMasterFormValues) => {
         setSubmitting(true);
+        const itemType = values.item_type || activeType;
         try {
             if (editingId && values.updated_at) {
                 await updateItem({
                     id: editingId,
                     sku: values.sku,
                     name: values.name,
-                    item_type: values.item_type,
+                    item_type: itemType,
                     base_unit: values.base_unit,
                     item_subtype: values.item_subtype,
                     minimum_stock: values.minimum_stock ?? 0,
                     is_active: values.is_active ?? true,
                     updated_at: values.updated_at,
                 });
-                message.success("Item updated");
+                message.success(`${typeTitles[activeType]} updated`);
             } else {
                 await createItem({
                     sku: values.sku,
                     name: values.name,
-                    item_type: values.item_type,
+                    item_type: itemType,
                     base_unit: values.base_unit,
                     item_subtype: values.item_subtype,
                     minimum_stock: values.minimum_stock ?? 0,
                     is_active: values.is_active ?? true,
                 });
-                message.success("Item created");
+                message.success(`${typeTitles[activeType]} created`);
             }
             resetForm();
             await refresh();
@@ -112,12 +128,28 @@ export function ItemMasterForm({ onDirtyChange, writeDisabled = false }: ItemMas
 
     return (
         <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+            <Segmented
+                block
+                options={typeViews}
+                value={activeType}
+                onChange={value => {
+                    const nextType = value as ItemMaster["item_type"];
+                    setActiveType(nextType);
+                    form.resetFields();
+                    form.setFieldsValue({ is_active: true, item_type: nextType, minimum_stock: 0 });
+                    setEditingId(null);
+                    onDirtyChange(false);
+                }}
+            />
             <Form
                 form={form}
                 layout="vertical"
                 onFinish={onFinish}
-                initialValues={{ is_active: true, item_type: "RAW", minimum_stock: 0 }}
+                initialValues={{ is_active: true, item_type: activeType, minimum_stock: 0 }}
             >
+                <Form.Item label="Master" colon={false}>
+                    <Input value={typeTitles[activeType]} readOnly />
+                </Form.Item>
                 <Form.Item label="Item Name" name="name" rules={[{ required: true, message: "Item name is required" }]}>
                     <Input autoFocus placeholder="Enter item name" />
                 </Form.Item>
@@ -125,13 +157,8 @@ export function ItemMasterForm({ onDirtyChange, writeDisabled = false }: ItemMas
                     <Input placeholder="Optional SKU/code" />
                 </Form.Item>
                 <Space style={{ width: "100%" }} size={12} wrap>
-                    <Form.Item
-                        style={{ minWidth: 220, flex: 1 }}
-                        label="Item Type"
-                        name="item_type"
-                        rules={[{ required: true, message: "Item type is required" }]}
-                    >
-                        <Select options={itemTypeOptions as unknown as { label: string; value: string }[]} />
+                    <Form.Item hidden name="item_type">
+                        <Input />
                     </Form.Item>
                     <Form.Item
                         style={{ minWidth: 220, flex: 1 }}
@@ -144,7 +171,7 @@ export function ItemMasterForm({ onDirtyChange, writeDisabled = false }: ItemMas
                 </Space>
                 <Form.Item shouldUpdate noStyle>
                     {({ getFieldValue }) =>
-                        getFieldValue("item_type") === "PACKING_MATERIAL" ? (
+                        (getFieldValue("item_type") || activeType) === "PACKING_MATERIAL" ? (
                             <Form.Item label="Subtype Tag" name="item_subtype" rules={[{ required: true, message: "Subtype is required for packing material" }]}>
                                 <Input placeholder="JAR_BODY / JAR_LID / CUP_STICKER" />
                             </Form.Item>
@@ -179,7 +206,6 @@ export function ItemMasterForm({ onDirtyChange, writeDisabled = false }: ItemMas
                 pagination={{ pageSize: 8 }}
                 columns={[
                     { title: "Name", dataIndex: "name" },
-                    { title: "Type", dataIndex: "item_type", render: value => <Tag color="blue">{value}</Tag> },
                     { title: "Base Unit", dataIndex: "base_unit" },
                     { title: "Subtype", dataIndex: "item_subtype" },
                     { title: "SKU", dataIndex: "sku" },

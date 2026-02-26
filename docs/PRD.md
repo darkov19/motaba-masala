@@ -57,6 +57,7 @@ The system operates in a **Food Manufacturing** context, specifically Spices.
 **Core Modules (All Essential Flows Included):**
 
 1.  **Masters Management:** Items (Raw, Bulk, Pack, FG), Suppliers, Customers, Recipes (BOM).
+    - Item Master remains one canonical catalog, presented through four operational type-specific views (Raw, Bulk Powder, Packing Material, Finished Goods).
     - Packing material master supports subtype classification (e.g., Jar Body, Lid, Seal/Cup Sticker) and reusable packaging consumption profiles.
 2.  **Procurement:** Purchase Orders & GRN for Raw Spices, Packing Material, and **Third-Party Bulk**.
 3.  **Production (In-House):**
@@ -178,6 +179,7 @@ Unlike standard inventory apps that just count stock, this system models the _tr
 ### 1. Procurement & Inventory
 
 - **FR-001: GRN (Goods Received Note):** Record incoming Raw Materials and Packing Materials.
+- **FR-001A: Item Master Structure:** System shall maintain a single canonical Item Master with type-specific workflows/views for Raw, Bulk Powder, Packing Material, and Finished Goods to support category-specific operations without fragmenting item identity.
 - **FR-002: Lot Tracking:** Assign internal Lot Numbers to incoming raw materials for traceability.
 - **FR-003: Re-order Alerts:** Visual indicators when stock dips below defined minimums.
 - **FR-004: Stock Reconciliation:** Feature to record physical stock counts and adjust system stock with reason codes (e.g., "Audit Found", "Spoilage").
