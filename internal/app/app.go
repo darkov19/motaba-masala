@@ -1,11 +1,14 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -65,6 +68,7 @@ const (
 	envServerProbeAddr     = "MASALA_SERVER_PROBE_ADDR"
 	envLocalSingleMachine  = "MASALA_LOCAL_SINGLE_MACHINE_MODE"
 	serverProbeTimeout     = 1500 * time.Millisecond
+	serverAPITimeout       = 5 * time.Second
 )
 
 // NewApp creates a new App application struct
@@ -339,6 +343,9 @@ func (a *App) GetSessionRole(authToken string) (string, error) {
 	if token == "" {
 		return "", fmt.Errorf("auth token is required")
 	}
+	if !a.isServer && a.sessionRoleResolver == nil {
+		return fetchSessionRoleOverNetwork(token)
+	}
 	if a.sessionRoleResolver == nil {
 		return "", fmt.Errorf("session role resolver is not configured")
 	}
@@ -373,6 +380,9 @@ func normalizeRole(raw string) (domainAuth.Role, error) {
 }
 
 func (a *App) Login(username, password string) (AuthTokenResult, error) {
+	if !a.isServer && a.authService == nil {
+		return loginOverNetwork(strings.TrimSpace(username), password)
+	}
 	if a.authService == nil {
 		return AuthTokenResult{}, fmt.Errorf("auth service is not configured")
 	}
@@ -386,7 +396,113 @@ func (a *App) Login(username, password string) (AuthTokenResult, error) {
 	}, nil
 }
 
+type sessionRoleResponse struct {
+	Role string `json:"role"`
+}
+
+type authAPIErrorResponse struct {
+	Message string `json:"message"`
+}
+
+func loginOverNetwork(username, password string) (AuthTokenResult, error) {
+	req := map[string]string{
+		"username": strings.TrimSpace(username),
+		"password": password,
+	}
+
+	var result AuthTokenResult
+	if err := postToServerAPI("/auth/login", req, &result); err != nil {
+		return AuthTokenResult{}, err
+	}
+
+	if strings.TrimSpace(result.Token) == "" {
+		return AuthTokenResult{}, fmt.Errorf("login did not return a session token")
+	}
+	return result, nil
+}
+
+func fetchSessionRoleOverNetwork(authToken string) (string, error) {
+	req := map[string]string{
+		"auth_token": strings.TrimSpace(authToken),
+	}
+
+	var response sessionRoleResponse
+	if err := postToServerAPI("/auth/session-role", req, &response); err != nil {
+		return "", err
+	}
+	role := strings.TrimSpace(response.Role)
+	if role == "" {
+		return "", fmt.Errorf("session role response is empty")
+	}
+	return role, nil
+}
+
+func postToServerAPI(path string, payload interface{}, output interface{}) error {
+	baseURL := resolveServerAPIBaseURL()
+	url := strings.TrimRight(baseURL, "/") + path
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to encode request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: serverAPITimeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("server request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var apiErr authAPIErrorResponse
+		if decodeErr := json.NewDecoder(resp.Body).Decode(&apiErr); decodeErr == nil {
+			msg := strings.TrimSpace(apiErr.Message)
+			if msg != "" {
+				return fmt.Errorf("%s", msg)
+			}
+		}
+		return fmt.Errorf("server request failed with status %d", resp.StatusCode)
+	}
+
+	if output == nil {
+		return nil
+	}
+	if err := json.NewDecoder(resp.Body).Decode(output); err != nil {
+		return fmt.Errorf("failed to decode server response: %w", err)
+	}
+	return nil
+}
+
+func resolveServerAPIBaseURL() string {
+	raw := strings.TrimSpace(os.Getenv(envServerProbeAddr))
+	if raw == "" {
+		return "http://" + defaultServerProbeAddr
+	}
+
+	if strings.Contains(raw, "://") {
+		parsed, err := url.Parse(raw)
+		if err == nil && strings.TrimSpace(parsed.Host) != "" {
+			scheme := parsed.Scheme
+			if scheme == "" {
+				scheme = "http"
+			}
+			return scheme + "://" + strings.TrimSpace(parsed.Host)
+		}
+	}
+
+	return "http://" + raw
+}
+
 func (a *App) CreateUser(input CreateUserInput) error {
+	if !a.isServer && a.authService == nil {
+		return postToServerAPI("/admin/create-user", input, nil)
+	}
 	if a.authService == nil {
 		return fmt.Errorf("auth service is not configured")
 	}
@@ -424,6 +540,13 @@ type PackagingProfileResult struct {
 }
 
 func (a *App) CreateItemMaster(input appInventory.CreateItemInput) (ItemMasterResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result ItemMasterResult
+		if err := postToServerAPI("/inventory/items/create", input, &result); err != nil {
+			return ItemMasterResult{}, err
+		}
+		return result, nil
+	}
 	if a.inventoryService == nil {
 		return ItemMasterResult{}, fmt.Errorf("inventory service is not configured")
 	}
@@ -445,6 +568,13 @@ func (a *App) CreateItemMaster(input appInventory.CreateItemInput) (ItemMasterRe
 }
 
 func (a *App) UpdateItemMaster(input appInventory.UpdateItemInput) (ItemMasterResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result ItemMasterResult
+		if err := postToServerAPI("/inventory/items/update", input, &result); err != nil {
+			return ItemMasterResult{}, err
+		}
+		return result, nil
+	}
 	if a.inventoryService == nil {
 		return ItemMasterResult{}, fmt.Errorf("inventory service is not configured")
 	}
@@ -466,6 +596,13 @@ func (a *App) UpdateItemMaster(input appInventory.UpdateItemInput) (ItemMasterRe
 }
 
 func (a *App) ListItems(input appInventory.ListItemsInput) ([]ItemMasterResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result []ItemMasterResult
+		if err := postToServerAPI("/inventory/items/list", input, &result); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
 	if a.inventoryService == nil {
 		return nil, fmt.Errorf("inventory service is not configured")
 	}
@@ -491,6 +628,13 @@ func (a *App) ListItems(input appInventory.ListItemsInput) ([]ItemMasterResult, 
 }
 
 func (a *App) CreatePackagingProfile(input appInventory.CreatePackagingProfileInput) (PackagingProfileResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result PackagingProfileResult
+		if err := postToServerAPI("/inventory/packaging/create", input, &result); err != nil {
+			return PackagingProfileResult{}, err
+		}
+		return result, nil
+	}
 	if a.inventoryService == nil {
 		return PackagingProfileResult{}, fmt.Errorf("inventory service is not configured")
 	}
@@ -518,6 +662,13 @@ func (a *App) CreatePackagingProfile(input appInventory.CreatePackagingProfileIn
 }
 
 func (a *App) ListPackagingProfiles(input appInventory.ListPackagingProfilesInput) ([]PackagingProfileResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result []PackagingProfileResult
+		if err := postToServerAPI("/inventory/packaging/list", input, &result); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
 	if a.inventoryService == nil {
 		return nil, fmt.Errorf("inventory service is not configured")
 	}

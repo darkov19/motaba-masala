@@ -619,6 +619,12 @@ func run() error {
 				slog.Info("Existing users detected; bootstrap admin creation skipped", "users", userCount)
 			}
 
+			stopAuthAPIServer, err := startServerAuthAPIServer(application)
+			if err != nil {
+				return fmt.Errorf("failed to start server auth API: %w", err)
+			}
+			defer stopAuthAPIServer()
+
 			if err := backupService.StartScheduler(); err != nil {
 				slog.Error("Failed to start backup scheduler", "error", err, "component", "backup")
 			}

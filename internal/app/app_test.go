@@ -1,7 +1,10 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 )
@@ -124,6 +127,95 @@ func TestCheckServerReachability_DefaultsToLocalProcessProbeWhenNoServerAddrConf
 	if !connected {
 		t.Fatal("expected reachability true via default local process probe path")
 	}
+}
+
+func TestLogin_ClientMode_UsesNetworkAuthAPI(t *testing.T) {
+	server := newTestHTTPServerOrSkip(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/auth/login" {
+			t.Fatalf("expected /auth/login path, got %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Fatalf("expected POST method, got %s", r.Method)
+		}
+
+		var payload map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("failed to decode login payload: %v", err)
+		}
+		if payload["username"] != "admin" || payload["password"] != "secret" {
+			t.Fatalf("unexpected payload: %#v", payload)
+		}
+
+		_ = json.NewEncoder(w).Encode(AuthTokenResult{
+			Token:     "network-token",
+			ExpiresAt: 1893456000,
+		})
+	}))
+	defer server.Close()
+
+	t.Setenv(envServerProbeAddr, server.URL)
+
+	a := NewApp(false)
+	token, err := a.Login("admin", "secret")
+	if err != nil {
+		t.Fatalf("expected login success, got %v", err)
+	}
+	if token.Token != "network-token" {
+		t.Fatalf("expected network token, got %q", token.Token)
+	}
+}
+
+func TestLogin_ClientMode_UsesNetworkErrorMessage(t *testing.T) {
+	server := newTestHTTPServerOrSkip(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"message": "invalid credentials",
+		})
+	}))
+	defer server.Close()
+
+	t.Setenv(envServerProbeAddr, server.URL)
+
+	a := NewApp(false)
+	if _, err := a.Login("admin", "wrong"); err == nil || err.Error() != "invalid credentials" {
+		t.Fatalf("expected invalid credentials error, got %v", err)
+	}
+}
+
+func TestGetSessionRole_ClientMode_UsesNetworkAuthAPI(t *testing.T) {
+	server := newTestHTTPServerOrSkip(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/auth/session-role" {
+			t.Fatalf("expected /auth/session-role path, got %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Fatalf("expected POST method, got %s", r.Method)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"role": "Admin",
+		})
+	}))
+	defer server.Close()
+
+	t.Setenv(envServerProbeAddr, server.URL)
+
+	a := NewApp(false)
+	role, err := a.GetSessionRole("trusted-token")
+	if err != nil {
+		t.Fatalf("expected role lookup success, got %v", err)
+	}
+	if role != "Admin" {
+		t.Fatalf("expected role Admin, got %q", role)
+	}
+}
+
+func newTestHTTPServerOrSkip(t *testing.T, handler http.Handler) (server *httptest.Server) {
+	t.Helper()
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			t.Skipf("skipping network socket test in restricted runtime: %v", recovered)
+		}
+	}()
+	return httptest.NewServer(handler)
 }
 
 func TestResolveProbeAddress(t *testing.T) {
