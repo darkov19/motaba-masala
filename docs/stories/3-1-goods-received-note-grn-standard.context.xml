@@ -1,0 +1,144 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>1</storyId>
+    <title>Goods Received Note (GRN) - Standard</title>
+    <status>drafted</status>
+    <generatedAt>2026-02-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-1-goods-received-note-grn-standard.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Store Keeper</asA>
+    <iWant>to record receipt of raw materials and packing materials through GRN with supplier and invoice references</iWant>
+    <soThat>stock is increased correctly and procurement cost tracking remains auditable</soThat>
+    <tasks>- Implement GRN create flow for RAW and PACKING_MATERIAL line items with transactional stock-in updates (AC: 1)
+- Extend procurement persistence for line-level inbound details (grn_lines) and inventory movement recording (AC: 1)
+- Wire API and frontend request/response contracts for GRN line submission and success/error feedback (AC: 1)
+- Add backend service/API tests for GRN create success and stock increase assertions for RAW and PACKING_MATERIAL lines (AC: 1)
+- Enforce strict quantity validation (&gt; 0) at UI, API, and service layers with explicit validation errors (AC: 2)
+- Add negative/zero quantity tests across UI validation and API/service 400 rejection paths (AC: 2)
+- Add supplier and invoice capture to GRN submission/edit surfaces and persistence mapping (AC: 3)
+- Add API/repository tests confirming supplier reference and invoice number persistence on GRN records (AC: 3)
+- Ensure packing material components remain independently stocked and represented as discrete GRN lines (AC: 4)
+- Add frontend/integration tests confirming packing profile components are entered/stored as separate line items with independent balances (AC: 4)
+- Add role/license denial coverage for procurement writes (401/403) and rollback-safety integration tests for GRN header+line failures (AC: 1, 2, 3)
+- Add API contract tests for 400/401/403/409 mappings and frontend keyboard-first rapid GRN flow assertions (AC: 1, 2, 3, 4)</tasks>
+  </story>
+
+  <acceptanceCriteria>1. The system allows recording a GRN for inbound RAW and PACKING_MATERIAL items and increases stock based on received quantities.
+2. Each GRN enforces quantity validation where every line quantity must be greater than zero before save.
+3. The system captures supplier reference and invoice number on GRN records for procurement traceability.
+4. Packing profile components are procured as separate line items with independent stock balances at intake time (grouping deferred to packing execution).</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-3.md" title="Tech Spec Epic 3" section="Acceptance Criteria (Authoritative)">
+        <snippet>The authoritative Epic 3 acceptance criteria require GRN intake for RAW and PACKING_MATERIAL, positive quantity validation for every line before save, and supplier/invoice capture for procurement traceability. These criteria explicitly anchor Story 3.1 scope.</snippet>
+      </doc>
+      <doc path="docs/tech-spec-epic-3.md" title="Tech Spec Epic 3" section="Data Models and Contracts">
+        <snippet>Epic 3 extends procurement persistence with planned `grn_lines` containing `item_id`, `quantity_received`, pricing fields, and source metadata. Contract constraints require receipt quantity to be strictly positive and packing components to remain line-item based at procurement time.</snippet>
+      </doc>
+      <doc path="docs/tech-spec-epic-3.md" title="Tech Spec Epic 3" section="APIs and Interfaces">
+        <snippet>The spec points to existing inventory repository/service APIs (`CreateGRN`, `UpdateGRN`) as current seams and defines them as extension points for Story 3.x procurement endpoints. It also references current HTTP gateway and error-mapping patterns to follow.</snippet>
+      </doc>
+      <doc path="docs/epics.md" title="Epics" section="Epic 3 / Story 3.1: Goods Received Note (GRN) - Standard">
+        <snippet>Story 3.1 defines Store Keeper GRN creation for supplier deliveries so stock increases and costs are tracked. Technical notes reinforce positive quantity validation and separate stocking of packing profile components until packing execution.</snippet>
+      </doc>
+      <doc path="docs/PRD.md" title="Product Requirements Document" section="Functional Requirements - Procurement &amp; Inventory">
+        <snippet>`FR-001` requires recording incoming Raw Materials and Packing Materials through GRN. Related procurement requirements establish traceable inventory operations that Story 3.1 must preserve.</snippet>
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="Implementation Patterns: Cohesive App Contract, IPC Pattern, Database Pattern">
+        <snippet>The architecture keeps backend services as authorization authority, uses shared Wails bindings across Server/Client modes, and applies repository plus embedded migration patterns for database changes. Story 3.1 should extend these existing seams without introducing parallel stacks.</snippet>
+      </doc>
+      <doc path="docs/ux-design-specification.md" title="UX Design Specification" section="Core Experience Principles / Chosen Design Approach / Critical User Paths">
+        <snippet>UX principles prioritize speed, keyboard-first operation, and subtle feedback for repetitive factory tasks. The Data Entry role path includes a rapid GRN workflow with immediate field focus and Enter-to-submit cadence, matching Story 3.1 operator behavior expectations.</snippet>
+      </doc>
+      <doc path="docs/navigation-rbac-contract.md" title="Navigation and RBAC Contract" section="Canonical Route and Backend Authority">
+        <snippet>Route/module ownership remains stable and backend authorization is canonical even when UI visibility differs by role. Procurement write flows in Story 3.1 must keep this contract, including backend-denied paths for unauthorized contexts.</snippet>
+      </doc>
+      <doc path="docs/stories/2-4-supplier-customer-masters.md" title="Story 2.4 Completion Notes" section="Learned Seams and File List">
+        <snippet>Recent completed story guidance identifies extension seams in `internal/app/inventory/service.go`, `cmd/server/api_server.go`, and frontend service wiring, with rollback-safe repository transaction expectations. Story 3.1 should reuse these seams and preserve quality patterns.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact path="internal/domain/inventory/entities.go" kind="domain-model" symbol="type GRN struct" lines="163-170" reason="Current GRN model is header-level (`grn_number`, `supplier_name`, `invoice_no`, `notes`) and is the baseline to extend with line-level intake details required by Story 3.1." />
+      <artifact path="internal/domain/inventory/repository.go" kind="repository-interface" symbol="Repository.CreateGRN / Repository.UpdateGRN" lines="27-52" reason="Canonical repository contract already defines GRN create/update seams; Story 3.1 should extend these rather than introducing a parallel procurement repository." />
+      <artifact path="internal/app/inventory/service.go" kind="application-service" symbol="Service.CreateGRN / Service.UpdateGRN" lines="818-839" reason="Application service currently gates GRN writes through license checks and delegates to repository; this is the right place for line-level validation and orchestration additions." />
+      <artifact path="internal/app/inventory/service.go" kind="authorization-license-guard" symbol="resolveRole / requireReadAccess / requireWriteAccess" lines="188-247" reason="Role resolution and license write gating patterns are already centralized here; Story 3.1 write paths should align with this enforcement model for `401/403` behavior." />
+      <artifact path="internal/infrastructure/db/sqlite_inventory_repository.go" kind="sqlite-repository" symbol="SqliteInventoryRepository.CreateGRN / UpdateGRN" lines="1078-1125" reason="Current persistence writes GRN header rows and optimistic-lock updates; Story 3.1 needs transactional header+line persistence and rollback safety in this repository seam." />
+      <artifact path="internal/infrastructure/db/migrations/000003_add_batches_grns.up.sql" kind="migration-schema" symbol="CREATE TABLE grns" lines="11-19" reason="Existing schema includes GRN header table only; new migration(s) should add `grn_lines` and related constraints without breaking existing records." />
+      <artifact path="cmd/server/api_server.go" kind="http-adapter" symbol="mapHTTPStatusFromError / mapHTTPStatus" lines="580-632" reason="Server error mapping already supports validation/auth/conflict semantics (`400/401/403/409`), matching the API contract depth required by Story 3.1 tests." />
+      <artifact path="frontend/src/components/forms/GRNForm.tsx" kind="frontend-component" symbol="GRNForm" lines="5-93" reason="Current GRN UI captures supplier/invoice/notes and autosave draft behavior; Story 3.1 must extend this form for line items and quantity validation while preserving keyboard-first flow." />
+      <artifact path="frontend/src/services/masterDataApi.ts" kind="frontend-service-binding" symbol="getBinding / mapServiceError / inventory binding methods" lines="196-300" reason="Frontend service layer already resolves auth token and maps backend auth/session failures; GRN line submission contracts should integrate through this existing API wiring pattern." />
+      <artifact path="internal/infrastructure/db/sqlite_inventory_repository_test.go" kind="repository-tests" symbol="TestSqliteInventoryRepository_UpdateGRN_ConcurrencyConflict" lines="124-148" reason="Existing GRN-related repository tests provide a base pattern for expanding transactional and conflict-path coverage once line-level writes are added." />
+      <artifact path="internal/app/inventory/service_test.go" kind="service-tests" symbol="TestService_CreateGRN_PassesThroughRepoErrors / TestService_UpdateGRN_MapsConcurrencyError" lines="173-229" reason="Current unit tests validate GRN error propagation and conflict mapping; Story 3.1 should add positive/negative quantity and authorization-focused cases here." />
+    </code>
+    <dependencies>
+      <ecosystem name="go" manifest="go.mod">
+        <package name="go" version="1.26" />
+        <package name="github.com/wailsapp/wails/v2" version="v2.11.0" />
+        <package name="github.com/mattn/go-sqlite3" version="v1.14.34" />
+        <package name="github.com/golang-migrate/migrate/v4" version="v4.18.2" />
+        <package name="github.com/golang-jwt/jwt/v5" version="v5.3.1" />
+        <package name="github.com/google/uuid" version="v1.6.0" />
+      </ecosystem>
+      <ecosystem name="node" manifest="frontend/package.json">
+        <package name="react" version="^19.0.0" />
+        <package name="react-dom" version="^19.0.0" />
+        <package name="react-router-dom" version="^6.30.3" />
+        <package name="antd" version="^6.2.1" />
+        <package name="@tanstack/react-query" version="^5.66.0" />
+        <package name="axios" version="^1.7.9" />
+        <package name="vite" version="^6.1.0" />
+        <package name="vitest" version="^4.0.18" />
+        <package name="@testing-library/react" version="^16.3.0" />
+      </ecosystem>
+      <ecosystem name="wails" manifest="wails.json/wails_server.json/wails_client.json">
+        <package name="wails-runtime-config" version="present" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Keep backend authoritative for procurement mutations: role/license checks and mutation permissions must be enforced server-side, not only in UI guards.</constraint>
+    <constraint>Preserve transaction safety for GRN header + line writes so partial failures do not leave stock state inconsistent.</constraint>
+    <constraint>Enforce strict positive quantity validation (`&gt; 0`) for every GRN line at UI, API/service, and persistence boundaries.</constraint>
+    <constraint>Retain optimistic-locking/conflict semantics on editable records and map stale-write scenarios to conflict behavior (`409`).</constraint>
+    <constraint>Maintain existing architecture seams (`internal/app/inventory/service.go`, `internal/infrastructure/db/sqlite_inventory_repository.go`, `cmd/server/api_server.go`, `frontend/src/services/masterDataApi.ts`) instead of introducing parallel procurement stacks.</constraint>
+    <constraint>Keep packing profile components as separate procurement line items with independent stock balances; grouping belongs to packing execution flow only.</constraint>
+    <constraint>Preserve canonical route/module ownership and backend-denied authorization behavior per navigation/RBAC contract.</constraint>
+  </constraints>
+  <interfaces>
+    <interface name="Inventory Repository CreateGRN" kind="function signature" signature="CreateGRN(grn *GRN) error" path="internal/domain/inventory/repository.go" />
+    <interface name="Inventory Repository UpdateGRN" kind="function signature" signature="UpdateGRN(grn *GRN) error" path="internal/domain/inventory/repository.go" />
+    <interface name="Inventory Service CreateGRN" kind="function signature" signature="CreateGRN(grn *domainInventory.GRN) error" path="internal/app/inventory/service.go" />
+    <interface name="Inventory Service UpdateGRN" kind="function signature" signature="UpdateGRN(grn *domainInventory.GRN) error" path="internal/app/inventory/service.go" />
+    <interface name="SQLite CreateGRN Persistence" kind="SQL operation" signature="INSERT INTO grns (grn_number, supplier_name, invoice_no, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)" path="internal/infrastructure/db/sqlite_inventory_repository.go" />
+    <interface name="SQLite UpdateGRN Persistence" kind="SQL operation" signature="UPDATE grns SET grn_number=?, supplier_name=?, invoice_no=?, notes=?, updated_at=... WHERE id=? AND updated_at=?" path="internal/infrastructure/db/sqlite_inventory_repository.go" />
+    <interface name="Server Error Mapping Contract" kind="HTTP status mapping" signature="ServiceError codes map to 400/401/403/409 via mapHTTPStatusFromError + mapHTTPStatus" path="cmd/server/api_server.go" />
+    <interface name="Wails GRN UI Form Contract" kind="component contract" signature="GRNForm captures supplierName/invoiceNumber/notes with submit/reset + draft autosave" path="frontend/src/components/forms/GRNForm.tsx" />
+  </interfaces>
+  <tests>
+    <standards>Use layered test coverage aligned to Epic 3 guidance: unit/service validation tests for positive quantities and auth/license gating, repository integration tests for transactional header+line rollback safety, API contract tests for `400/401/403/409` mappings, and frontend tests for keyboard-first rapid GRN data-entry behavior with clear validation feedback. Preserve deterministic assertions, concurrency/conflict checks, and route/role constraints from the existing shell and RBAC contract.</standards>
+    <locations>
+      <location>internal/app/inventory/service_test.go</location>
+      <location>internal/infrastructure/db/sqlite_inventory_repository_test.go</location>
+      <location>cmd/server/api_server_test.go</location>
+      <location>internal/domain/inventory/*_test.go</location>
+      <location>frontend/src/components/forms/__tests__/*.test.tsx</location>
+      <location>frontend/src/__tests__/*.test.tsx</location>
+      <location>docs/test-protocols/resilience-testing.md</location>
+      <location>scripts/*.ps1</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Add service+repository integration tests that create GRN entries with RAW and PACKING_MATERIAL line items and assert stock increases and transaction commit behavior.</idea>
+      <idea ac="2">Add UI/API/service negative tests for zero and negative quantities and assert validation errors map to `400 validation_failed` responses.</idea>
+      <idea ac="3">Add API and repository tests asserting supplier reference and invoice number persist correctly on GRN records and remain retrievable after save/update.</idea>
+      <idea ac="4">Add frontend/integration tests proving packing profile components are captured as independent GRN lines with separate balances, not pre-grouped bundles.</idea>
+      <idea ac="1,2,3">Add auth/license enforcement tests showing denied mutation paths return `401/403` and successful paths still maintain rollback safety on partial failures.</idea>
+      <idea ac="1,2,3,4">Add operator rapid-flow tests for keyboard-first GRN entry (focus progression, Enter submit, validation messaging, and form reset/draft behavior).</idea>
+    </ideas>
+  </tests>
+</story-context>
