@@ -1,6 +1,6 @@
 # Story 2.4: Supplier & Customer Masters
 
-Status: review
+Status: done
 
 ## Story
 
@@ -19,37 +19,37 @@ so that procurement and sales flows can reference validated parties consistently
 ## Tasks / Subtasks
 
 - [x] Implement party master domain contracts and validation rules (AC: 1, 2, 3)
-  - [x] Define supplier/customer create-update-list DTOs with required contact fields and optional supplier lead time
-  - [x] Enforce `party_type` enum and duplicate/invalid payload validation behavior
+    - [x] Define supplier/customer create-update-list DTOs with required contact fields and optional supplier lead time
+    - [x] Enforce `party_type` enum and duplicate/invalid payload validation behavior
 - [x] Implement party persistence and migration-safe storage behavior (AC: 1, 2, 3, 4)
-  - [x] Add or verify `parties` schema and constraints aligned to Epic 2 contract
-  - [x] Implement repository create/update/list flows using rollback-safe transaction handling patterns
+    - [x] Add or verify `parties` schema and constraints aligned to Epic 2 contract
+    - [x] Implement repository create/update/list flows using rollback-safe transaction handling patterns
 - [x] Implement service + API + binding flow under existing masters module seams (AC: 1, 2, 4, 5)
-  - [x] Add application service methods for `CreateParty`, `UpdateParty`, and `ListParties` with backend authorization checks
-  - [x] Wire server API/bindings and frontend API service calls for `masters.parties` without introducing new module identities
+    - [x] Add application service methods for `CreateParty`, `UpdateParty`, and `ListParties` with backend authorization checks
+    - [x] Wire server API/bindings and frontend API service calls for `masters.parties` without introducing new module identities
 - [x] Implement `masters.parties` UI behavior by role contract (AC: 1, 2, 4, 5)
-  - [x] Admin UX supports supplier/customer create and edit flows
-  - [x] Operator UX remains list/read-only, with backend-denied handling for write attempts
+    - [x] Admin UX supports supplier/customer create and edit flows
+    - [x] Operator UX remains list/read-only, with backend-denied handling for write attempts
 - [x] Add automated tests mapped to acceptance criteria (AC: 1, 2, 3, 4, 5)
-  - [x] Unit tests for enum/required-field/contact validation rules
-  - [x] Integration tests for constraints, duplicate handling, and transactional failure safety
-  - [x] API contract tests for create/update/list success + error paths and role-denial behavior
-  - [x] Frontend tests for `masters.parties` form/list behavior and role-aware UI constraints
+    - [x] Unit tests for enum/required-field/contact validation rules
+    - [x] Integration tests for constraints, duplicate handling, and transactional failure safety
+    - [x] API contract tests for create/update/list success + error paths and role-denial behavior
+    - [x] Frontend tests for `masters.parties` form/list behavior and role-aware UI constraints
 - [x] Add Windows validation automation for this story (AC: 1, 2, 3, 4, 5)
-  - [x] Create `scripts/s2-4-win-test.ps1` with build/runtime checks and explicit PASS/FAIL output
-  - [x] Ensure script returns non-zero exit code on failure
+    - [x] Create `scripts/s2-4-win-test.ps1` with build/runtime checks and explicit PASS/FAIL output
+    - [x] Ensure script returns non-zero exit code on failure
 - [x] Review Follow-ups (AI)
-  - [x] [AI-Review][High] Add missing party API contract tests for update-success, list-success, and explicit operator write-denial mapping (AC #5)
-  - [x] [AI-Review][Med] Add explicit party read-only UI test asserting operator mode hides create/edit controls while list remains accessible (AC #5)
+    - [x] [AI-Review][High] Add missing party API contract tests for update-success, list-success, and explicit operator write-denial mapping (AC #5)
+    - [x] [AI-Review][Med] Add explicit party read-only UI test asserting operator mode hides create/edit controls while list remains accessible (AC #5)
 
 ## Windows Validation (WSL2 -> Windows Required)
 
 - Script Path: `scripts/s2-4-win-test.ps1`
 - Minimum Coverage:
-  - Build the relevant application target(s)
-  - Launch and validate runtime behavior for this story
-  - Return non-zero exit code on failure
-  - Print explicit PASS/FAIL summary
+    - Build the relevant application target(s)
+    - Launch and validate runtime behavior for this story
+    - Return non-zero exit code on failure
+    - Print explicit PASS/FAIL summary
 
 ## Dev Notes
 
@@ -92,13 +92,13 @@ so that procurement and sales flows can reference validated parties consistently
 ### Project Structure Notes
 
 - Backend:
-  - Extend party domain contracts in `internal/domain/inventory/*`.
-  - Implement service orchestration in `internal/app/inventory/service.go`.
-  - Add persistence/migration changes under `internal/infrastructure/db` and `internal/infrastructure/db/migrations`.
+    - Extend party domain contracts in `internal/domain/inventory/*`.
+    - Implement service orchestration in `internal/app/inventory/service.go`.
+    - Add persistence/migration changes under `internal/infrastructure/db` and `internal/infrastructure/db/migrations`.
 - API/bindings:
-  - Extend server API/binding paths in `cmd/server/api_server.go` and app bindings in `internal/app/app.go`.
+    - Extend server API/binding paths in `cmd/server/api_server.go` and app bindings in `internal/app/app.go`.
 - Frontend:
-  - Keep party master UX/data access under existing masters shell paths in `frontend/src/components/forms` and `frontend/src/services`.
+    - Keep party master UX/data access under existing masters shell paths in `frontend/src/components/forms` and `frontend/src/services`.
 - No structure conflict detected with current architecture guidance; follow existing masters module boundaries.
 
 ### Testing Standards Summary
@@ -162,10 +162,10 @@ GPT-5 Codex
 - cmd/server/api_server_test.go
 - frontend/src/App.css
 - frontend/src/App.tsx
-- frontend/src/__tests__/AppShellRBAC.test.tsx
+- frontend/src/**tests**/AppShellRBAC.test.tsx
 - frontend/src/components/forms/PartyMasterForm.tsx
-- frontend/src/components/forms/__tests__/PartyMasterForm.test.tsx
-- frontend/src/components/forms/__tests__/RecipeForm.test.tsx
+- frontend/src/components/forms/**tests**/PartyMasterForm.test.tsx
+- frontend/src/components/forms/**tests**/RecipeForm.test.tsx
 - frontend/src/services/masterDataApi.ts
 - frontend/src/shell/rbac.ts
 - internal/app/app.go
@@ -233,62 +233,62 @@ Implementation quality is strong and all acceptance criteria are implemented wit
 
 ### Acceptance Criteria Coverage
 
-| AC# | Description | Status | Evidence |
-| --- | --- | --- | --- |
-| AC1 | Supplier master records can be created/updated with contact details and optional lead-time metadata | IMPLEMENTED | `internal/domain/inventory/party.go:41`, `internal/app/inventory/service.go:613`, `internal/infrastructure/db/sqlite_inventory_repository.go:756`, `frontend/src/components/forms/PartyMasterForm.tsx:112` |
-| AC2 | Customer master records can be created/updated with contact details | IMPLEMENTED | `internal/domain/inventory/party.go:15`, `internal/app/inventory/service.go:636`, `frontend/src/components/forms/PartyMasterForm.tsx:235`, `internal/infrastructure/db/sqlite_inventory_repository_test.go:842` |
-| AC3 | Persistence enforces `party_type` validity and actionable invalid/duplicate errors | IMPLEMENTED | `internal/infrastructure/db/migrations/000009_parties.up.sql:3`, `internal/domain/inventory/party.go:72`, `internal/app/inventory/service.go:287`, `internal/app/inventory/service.go:401`, `internal/infrastructure/db/sqlite_inventory_repository_test.go:876` |
-| AC4 | Party data discoverable via list/query interfaces | IMPLEMENTED | `internal/app/inventory/service.go:673`, `cmd/server/api_server.go:469`, `frontend/src/services/masterDataApi.ts:358`, `frontend/src/components/forms/PartyMasterForm.tsx:69`, `internal/infrastructure/db/sqlite_inventory_repository.go:841` |
-| AC5 | Behavior aligned with `masters.parties` and backend-authoritative RBAC | IMPLEMENTED | `frontend/src/shell/rbac.ts:22`, `frontend/src/App.tsx:636`, `internal/app/inventory/service.go:614`, `internal/app/inventory/service_test.go:523` |
+| AC# | Description                                                                                         | Status      | Evidence                                                                                                                                                                                                                                                         |
+| --- | --------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | Supplier master records can be created/updated with contact details and optional lead-time metadata | IMPLEMENTED | `internal/domain/inventory/party.go:41`, `internal/app/inventory/service.go:613`, `internal/infrastructure/db/sqlite_inventory_repository.go:756`, `frontend/src/components/forms/PartyMasterForm.tsx:112`                                                       |
+| AC2 | Customer master records can be created/updated with contact details                                 | IMPLEMENTED | `internal/domain/inventory/party.go:15`, `internal/app/inventory/service.go:636`, `frontend/src/components/forms/PartyMasterForm.tsx:235`, `internal/infrastructure/db/sqlite_inventory_repository_test.go:842`                                                  |
+| AC3 | Persistence enforces `party_type` validity and actionable invalid/duplicate errors                  | IMPLEMENTED | `internal/infrastructure/db/migrations/000009_parties.up.sql:3`, `internal/domain/inventory/party.go:72`, `internal/app/inventory/service.go:287`, `internal/app/inventory/service.go:401`, `internal/infrastructure/db/sqlite_inventory_repository_test.go:876` |
+| AC4 | Party data discoverable via list/query interfaces                                                   | IMPLEMENTED | `internal/app/inventory/service.go:673`, `cmd/server/api_server.go:469`, `frontend/src/services/masterDataApi.ts:358`, `frontend/src/components/forms/PartyMasterForm.tsx:69`, `internal/infrastructure/db/sqlite_inventory_repository.go:841`                   |
+| AC5 | Behavior aligned with `masters.parties` and backend-authoritative RBAC                              | IMPLEMENTED | `frontend/src/shell/rbac.ts:22`, `frontend/src/App.tsx:636`, `internal/app/inventory/service.go:614`, `internal/app/inventory/service_test.go:523`                                                                                                               |
 
 **AC Coverage Summary:** 5 of 5 acceptance criteria fully implemented.
 
 ### Task Completion Validation
 
-| Task | Marked As | Verified As | Evidence |
-| --- | --- | --- | --- |
-| Implement party master domain contracts and validation rules (AC: 1,2,3) | [x] | VERIFIED COMPLETE | `internal/domain/inventory/party.go:11`, `internal/domain/inventory/party.go:65` |
-| Define supplier/customer create-update-list DTOs with required contact + optional supplier lead time | [x] | VERIFIED COMPLETE | `internal/app/inventory/service.go:123`, `frontend/src/services/masterDataApi.ts:108`, `internal/domain/inventory/party.go:48` |
-| Enforce `party_type` enum and duplicate/invalid payload validation behavior | [x] | VERIFIED COMPLETE | `internal/domain/inventory/party.go:72`, `internal/infrastructure/db/migrations/000009_parties.up.sql:3`, `internal/app/inventory/service.go:401` |
-| Implement party persistence and migration-safe storage behavior (AC: 1,2,3,4) | [x] | VERIFIED COMPLETE | `internal/infrastructure/db/migrations/000009_parties.up.sql:1`, `internal/infrastructure/db/sqlite_inventory_repository.go:732` |
-| Add/verify `parties` schema and constraints aligned to Epic 2 contract | [x] | VERIFIED COMPLETE | `internal/infrastructure/db/migrations/000009_parties.up.sql:3`, `internal/infrastructure/db/migrations/000009_parties.up.sql:15` |
-| Implement repository create/update/list flows using rollback-safe transaction patterns | [x] | VERIFIED COMPLETE | `internal/infrastructure/db/sqlite_inventory_repository.go:743`, `internal/infrastructure/db/sqlite_inventory_repository.go:793`, `internal/infrastructure/db/sqlite_inventory_repository.go:841` |
-| Implement service + API + binding flow under existing masters seams (AC: 1,2,4,5) | [x] | VERIFIED COMPLETE | `internal/app/inventory/service.go:613`, `internal/app/app.go:995`, `cmd/server/api_server.go:429` |
-| Add app service methods CreateParty/UpdateParty/ListParties with backend auth checks | [x] | VERIFIED COMPLETE | `internal/app/inventory/service.go:614`, `internal/app/inventory/service.go:637`, `internal/app/inventory/service.go:674` |
-| Wire server API/bindings + frontend service calls for `masters.parties` contract | [x] | VERIFIED COMPLETE | `cmd/server/api_server.go:429`, `internal/app/app.go:995`, `frontend/src/services/masterDataApi.ts:379` |
-| Implement `masters.parties` UI behavior by role contract (AC: 1,2,4,5) | [x] | VERIFIED COMPLETE | `frontend/src/components/forms/PartyMasterForm.tsx:28`, `frontend/src/App.tsx:636`, `frontend/src/shell/rbac.ts:22` |
-| Admin UX supports supplier/customer create and edit flows | [x] | VERIFIED COMPLETE | `frontend/src/components/forms/PartyMasterForm.tsx:140`, `frontend/src/components/forms/PartyMasterForm.tsx:118`, `frontend/src/components/forms/PartyMasterForm.tsx:197` |
-| Operator UX remains list/read-only; backend-denied on write attempts | [x] | VERIFIED COMPLETE | `frontend/src/components/forms/PartyMasterForm.tsx:153`, `frontend/src/components/forms/PartyMasterForm.tsx:191`, `internal/app/inventory/service_test.go:523` |
-| Add automated tests mapped to acceptance criteria (AC: 1,2,3,4,5) | [x] | QUESTIONABLE | Strong coverage exists, but API contract matrix is incomplete for one subtask. Evidence in rows below. |
-| Unit tests for enum/required-field/contact validation rules | [x] | VERIFIED COMPLETE | `internal/domain/inventory/party_test.go:8` |
-| Integration tests for constraints, duplicate handling, transactional failure safety | [x] | VERIFIED COMPLETE | `internal/infrastructure/db/sqlite_inventory_repository_test.go:829`, `internal/infrastructure/db/sqlite_inventory_repository_test.go:876`, `internal/infrastructure/db/sqlite_inventory_repository_test.go:908` |
-| **API contract tests for create/update/list success + error paths and role-denial behavior** | [x] | **NOT DONE** | `cmd/server/api_server_test.go:549` (create success), `cmd/server/api_server_test.go:589` (update error), `cmd/server/api_server_test.go:607` (list unauthorized) but missing update-success, list-success, and explicit operator-forbidden write mapping tests. |
-| Frontend tests for `masters.parties` form/list behavior and role-aware UI constraints | [x] | VERIFIED COMPLETE | `frontend/src/components/forms/__tests__/PartyMasterForm.test.tsx:33`, `frontend/src/__tests__/AppShellRBAC.test.tsx:105` |
-| Add Windows validation automation for this story (AC: 1,2,3,4,5) | [x] | VERIFIED COMPLETE | `scripts/s2-4-win-test.ps1:1` |
-| Create `scripts/s2-4-win-test.ps1` with build/runtime checks and explicit PASS/FAIL output | [x] | VERIFIED COMPLETE | `scripts/s2-4-win-test.ps1:65`, `scripts/s2-4-win-test.ps1:75`, `scripts/s2-4-win-test.ps1:112` |
-| Ensure script returns non-zero exit code on failure | [x] | VERIFIED COMPLETE | `scripts/s2-4-win-test.ps1:115` |
+| Task                                                                                                 | Marked As | Verified As       | Evidence                                                                                                                                                                                                                                                         |
+| ---------------------------------------------------------------------------------------------------- | --------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Implement party master domain contracts and validation rules (AC: 1,2,3)                             | [x]       | VERIFIED COMPLETE | `internal/domain/inventory/party.go:11`, `internal/domain/inventory/party.go:65`                                                                                                                                                                                 |
+| Define supplier/customer create-update-list DTOs with required contact + optional supplier lead time | [x]       | VERIFIED COMPLETE | `internal/app/inventory/service.go:123`, `frontend/src/services/masterDataApi.ts:108`, `internal/domain/inventory/party.go:48`                                                                                                                                   |
+| Enforce `party_type` enum and duplicate/invalid payload validation behavior                          | [x]       | VERIFIED COMPLETE | `internal/domain/inventory/party.go:72`, `internal/infrastructure/db/migrations/000009_parties.up.sql:3`, `internal/app/inventory/service.go:401`                                                                                                                |
+| Implement party persistence and migration-safe storage behavior (AC: 1,2,3,4)                        | [x]       | VERIFIED COMPLETE | `internal/infrastructure/db/migrations/000009_parties.up.sql:1`, `internal/infrastructure/db/sqlite_inventory_repository.go:732`                                                                                                                                 |
+| Add/verify `parties` schema and constraints aligned to Epic 2 contract                               | [x]       | VERIFIED COMPLETE | `internal/infrastructure/db/migrations/000009_parties.up.sql:3`, `internal/infrastructure/db/migrations/000009_parties.up.sql:15`                                                                                                                                |
+| Implement repository create/update/list flows using rollback-safe transaction patterns               | [x]       | VERIFIED COMPLETE | `internal/infrastructure/db/sqlite_inventory_repository.go:743`, `internal/infrastructure/db/sqlite_inventory_repository.go:793`, `internal/infrastructure/db/sqlite_inventory_repository.go:841`                                                                |
+| Implement service + API + binding flow under existing masters seams (AC: 1,2,4,5)                    | [x]       | VERIFIED COMPLETE | `internal/app/inventory/service.go:613`, `internal/app/app.go:995`, `cmd/server/api_server.go:429`                                                                                                                                                               |
+| Add app service methods CreateParty/UpdateParty/ListParties with backend auth checks                 | [x]       | VERIFIED COMPLETE | `internal/app/inventory/service.go:614`, `internal/app/inventory/service.go:637`, `internal/app/inventory/service.go:674`                                                                                                                                        |
+| Wire server API/bindings + frontend service calls for `masters.parties` contract                     | [x]       | VERIFIED COMPLETE | `cmd/server/api_server.go:429`, `internal/app/app.go:995`, `frontend/src/services/masterDataApi.ts:379`                                                                                                                                                          |
+| Implement `masters.parties` UI behavior by role contract (AC: 1,2,4,5)                               | [x]       | VERIFIED COMPLETE | `frontend/src/components/forms/PartyMasterForm.tsx:28`, `frontend/src/App.tsx:636`, `frontend/src/shell/rbac.ts:22`                                                                                                                                              |
+| Admin UX supports supplier/customer create and edit flows                                            | [x]       | VERIFIED COMPLETE | `frontend/src/components/forms/PartyMasterForm.tsx:140`, `frontend/src/components/forms/PartyMasterForm.tsx:118`, `frontend/src/components/forms/PartyMasterForm.tsx:197`                                                                                        |
+| Operator UX remains list/read-only; backend-denied on write attempts                                 | [x]       | VERIFIED COMPLETE | `frontend/src/components/forms/PartyMasterForm.tsx:153`, `frontend/src/components/forms/PartyMasterForm.tsx:191`, `internal/app/inventory/service_test.go:523`                                                                                                   |
+| Add automated tests mapped to acceptance criteria (AC: 1,2,3,4,5)                                    | [x]       | QUESTIONABLE      | Strong coverage exists, but API contract matrix is incomplete for one subtask. Evidence in rows below.                                                                                                                                                           |
+| Unit tests for enum/required-field/contact validation rules                                          | [x]       | VERIFIED COMPLETE | `internal/domain/inventory/party_test.go:8`                                                                                                                                                                                                                      |
+| Integration tests for constraints, duplicate handling, transactional failure safety                  | [x]       | VERIFIED COMPLETE | `internal/infrastructure/db/sqlite_inventory_repository_test.go:829`, `internal/infrastructure/db/sqlite_inventory_repository_test.go:876`, `internal/infrastructure/db/sqlite_inventory_repository_test.go:908`                                                 |
+| **API contract tests for create/update/list success + error paths and role-denial behavior**         | [x]       | **NOT DONE**      | `cmd/server/api_server_test.go:549` (create success), `cmd/server/api_server_test.go:589` (update error), `cmd/server/api_server_test.go:607` (list unauthorized) but missing update-success, list-success, and explicit operator-forbidden write mapping tests. |
+| Frontend tests for `masters.parties` form/list behavior and role-aware UI constraints                | [x]       | VERIFIED COMPLETE | `frontend/src/components/forms/__tests__/PartyMasterForm.test.tsx:33`, `frontend/src/__tests__/AppShellRBAC.test.tsx:105`                                                                                                                                        |
+| Add Windows validation automation for this story (AC: 1,2,3,4,5)                                     | [x]       | VERIFIED COMPLETE | `scripts/s2-4-win-test.ps1:1`                                                                                                                                                                                                                                    |
+| Create `scripts/s2-4-win-test.ps1` with build/runtime checks and explicit PASS/FAIL output           | [x]       | VERIFIED COMPLETE | `scripts/s2-4-win-test.ps1:65`, `scripts/s2-4-win-test.ps1:75`, `scripts/s2-4-win-test.ps1:112`                                                                                                                                                                  |
+| Ensure script returns non-zero exit code on failure                                                  | [x]       | VERIFIED COMPLETE | `scripts/s2-4-win-test.ps1:115`                                                                                                                                                                                                                                  |
 
 **Task Summary:** 19 of 20 completed tasks verified, 0 questionable, **1 falsely marked complete**.
 
 ### Test Coverage and Gaps
 
 - Executed and passing in this review:
-  - `GOCACHE=/tmp/go-build-cache go test ./internal/domain/inventory ./internal/app/inventory ./internal/infrastructure/db ./cmd/server`
-  - `npm --prefix frontend run test:run -- src/components/forms/__tests__/PartyMasterForm.test.tsx src/__tests__/AppShellRBAC.test.tsx`
+    - `GOCACHE=/tmp/go-build-cache go test ./internal/domain/inventory ./internal/app/inventory ./internal/infrastructure/db ./cmd/server`
+    - `npm --prefix frontend run test:run -- src/components/forms/__tests__/PartyMasterForm.test.tsx src/__tests__/AppShellRBAC.test.tsx`
 - Coverage present:
-  - Domain validation tests: `internal/domain/inventory/party_test.go:8`
-  - Repository create/list/duplicate/concurrency tests: `internal/infrastructure/db/sqlite_inventory_repository_test.go:829`
-  - Service RBAC + validation mapping tests: `internal/app/inventory/service_test.go:499`
-  - Frontend form + shell RBAC tests: `frontend/src/components/forms/__tests__/PartyMasterForm.test.tsx:33`, `frontend/src/__tests__/AppShellRBAC.test.tsx:105`
+    - Domain validation tests: `internal/domain/inventory/party_test.go:8`
+    - Repository create/list/duplicate/concurrency tests: `internal/infrastructure/db/sqlite_inventory_repository_test.go:829`
+    - Service RBAC + validation mapping tests: `internal/app/inventory/service_test.go:499`
+    - Frontend form + shell RBAC tests: `frontend/src/components/forms/__tests__/PartyMasterForm.test.tsx:33`, `frontend/src/__tests__/AppShellRBAC.test.tsx:105`
 - Gap:
-  - Party API contract tests are incomplete versus claimed scope (missing update/list success-path and explicit write-denial mapping tests).
+    - Party API contract tests are incomplete versus claimed scope (missing update/list success-path and explicit write-denial mapping tests).
 
 ### Architectural Alignment
 
 - Aligned with hexagonal seams and existing module ownership:
-  - Domain/app/infrastructure layering preserved: `internal/domain/inventory/party.go:11`, `internal/app/inventory/service.go:613`, `internal/infrastructure/db/sqlite_inventory_repository.go:732`
-  - Canonical route identity preserved: `frontend/src/shell/rbac.ts:22`
-  - Backend remains authorization authority: `internal/app/inventory/service.go:614`, `internal/app/inventory/service_test.go:523`
+    - Domain/app/infrastructure layering preserved: `internal/domain/inventory/party.go:11`, `internal/app/inventory/service.go:613`, `internal/infrastructure/db/sqlite_inventory_repository.go:732`
+    - Canonical route identity preserved: `frontend/src/shell/rbac.ts:22`
+    - Backend remains authorization authority: `internal/app/inventory/service.go:614`, `internal/app/inventory/service_test.go:523`
 
 ### Security Notes
 
@@ -306,8 +306,10 @@ Implementation quality is strong and all acceptance criteria are implemented wit
 ### Action Items
 
 **Code Changes Required:**
+
 - [x] [High] Add missing party API contract tests for update-success, list-success, and explicit operator write-denial mapping (AC #5). [file: `cmd/server/api_server_test.go`]
 - [x] [Med] Add explicit party read-only UI test asserting operator mode hides create/edit controls while list remains accessible (AC #5). [file: `frontend/src/components/forms/__tests__/PartyMasterForm.test.tsx`]
 
 **Advisory Notes:**
+
 - Note: Execute `scripts/s2-4-win-test.ps1 -Mode user-auto` on a Windows host and record PASS evidence in this story. [file: `docs/stories/2-4-supplier-customer-masters.md:184`]
