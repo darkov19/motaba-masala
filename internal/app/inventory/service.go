@@ -175,6 +175,20 @@ type ListMaterialLotsInput struct {
 	AuthToken  string `json:"auth_token"`
 }
 
+type RecordLotStockMovementInput struct {
+	LotNumber       string  `json:"lot_number"`
+	TransactionType string  `json:"transaction_type"`
+	Quantity        float64 `json:"quantity"`
+	ReferenceID     string  `json:"reference_id"`
+	Notes           string  `json:"notes"`
+	AuthToken       string  `json:"auth_token"`
+}
+
+type ListLotStockMovementsInput struct {
+	LotNumber string `json:"lot_number"`
+	AuthToken string `json:"auth_token"`
+}
+
 type CreateUnitConversionRuleInput struct {
 	ItemID         *int64  `json:"item_id,omitempty"`
 	FromUnit       string  `json:"from_unit"`
@@ -332,6 +346,12 @@ func mapValidationError(err error) error {
 		return &ServiceError{Code: "validation_failed", Message: "grn validation failed", Fields: []FieldError{{Field: "lines.item_id", Message: domainInventory.ErrGRNLineItemID.Error()}}}
 	case errors.Is(err, domainInventory.ErrGRNLineQuantity):
 		return &ServiceError{Code: "validation_failed", Message: "grn validation failed", Fields: []FieldError{{Field: "lines.quantity_received", Message: domainInventory.ErrGRNLineQuantity.Error()}}}
+	case errors.Is(err, domainInventory.ErrLotNumberRequired):
+		return &ServiceError{Code: "validation_failed", Message: "lot movement validation failed", Fields: []FieldError{{Field: "lot_number", Message: domainInventory.ErrLotNumberRequired.Error()}}}
+	case errors.Is(err, domainInventory.ErrMovementTypeInvalid):
+		return &ServiceError{Code: "validation_failed", Message: "lot movement validation failed", Fields: []FieldError{{Field: "transaction_type", Message: domainInventory.ErrMovementTypeInvalid.Error()}}}
+	case errors.Is(err, domainInventory.ErrMovementQtyInvalid):
+		return &ServiceError{Code: "validation_failed", Message: "lot movement validation failed", Fields: []FieldError{{Field: "quantity", Message: domainInventory.ErrMovementQtyInvalid.Error()}}}
 	case errors.Is(err, domainInventory.ErrConversionFromUnitRequired):
 		return &ServiceError{Code: "validation_failed", Message: "conversion rule validation failed", Fields: []FieldError{{Field: "from_unit", Message: domainInventory.ErrConversionFromUnitRequired.Error()}}}
 	case errors.Is(err, domainInventory.ErrConversionToUnitRequired):
@@ -473,6 +493,24 @@ func mapGRNPersistenceError(err error) error {
 			Code:    "validation_failed",
 			Message: "grn validation failed",
 			Fields:  []FieldError{{Field: "lines.item_id", Message: "line item must reference an existing item"}},
+		}
+	default:
+		return mapValidationError(err)
+	}
+}
+
+func mapLotMovementPersistenceError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	lowered := strings.ToLower(strings.TrimSpace(err.Error()))
+	switch {
+	case strings.Contains(lowered, "lot not found"):
+		return &ServiceError{
+			Code:    "validation_failed",
+			Message: "lot movement validation failed",
+			Fields:  []FieldError{{Field: "lot_number", Message: "lot_number must reference an existing lot"}},
 		}
 	default:
 		return mapValidationError(err)
@@ -794,6 +832,37 @@ func (s *Service) ListMaterialLots(input ListMaterialLotsInput) ([]domainInvento
 		Search:     strings.TrimSpace(input.Search),
 	}
 	return s.repo.ListMaterialLots(filter)
+}
+
+func (s *Service) RecordLotStockMovement(input RecordLotStockMovementInput) (*domainInventory.StockLedgerMovement, error) {
+	if err := s.requireWriteAccess(input.AuthToken); err != nil {
+		return nil, err
+	}
+
+	movement := &domainInventory.StockLedgerMovement{
+		LotNumber:       input.LotNumber,
+		TransactionType: input.TransactionType,
+		Quantity:        input.Quantity,
+		ReferenceID:     input.ReferenceID,
+		Notes:           input.Notes,
+	}
+	if err := movement.ValidateNonInbound(); err != nil {
+		return nil, mapValidationError(err)
+	}
+	if err := s.repo.RecordLotStockMovement(movement); err != nil {
+		return nil, mapLotMovementPersistenceError(err)
+	}
+	return movement, nil
+}
+
+func (s *Service) ListLotStockMovements(input ListLotStockMovementsInput) ([]domainInventory.StockLedgerMovement, error) {
+	if err := s.requireReadAccess(input.AuthToken); err != nil {
+		return nil, err
+	}
+	filter := domainInventory.StockLedgerMovementListFilter{
+		LotNumber: strings.TrimSpace(input.LotNumber),
+	}
+	return s.repo.ListLotStockMovements(filter)
 }
 
 func (s *Service) CreateUnitConversionRule(input CreateUnitConversionRuleInput) (*domainInventory.UnitConversionRule, error) {

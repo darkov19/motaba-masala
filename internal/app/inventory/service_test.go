@@ -3,6 +3,7 @@ package inventory
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	appLicenseMode "masala_inventory_managment/internal/app/licensemode"
@@ -30,7 +31,9 @@ type fakeInventoryRepo struct {
 	parties             []domainInventory.Party
 	conversionRules     []domainInventory.UnitConversionRule
 	materialLots        []domainInventory.MaterialLot
+	lotMovements        []domainInventory.StockLedgerMovement
 	lastCreatedGRN      *domainInventory.GRN
+	lastLotMovement     *domainInventory.StockLedgerMovement
 }
 
 func (f *fakeInventoryRepo) CreateItem(*domainInventory.Item) error   { return f.createItemErr }
@@ -158,6 +161,29 @@ func (f *fakeInventoryRepo) ListUnitConversionRules(domainInventory.UnitConversi
 }
 func (f *fakeInventoryRepo) ListMaterialLots(domainInventory.MaterialLotListFilter) ([]domainInventory.MaterialLot, error) {
 	return f.materialLots, nil
+}
+func (f *fakeInventoryRepo) RecordLotStockMovement(movement *domainInventory.StockLedgerMovement) error {
+	if movement == nil {
+		return errors.New("movement is nil")
+	}
+	copyMovement := *movement
+	copyMovement.ID = int64(len(f.lotMovements) + 1)
+	f.lotMovements = append(f.lotMovements, copyMovement)
+	f.lastLotMovement = &copyMovement
+	movement.ID = copyMovement.ID
+	return nil
+}
+func (f *fakeInventoryRepo) ListLotStockMovements(filter domainInventory.StockLedgerMovementListFilter) ([]domainInventory.StockLedgerMovement, error) {
+	if strings.TrimSpace(filter.LotNumber) == "" {
+		return nil, domainInventory.ErrLotNumberRequired
+	}
+	results := make([]domainInventory.StockLedgerMovement, 0)
+	for _, movement := range f.lotMovements {
+		if movement.LotNumber == filter.LotNumber {
+			results = append(results, movement)
+		}
+	}
+	return results, nil
 }
 
 func fixedRoleResolver(role domainAuth.Role, err error) func(string) (domainAuth.Role, error) {
@@ -405,6 +431,43 @@ func TestService_ListMaterialLots_OperatorAllowed(t *testing.T) {
 	}
 	if len(lots) != 1 || lots[0].LotNumber != "LOT-20260227-001" {
 		t.Fatalf("unexpected lots response: %+v", lots)
+	}
+}
+
+func TestService_RecordLotStockMovement_OperatorAllowed(t *testing.T) {
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+
+	movement, err := svc.RecordLotStockMovement(RecordLotStockMovementInput{
+		LotNumber:       "LOT-20260227-001",
+		TransactionType: "OUT",
+		Quantity:        2.5,
+		ReferenceID:     "PK-1001",
+		Notes:           "packing consumption",
+		AuthToken:       "operator-token",
+	})
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if movement == nil || movement.ID == 0 || movement.TransactionType != "OUT" {
+		t.Fatalf("unexpected movement: %+v", movement)
+	}
+}
+
+func TestService_RecordLotStockMovement_RejectsInboundType(t *testing.T) {
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+
+	_, err := svc.RecordLotStockMovement(RecordLotStockMovementInput{
+		LotNumber:       "LOT-20260227-001",
+		TransactionType: "IN",
+		Quantity:        1,
+		AuthToken:       "admin-token",
+	})
+	if err == nil {
+		t.Fatalf("expected validation error")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok || typed.Code != "validation_failed" {
+		t.Fatalf("expected validation_failed ServiceError, got %v", err)
 	}
 }
 

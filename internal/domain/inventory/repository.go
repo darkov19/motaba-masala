@@ -49,5 +49,7 @@ type Repository interface {
 
 	CreateGRN(grn *GRN) error
 	ListMaterialLots(filter MaterialLotListFilter) ([]MaterialLot, error)
+	RecordLotStockMovement(movement *StockLedgerMovement) error
+	ListLotStockMovements(filter StockLedgerMovementListFilter) ([]StockLedgerMovement, error)
 	UpdateGRN(grn *GRN) error
 }

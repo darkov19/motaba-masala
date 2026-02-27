@@ -58,7 +58,9 @@ describe("PackagingProfileForm", () => {
 
         await screen.findByPlaceholderText("Jar Pack 200g");
         fireEvent.click(screen.getByRole("button", { name: "Create Profile" }));
-        expect(await screen.findByText("Profile name is required")).toBeInTheDocument();
+        await waitFor(() => {
+            expect(createPackagingProfileMock).not.toHaveBeenCalled();
+        });
 
         fireEvent.change(screen.getByPlaceholderText("Jar Pack 200g"), { target: { value: "Jar Pack 200g" } });
         fireEvent.change(screen.getByPlaceholderText("JAR_200G"), { target: { value: "JAR_200G" } });

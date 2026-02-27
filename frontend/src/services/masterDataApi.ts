@@ -170,6 +170,17 @@ export type MaterialLot = {
     created_at: string;
 };
 
+export type LotStockMovement = {
+    id: number;
+    item_id: number;
+    transaction_type: "IN" | "OUT" | "ADJUSTMENT";
+    quantity: number;
+    reference_id: string;
+    lot_number: string;
+    notes: string;
+    created_at: string;
+};
+
 export type CreateRecipePayload = {
     recipe_code: string;
     output_item_id: number;
@@ -255,6 +266,18 @@ type AppBinding = {
         search?: string;
         auth_token?: string;
     }) => Promise<MaterialLot[]>;
+    RecordLotStockMovement?: (input: {
+        lot_number: string;
+        transaction_type: "OUT" | "ADJUSTMENT";
+        quantity: number;
+        reference_id?: string;
+        notes?: string;
+        auth_token?: string;
+    }) => Promise<LotStockMovement>;
+    ListLotStockMovements?: (input: {
+        lot_number: string;
+        auth_token?: string;
+    }) => Promise<LotStockMovement[]>;
     CreateGRN?: (input: CreateGRNPayload) => Promise<GRN>;
     CreateUnitConversionRule?: (input: CreateConversionRulePayload) => Promise<ConversionRule>;
     ListUnitConversionRules?: (input: { active_only?: boolean; item_id?: number; from_unit?: string; to_unit?: string; auth_token?: string }) => Promise<ConversionRule[]>;
@@ -493,6 +516,46 @@ export async function listMaterialLots(params?: {
             lot_number: params?.lotNumber?.trim() || undefined,
             grn_number: params?.grnNumber?.trim() || undefined,
             search: params?.search?.trim() || undefined,
+            auth_token: resolveAuthToken(),
+        });
+    } catch (error) {
+        throw mapServiceError(error);
+    }
+}
+
+export async function recordLotStockMovement(payload: {
+    lotNumber: string;
+    transactionType: "OUT" | "ADJUSTMENT";
+    quantity: number;
+    referenceId?: string;
+    notes?: string;
+}): Promise<LotStockMovement> {
+    const fn = getBinding().RecordLotStockMovement;
+    if (typeof fn !== "function") {
+        throw new Error("RecordLotStockMovement binding is unavailable");
+    }
+    try {
+        return await fn({
+            lot_number: payload.lotNumber,
+            transaction_type: payload.transactionType,
+            quantity: payload.quantity,
+            reference_id: payload.referenceId?.trim() || undefined,
+            notes: payload.notes?.trim() || undefined,
+            auth_token: resolveAuthToken(),
+        });
+    } catch (error) {
+        throw mapServiceError(error);
+    }
+}
+
+export async function listLotStockMovements(lotNumber: string): Promise<LotStockMovement[]> {
+    const fn = getBinding().ListLotStockMovements;
+    if (typeof fn !== "function") {
+        return [];
+    }
+    try {
+        return await fn({
+            lot_number: lotNumber.trim(),
             auth_token: resolveAuthToken(),
         });
     } catch (error) {

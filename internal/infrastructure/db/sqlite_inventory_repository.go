@@ -1297,6 +1297,89 @@ func (r *SqliteInventoryRepository) ListMaterialLots(filter domainInventory.Mate
 	return lots, rows.Err()
 }
 
+func (r *SqliteInventoryRepository) RecordLotStockMovement(movement *domainInventory.StockLedgerMovement) error {
+	if err := movement.ValidateNonInbound(); err != nil {
+		return err
+	}
+	if movement.CreatedAt.IsZero() {
+		movement.CreatedAt = time.Now().UTC()
+	}
+
+	var itemID int64
+	err := r.db.QueryRowContext(
+		context.Background(),
+		`SELECT item_id
+		 FROM material_lots
+		 WHERE lot_number = ?`,
+		movement.LotNumber,
+	).Scan(&itemID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("lot not found: %s", movement.LotNumber)
+		}
+		return err
+	}
+	movement.ItemID = itemID
+
+	res, err := r.db.ExecContext(
+		context.Background(),
+		`INSERT INTO stock_ledger (item_id, transaction_type, quantity, reference_id, lot_number, notes, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		movement.ItemID,
+		movement.TransactionType,
+		movement.Quantity,
+		movement.ReferenceID,
+		movement.LotNumber,
+		movement.Notes,
+		movement.CreatedAt,
+	)
+	if err != nil {
+		return err
+	}
+	movement.ID, _ = res.LastInsertId()
+	return nil
+}
+
+func (r *SqliteInventoryRepository) ListLotStockMovements(filter domainInventory.StockLedgerMovementListFilter) ([]domainInventory.StockLedgerMovement, error) {
+	lot := strings.TrimSpace(filter.LotNumber)
+	if lot == "" {
+		return nil, domainInventory.ErrLotNumberRequired
+	}
+
+	rows, err := r.db.QueryContext(
+		context.Background(),
+		`SELECT id, item_id, transaction_type, quantity, reference_id, lot_number, notes, created_at
+		 FROM stock_ledger
+		 WHERE lot_number = ?
+		 ORDER BY created_at ASC, id ASC`,
+		lot,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	movements := make([]domainInventory.StockLedgerMovement, 0)
+	for rows.Next() {
+		var movement domainInventory.StockLedgerMovement
+		if err := rows.Scan(
+			&movement.ID,
+			&movement.ItemID,
+			&movement.TransactionType,
+			&movement.Quantity,
+			&movement.ReferenceID,
+			&movement.LotNumber,
+			&movement.Notes,
+			&movement.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		movements = append(movements, movement)
+	}
+
+	return movements, rows.Err()
+}
+
 func (r *SqliteInventoryRepository) UpdateGRN(grn *domainInventory.GRN) error {
 	res, err := r.db.ExecContext(
 		context.Background(),

@@ -1,0 +1,236 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>2B</storyId>
+    <title>Procurement Lots Route Enablement</title>
+    <status>drafted</status>
+    <generatedAt>2026-02-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-2b-procurement-lots-route-enablement.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Quality Manager and Data Entry Operator</asA>
+    <iWant>the procurement.lots route to render an operational lot lookup surface with role-safe access</iWant>
+    <soThat>inbound lot traceability is usable from the shell contract instead of remaining a placeholder</soThat>
+    <tasks>
+      <task id="T1" acRefs="AC1">Implement route-level lots page rendering for `procurement.lots` instead of placeholder fallback content.</task>
+      <task id="T2" acRefs="AC2">Implement lots listing UI with traceability table fields and keyboard-first interaction flow.</task>
+      <task id="T3" acRefs="AC3">Wire page filters to existing backend lot-listing contract with deterministic loading/empty/error states.</task>
+      <task id="T4" acRefs="AC4">Preserve backend-authoritative authorization behavior and route-visibility alignment.</task>
+      <task id="T5" acRefs="AC5">Add frontend/API automated tests for route rendering and lot-listing contract error mappings.</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Authenticated Admin and Operator users can open route `procurement.lots` and see a functional lots page (not placeholder messaging).</criterion>
+    <criterion id="AC2">The lots page lists core traceability fields: lot number, GRN reference, supplier, item, quantity, and created timestamp.</criterion>
+    <criterion id="AC3">Filtering by `search`, `lot_number`, `grn_number`, `supplier`, and optional `item_id` is supported via backend lot-listing contract and provides deterministic result rendering with clear empty/error states.</criterion>
+    <criterion id="AC4">Backend-authoritative authorization is preserved for lots access (`401/403` behavior), with frontend guards used only for UX routing.</criterion>
+    <criterion id="AC5">Automated tests cover route rendering and lot filter contract/error mapping (`400/401/403`) for this route.</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <artifact>
+        <path>docs/navigation-rbac-contract.md</path>
+        <title>Navigation and RBAC Contract</title>
+        <section>Canonical Route Map (Stable IDs and Paths)</section>
+        <snippet>The canonical route map includes `procurement.lots` at path `/procurement/lots` and marks it visible for both Admin and Operator roles.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/navigation-rbac-contract.md</path>
+        <title>Navigation and RBAC Contract</title>
+        <section>Frontend vs Backend Authority (Canonical Rule)</section>
+        <snippet>The frontend may hide or show route entry points, but backend authorization remains authoritative and must enforce role constraints regardless of UI state.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Story 3.2B: Procurement Lots Route Enablement</section>
+        <snippet>Story 3.2B requires rendering a functional `procurement.lots` page, exposing lot traceability fields, preserving role-safe access, and adding automated tests.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/tech-spec-epic-3.md</path>
+        <title>Epic Technical Specification: Procurement &amp; Inventory (Inbound)</title>
+        <section>Services and Modules</section>
+        <snippet>Procurement lots route is defined as a frontend surface for lot visibility and traceability lookups over lot-linked GRN data.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/tech-spec-epic-3.md</path>
+        <title>Epic Technical Specification: Procurement &amp; Inventory (Inbound)</title>
+        <section>APIs and Interfaces</section>
+        <snippet>The backend lot listing endpoint pattern (`POST /inventory/lots/list`) and 400/401/403/409 mapping conventions are the expected API contract model.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Functional Requirements / User Experience Principles</section>
+        <snippet>Lot tracking and keyboard-first data operations are core product requirements; procurement flows should emphasize fast, deterministic operator interactions.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/ux-design-specification.md</path>
+        <title>UX Design Specification</title>
+        <section>2.3 Core Experience Principles / 5.1 Critical User Paths / 7.1 Consistency Rules</section>
+        <snippet>UX requires speed-first interactions, role-variant clarity, and consistent route-contract behavior across shared shell experiences.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/stories/3-2-lot-tracking-system.md</path>
+        <title>Story 3.2 Completion Record</title>
+        <section>Completion Notes List</section>
+        <snippet>Story 3.2 already implemented lot persistence and listing contracts; this story should reuse those contracts and complete route/page enablement.</snippet>
+      </artifact>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>frontend/src/App.tsx</path>
+        <kind>frontend-route-renderer</kind>
+        <symbol>renderActiveView switch default placeholder branch</symbol>
+        <lines>601-660</lines>
+        <reason>Current fallback renders placeholder text for unresolved routes; `procurement.lots` currently lands here and must be replaced with real page rendering.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/shell/rbac.ts</path>
+        <kind>route-contract</kind>
+        <symbol>route id `procurement.lots`</symbol>
+        <lines>24</lines>
+        <reason>Canonical frontend route registration currently uses `viewKey: "placeholder"`, which should be transitioned to a concrete view key for lots page rendering.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/services/masterDataApi.ts</path>
+        <kind>frontend-service</kind>
+        <symbol>ListMaterialLots binding + listMaterialLots function</symbol>
+        <lines>260-268,499-523</lines>
+        <reason>Existing frontend contract for lot listing already exists and should be reused directly by the new lots page.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/app/app.go</path>
+        <kind>app-binding</kind>
+        <symbol>func (a *App) ListMaterialLots(input appInventory.ListMaterialLotsInput)</symbol>
+        <lines>1126-1159</lines>
+        <reason>Wails binding endpoint exposes lot listing in both local and server-proxy modes; route UI should consume this contract rather than introducing new transport code.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/app/inventory/service.go</path>
+        <kind>service-layer</kind>
+        <symbol>func (s *Service) ListMaterialLots(input ListMaterialLotsInput)</symbol>
+        <lines>821-834</lines>
+        <reason>Service layer applies auth and filter normalization; AC4 depends on preserving this backend-authoritative behavior.</reason>
+      </artifact>
+      <artifact>
+        <path>cmd/server/api_server.go</path>
+        <kind>api-handler</kind>
+        <symbol>POST /inventory/lots/list</symbol>
+        <lines>513-530</lines>
+        <reason>HTTP entrypoint for lot listing and mapped server errors; tests and UI behavior should align with this contract.</reason>
+      </artifact>
+      <artifact>
+        <path>cmd/server/api_server_test.go</path>
+        <kind>api-tests</kind>
+        <symbol>TestServerAPI_ListMaterialLots* suite</symbol>
+        <lines>916-1001</lines>
+        <reason>Existing tests for success and unauthorized/forbidden/validation mappings provide baseline coverage to extend for Story 3.2B contract assertions.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/shell/RoleShellNavigation.tsx</path>
+        <kind>shell-navigation</kind>
+        <symbol>route badge mapping for procurement.lots</symbol>
+        <lines>46</lines>
+        <reason>Navigation already exposes Lots route entry; missing part is route rendering implementation.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/infrastructure/db/sqlite_inventory_repository.go</path>
+        <kind>repository</kind>
+        <symbol>func (r *SqliteInventoryRepository) ListMaterialLots</symbol>
+        <lines>1235-1298</lines>
+        <reason>Repository implements filtered lot query and sort order, enabling deterministic route-level listing behavior required by AC2/AC3.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/__tests__/AppShellRBAC.test.tsx</path>
+        <kind>frontend-rbac-tests</kind>
+        <symbol>role-aware route guard behavior tests</symbol>
+        <lines>72-120</lines>
+        <reason>Current shell route guard test patterns should be mirrored/extended for procurement lots route rendering and authorization UX paths.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <go>
+        <package name="github.com/wailsapp/wails/v2" version="v2.11.0" />
+        <package name="github.com/mattn/go-sqlite3" version="v1.14.34" />
+        <package name="github.com/golang-jwt/jwt/v5" version="v5.3.1" />
+      </go>
+      <node>
+        <package name="react" version="^19.0.0" />
+        <package name="react-router-dom" version="^6.30.3" />
+        <package name="antd" version="^6.2.1" />
+        <package name="@tanstack/react-query" version="^5.66.0" />
+        <package name="axios" version="^1.7.9" />
+        <package name="vitest" version="^4.0.18" type="dev" />
+        <package name="@testing-library/react" version="^16.3.0" type="dev" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Do not change canonical route identity (`procurement.lots` / `/procurement/lots`) or module ownership semantics.</constraint>
+    <constraint>Backend authorization remains authoritative; frontend route guards must not replace server-side enforcement.</constraint>
+    <constraint>Reuse existing `ListMaterialLots` contracts across frontend service, app binding, service layer, and API handler.</constraint>
+    <constraint>Preserve existing API error mapping behavior for `400/401/403` and user-facing non-spammy error feedback.</constraint>
+    <constraint>Implement keyboard-first filter interactions consistent with operator speed workflows.</constraint>
+    <constraint>Maintain shared shell consistency across Admin and Operator variants; only route content should change.</constraint>
+    <constraint>Follow repository pattern and existing test structure conventions when adding/adjusting coverage.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Lots List Endpoint</name>
+      <kind>REST endpoint</kind>
+      <signature>POST /inventory/lots/list</signature>
+      <path>cmd/server/api_server.go</path>
+    </interface>
+    <interface>
+      <name>App Lots Binding</name>
+      <kind>Go function signature</kind>
+      <signature>func (a *App) ListMaterialLots(input appInventory.ListMaterialLotsInput) ([]MaterialLotResult, error)</signature>
+      <path>internal/app/app.go</path>
+    </interface>
+    <interface>
+      <name>Service Lots Listing</name>
+      <kind>Go function signature</kind>
+      <signature>func (s *Service) ListMaterialLots(input ListMaterialLotsInput) ([]domainInventory.MaterialLot, error)</signature>
+      <path>internal/app/inventory/service.go</path>
+    </interface>
+    <interface>
+      <name>Frontend Lots Service</name>
+      <kind>TypeScript function signature</kind>
+      <signature>listMaterialLots(params?: { activeOnly?: boolean; itemId?: number; supplier?: string; lotNumber?: string; grnNumber?: string; search?: string }): Promise&lt;MaterialLot[]&gt;</signature>
+      <path>frontend/src/services/masterDataApi.ts</path>
+    </interface>
+    <interface>
+      <name>Route Contract Entry</name>
+      <kind>Route registry entry</kind>
+      <signature>{ id: "procurement.lots", path: "/procurement/lots", module: "procurement", minRole: "operator" }</signature>
+      <path>frontend/src/shell/rbac.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Use layered verification: frontend route/component tests for rendered lots view and filter states, API contract tests for `/inventory/lots/list` success + `400/401/403` mappings, and regression checks across Go and frontend suites. Keep tests deterministic and aligned to backend-authoritative RBAC behavior.</standards>
+    <locations>
+      <location>frontend/src/__tests__/</location>
+      <location>frontend/src/components/**/__tests__/</location>
+      <location>cmd/server/api_server_test.go</location>
+      <location>internal/app/inventory/service_test.go</location>
+      <location>internal/infrastructure/db/sqlite_inventory_repository_test.go</location>
+    </locations>
+    <ideas>
+      <idea acRef="AC1">Navigate to `/procurement/lots` and assert a functional lots page renders instead of placeholder alert content.</idea>
+      <idea acRef="AC2">Mock lot-list response and verify table columns include lot number, GRN ref, supplier, item, quantity, and created timestamp.</idea>
+      <idea acRef="AC3">Submit filter combinations (`search`, `lotNumber`, `grnNumber`, `supplier`, optional `itemId`) and assert deterministic request payload + rendered results/empty state.</idea>
+      <idea acRef="AC4">Simulate `401` and `403` responses for `/inventory/lots/list` and assert UI displays actionable error feedback without bypassing backend restrictions.</idea>
+      <idea acRef="AC5">Run `go test ./...` and frontend `vitest run` and verify new lots-route tests and existing lot-list API tests pass without regressions.</idea>
+    </ideas>
+  </tests>
+</story-context>

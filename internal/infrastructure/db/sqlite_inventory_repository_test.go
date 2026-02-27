@@ -355,6 +355,64 @@ func TestSqliteInventoryRepository_ListMaterialLots_FiltersAndReturnsNewestFirst
 	}
 }
 
+func TestSqliteInventoryRepository_RecordAndListLotStockMovements_TracksNonInboundContinuity(t *testing.T) {
+	repo, _ := setupInventoryRepo(t)
+	rawID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-41", "Raw Fennel", "kg")
+
+	grn := &domainInventory.GRN{
+		GRNNumber:    "GRN-3301",
+		SupplierName: "Trace Supplier",
+		Lines: []domainInventory.GRNLine{
+			{LineNo: 1, ItemID: rawID, QuantityReceived: 30},
+		},
+	}
+	if err := repo.CreateGRN(grn); err != nil {
+		t.Fatalf("CreateGRN failed: %v", err)
+	}
+	lotNumber := grn.Lines[0].LotNumber
+	if lotNumber == "" {
+		t.Fatalf("expected lot number on GRN line")
+	}
+
+	movement := &domainInventory.StockLedgerMovement{
+		LotNumber:       lotNumber,
+		TransactionType: "OUT",
+		Quantity:        5,
+		ReferenceID:     "PK-3301",
+		Notes:           "packing consumption",
+	}
+	if err := repo.RecordLotStockMovement(movement); err != nil {
+		t.Fatalf("RecordLotStockMovement failed: %v", err)
+	}
+
+	movements, err := repo.ListLotStockMovements(domainInventory.StockLedgerMovementListFilter{
+		LotNumber: lotNumber,
+	})
+	if err != nil {
+		t.Fatalf("ListLotStockMovements failed: %v", err)
+	}
+	if len(movements) < 2 {
+		t.Fatalf("expected at least inbound and downstream movement, got %d", len(movements))
+	}
+
+	if movements[0].TransactionType != "IN" {
+		t.Fatalf("expected first movement to be inbound IN, got %s", movements[0].TransactionType)
+	}
+
+	foundDownstream := false
+	for _, m := range movements {
+		if m.TransactionType == "OUT" && m.ReferenceID == "PK-3301" {
+			foundDownstream = true
+			if m.LotNumber != lotNumber {
+				t.Fatalf("expected downstream movement lot continuity, got %q", m.LotNumber)
+			}
+		}
+	}
+	if !foundDownstream {
+		t.Fatalf("expected downstream OUT movement for lot %s", lotNumber)
+	}
+}
+
 func TestSqliteInventoryRepository_CreateGRN_PersistsSupplierAndInvoice(t *testing.T) {
 	repo, manager := setupInventoryRepo(t)
 

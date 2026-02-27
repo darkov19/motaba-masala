@@ -53,6 +53,8 @@ type serverAPIApplication interface {
 	UpdateParty(input appInventory.UpdatePartyInput) (app.PartyResult, error)
 	ListParties(input appInventory.ListPartiesInput) ([]app.PartyResult, error)
 	ListMaterialLots(input appInventory.ListMaterialLotsInput) ([]app.MaterialLotResult, error)
+	RecordLotStockMovement(input appInventory.RecordLotStockMovementInput) (app.LotStockMovementResult, error)
+	ListLotStockMovements(input appInventory.ListLotStockMovementsInput) ([]app.LotStockMovementResult, error)
 	CreateGRN(input appInventory.CreateGRNInput) (app.GRNResult, error)
 	CreateUnitConversionRule(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error)
 	ListUnitConversionRules(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error)
@@ -523,6 +525,46 @@ func buildServerAPIRouter(application serverAPIApplication) *http.ServeMux {
 		result, err := application.ListMaterialLots(input)
 		if err != nil {
 			writeMappedServerError(w, "Server inventory list lots failed", err)
+			return
+		}
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("/inventory/lots/movements/create", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input appInventory.RecordLotStockMovementInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.RecordLotStockMovement(input)
+		if err != nil {
+			writeMappedServerError(w, "Server inventory create lot movement failed", err)
+			return
+		}
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("/inventory/lots/movements/list", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input appInventory.ListLotStockMovementsInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.ListLotStockMovements(input)
+		if err != nil {
+			writeMappedServerError(w, "Server inventory list lot movements failed", err)
 			return
 		}
 		writeServerJSON(w, http.StatusOK, result)

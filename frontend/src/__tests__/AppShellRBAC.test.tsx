@@ -13,6 +13,10 @@ vi.mock("../components/forms/BatchForm", () => ({
     BatchForm: () => <div>Mock Batch Form</div>,
 }));
 
+vi.mock("../components/forms/ProcurementLotsPage", () => ({
+    ProcurementLotsPage: () => <div>Mock Procurement Lots Page</div>,
+}));
+
 vi.mock("../components/forms/ItemMasterForm", () => ({
     ItemMasterForm: () => <div>Mock Item Master Form</div>,
 }));
@@ -151,6 +155,28 @@ describe("App shell RBAC behavior", () => {
 
         expect(await screen.findByText("Operator Shell")).toBeInTheDocument();
         expect(screen.queryByRole("menuitem", { name: "Users" })).not.toBeInTheDocument();
+
+        router.dispose();
+    });
+
+    it("renders procurement lots page instead of placeholder for operator route", async () => {
+        getSessionRole.mockResolvedValue("operator");
+
+        const router = createFutureMemoryRouter(
+            [
+                {
+                    path: "*",
+                    element: <App />,
+                },
+            ],
+            ["/procurement/lots"],
+        );
+
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
+
+        expect(await screen.findByText("Operator Shell")).toBeInTheDocument();
+        expect(screen.getByText("Mock Procurement Lots Page")).toBeInTheDocument();
+        expect(screen.queryByText("This route is part of the approved contract and is reserved for upcoming stories.")).not.toBeInTheDocument();
 
         router.dispose();
     });

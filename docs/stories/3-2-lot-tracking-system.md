@@ -1,6 +1,6 @@
 # Story 3.2: Lot Tracking System
 
-Status: review
+Status: done
 
 ## Story
 
@@ -160,12 +160,15 @@ GPT-5 Codex
 - 2026-02-27: Implemented deterministic lot allocator (`LOT-YYYYMMDD-###`) with unique-conflict retry inside GRN transaction and mapped persistence conflicts/validation failures to service-layer contract errors.
 - 2026-02-27: Extended API/app/frontend contracts with `ListMaterialLots` and GRN line `lot_number`, plus GRN success UI with copyable lot IDs and explicit deferred-label messaging.
 - 2026-02-27: Added repository/service/API/frontend automated tests and verified full Go + frontend regression suites.
+- 2026-02-27: Implemented downstream non-inbound lot stock movement persistence/query path (`OUT`/`ADJUSTMENT`) with API/app/frontend contract exposure.
+- 2026-02-27: Added continuity tests proving lot traceability from inbound `IN` events to downstream non-inbound movements.
 
 ### Completion Notes List
 
 - Lot creation now runs transactionally with GRN header/lines and stock-ledger inserts; each GRN line receives a persisted `material_lots` row and `stock_ledger.lot_number` reference.
 - Lot IDs follow deterministic `LOT-YYYYMMDD-###` format using date-scoped sequence allocation with retry loop on uniqueness collisions.
 - Added backend lot lookup surface via `/inventory/lots/list`, App `ListMaterialLots`, and frontend `listMaterialLots` service contract for `procurement.lots` workflows.
+- Added downstream lot movement surfaces via `/inventory/lots/movements/create` and `/inventory/lots/movements/list`, App `RecordLotStockMovement`/`ListLotStockMovements`, and frontend service helpers.
 - GRN UI now exposes generated lot IDs as copyable values after submit and clearly states that label printing is deferred in this story scope.
 - Regression executed: `GOCACHE=/tmp/go-build-cache go test ./...` and `cd frontend && npm run test:run` both passed on 2026-02-27.
 - Windows validation script added: `scripts/s3-2-win-test.ps1` (not executed in this Linux workspace).
@@ -193,33 +196,135 @@ GPT-5 Codex
 
 - 2026-02-27: Initial draft created by create-story workflow for Story 3.2 from sprint backlog.
 - 2026-02-27: Implemented lot tracking across GRN persistence, stock ledger references, lot listing API contract, frontend GRN lot visibility, and automated coverage for repository/service/API/UI.
+- 2026-02-27: Senior Developer Review notes appended (Outcome: Blocked).
+- 2026-02-27: Implemented blocked review follow-ups for downstream lot movement continuity; re-review completed and approved.
 
 ## Senior Developer Review (AI)
 
 ### Reviewer
 
-TBD
+darko
 
 ### Date
 
-TBD
+2026-02-27
 
 ### Outcome
 
-Pending
+Blocked
 
 ### Summary
 
-Pending review.
+Implementation is solid on transactional lot creation, deterministic lot IDs, API/UI exposure, and test coverage for inbound GRN flows. However, one completed subtask over-claims scope: evidence only shows lot references persisted for inbound stock ledger writes, not for downstream non-inbound movements/adjustments as explicitly claimed in AC3 task wording. Because a completed task is not fully implemented, this review is blocked pending correction.
 
 ### Key Findings
 
-- Pending review.
+#### High
+
+1. **Task marked complete but implementation not found for full scope**
+   - Task: "Extend stock movement records/contracts with lot reference fields for inbound and subsequent adjustments/movements (AC: 3)"
+   - Finding: Repository writes `lot_number` only on GRN inbound stock ledger insert path; no evidence of non-inbound movement/adjustment persistence using lot reference.
+   - Evidence:
+     - Inbound-only lot write: `internal/infrastructure/db/sqlite_inventory_repository.go:1215`
+     - Only stock-ledger insert location found: `internal/infrastructure/db/sqlite_inventory_repository.go:1215`
+   - Impact: AC3 is only partially satisfied and traceability continuity is unproven beyond intake.
+
+#### Medium
+
+1. Parent task "Add lot-aware stock movement persistence and query surfaces..." is partially complete due the high-severity gap above.
+
+#### Low
+
+1. Migration down script does not remove `stock_ledger.lot_number` column (SQLite limitation); rollback is partial at schema level.
+   - Evidence: `internal/infrastructure/db/migrations/000011_material_lots.down.sql:1`
+
+### Acceptance Criteria Coverage
+
+| AC# | Description | Status | Evidence |
+| --- | --- | --- | --- |
+| AC1 | GRN save generates unique lot per inbound line and persists lot linked to GRN | IMPLEMENTED | `internal/infrastructure/db/sqlite_inventory_repository.go:1170`, `internal/infrastructure/db/sqlite_inventory_repository.go:1196`, `internal/infrastructure/db/sqlite_inventory_repository_test.go:211` |
+| AC2 | Deterministic lot format and persistence-level uniqueness | IMPLEMENTED | `internal/infrastructure/db/sqlite_inventory_repository.go:1097`, `internal/infrastructure/db/migrations/000011_material_lots.up.sql:3`, `internal/infrastructure/db/sqlite_inventory_repository_test.go:283` |
+| AC3 | Downstream stock movements store/expose lot reference for traceability | PARTIAL | Inbound write exists at `internal/infrastructure/db/sqlite_inventory_repository.go:1215`; no evidence of non-inbound lot-linked movement persistence |
+| AC4 | Label printing deferred; IDs generated/stored for future workflows | IMPLEMENTED | `frontend/src/components/forms/GRNForm.tsx:311`, `frontend/src/components/forms/GRNForm.tsx:320`, `frontend/src/components/forms/__tests__/GRNForm.test.tsx:190` |
+
+Summary: **3 of 4 acceptance criteria fully implemented**.
+
+### Task Completion Validation
+
+| Task | Marked As | Verified As | Evidence |
+| --- | --- | --- | --- |
+| Extend GRN write flow to create lot entities transactionally with rollback safety | [x] Complete | VERIFIED COMPLETE | `internal/infrastructure/db/sqlite_inventory_repository.go:1137`, `internal/infrastructure/db/sqlite_inventory_repository_test.go:231` |
+| Add lot number generator service with date + sequence + conflict retry | [x] Complete | VERIFIED COMPLETE | `internal/infrastructure/db/sqlite_inventory_repository.go:1097`, `internal/infrastructure/db/sqlite_inventory_repository.go:1186` |
+| Add migration and persistence for `material_lots` and GRN-line linkage | [x] Complete | VERIFIED COMPLETE | `internal/infrastructure/db/migrations/000011_material_lots.up.sql:1`, `internal/infrastructure/db/sqlite_inventory_repository.go:1170`, `internal/infrastructure/db/sqlite_inventory_repository.go:1196` |
+| Ensure lot creation for eligible inbound item types with supplier linkage metadata | [x] Complete | VERIFIED COMPLETE | `internal/infrastructure/db/sqlite_inventory_repository.go:1079`, `internal/infrastructure/db/sqlite_inventory_repository.go:1198` |
+| Add lot-aware stock movement persistence/query surfaces | [x] Complete | QUESTIONABLE | Partly covered via inbound lot write + lots list (`internal/infrastructure/db/sqlite_inventory_repository.go:1215`, `internal/infrastructure/db/sqlite_inventory_repository.go:1235`) but not all claimed movement paths |
+| Extend stock movement records/contracts with lot refs for inbound and subsequent adjustments/movements | [x] Complete | **NOT DONE (FALSELY MARKED COMPLETE)** | Only inbound write found at `internal/infrastructure/db/sqlite_inventory_repository.go:1215`; no non-inbound lot-reference writes found |
+| Add backend/API lot-listing support (`procurement.lots`) | [x] Complete | VERIFIED COMPLETE | `cmd/server/api_server.go:511`, `internal/app/app.go:1115`, `frontend/src/services/masterDataApi.ts:476` |
+| Maintain out-of-scope printing handling | [x] Complete | VERIFIED COMPLETE | `frontend/src/components/forms/GRNForm.tsx:320` |
+| Add UI/backend messaging for deferred labels with visible/copyable lot IDs | [x] Complete | VERIFIED COMPLETE | `frontend/src/components/forms/GRNForm.tsx:313`, `frontend/src/components/forms/GRNForm.tsx:195` |
+| Add automated test coverage aligned to ACs and Epic 3 strategy | [x] Complete | VERIFIED COMPLETE | `internal/infrastructure/db/sqlite_inventory_repository_test.go:175`, `cmd/server/api_server_test.go:744`, `internal/app/inventory/service_test.go:251`, `frontend/src/components/forms/__tests__/GRNForm.test.tsx:76` |
+| Add repository integration tests for lot uniqueness and rollback | [x] Complete | VERIFIED COMPLETE | `internal/infrastructure/db/sqlite_inventory_repository_test.go:231`, `internal/infrastructure/db/sqlite_inventory_repository_test.go:283` |
+| Add API contract tests for lot creation/listing and `400/401/403/409` mappings | [x] Complete | VERIFIED COMPLETE | `cmd/server/api_server_test.go:789`, `cmd/server/api_server_test.go:827`, `cmd/server/api_server_test.go:846`, `cmd/server/api_server_test.go:881`, `cmd/server/api_server_test.go:900` |
+| Add service tests for read-only write denial on lot-generating GRN writes | [x] Complete | VERIFIED COMPLETE | `internal/app/inventory/service_test.go:370` |
+| Add frontend/component tests for GRN confirmation lot IDs and keyboard-first flow | [x] Complete | VERIFIED COMPLETE | `frontend/src/components/forms/__tests__/GRNForm.test.tsx:111`, `frontend/src/components/forms/__tests__/GRNForm.test.tsx:190` |
+
+Summary: **12 of 14 completed tasks verified, 1 questionable, 1 falsely marked complete**.
+
+### Test Coverage and Gaps
+
+- Verified passing targeted tests:
+  - `go test ./internal/infrastructure/db ./internal/app/inventory ./cmd/server`
+  - `frontend: vitest run src/components/forms/__tests__/GRNForm.test.tsx`
+- Coverage is strong for inbound GRN + lot creation flow, API error mappings, and GRN UI behavior.
+- Gap: no automated proof of lot reference continuity for downstream non-inbound movements tied to AC3 full wording.
+
+### Architectural Alignment
+
+- Transactional write pattern and repository-centric migration flow align with architecture guidance.
+- Route and binding additions (`/inventory/lots/list`, `App.ListMaterialLots`) align with existing layering.
+- Partial deviation from epic AC5 intent (traceability through subsequent operations) remains unresolved.
+
+### Security Notes
+
+- Auth/RBAC and license-mode behavior are covered by service/API tests for `401/403` and read-only denial.
+- No additional critical security defects identified in reviewed diff scope.
+
+### Best-Practices and References
+
+- Go transaction handling guidance (official): https://go.dev/doc/database/execute-transactions
+- SQLite constraint/reference behavior (official): https://www.sqlite.org/lang_createtable.html
+- Testing Library guiding principles (official): https://testing-library.com/docs/guiding-principles/
+- Project stack/context versions:
+  - Go `1.26` + SQLite driver `github.com/mattn/go-sqlite3 v1.14.34` (`go.mod`)
+  - Vitest `^4.0.18` (`frontend/package.json`)
 
 ### Action Items
 
-- [x] Pending review.
+**Code Changes Required:**
+- [x] [High] Implement lot-reference persistence for downstream non-inbound stock movements/adjustments and expose them in traceability queries (AC #3) [file: internal/infrastructure/db/sqlite_inventory_repository.go:1300]
+- [x] [Med] Add integration/API tests proving lot-reference continuity across at least one downstream non-inbound movement path (AC #3) [file: internal/infrastructure/db/sqlite_inventory_repository_test.go:358]
+
+**Advisory Notes:**
+- Note: Document migration rollback expectations for SQLite column-add behavior to avoid false assumptions during downgrade drills (no action required).
 
 ### Review Follow-ups (AI)
 
-- [x] Pending review.
+- [x] [AI-Review][High] Implement downstream non-inbound lot-reference stock movement persistence and query exposure (AC #3).
+- [x] [AI-Review][Med] Add automated downstream lot-trace continuity tests covering non-inbound movement paths (AC #3).
+
+### Re-Review Addendum (AI)
+
+- Reviewer: darko
+- Date: 2026-02-27
+- Outcome: Approve
+- Scope: Verified closure of blocked AC3 continuity gap from prior review.
+- Evidence:
+  - Downstream lot movement persistence path implemented: `internal/infrastructure/db/sqlite_inventory_repository.go:1300`
+  - Downstream lot movement query path implemented: `internal/infrastructure/db/sqlite_inventory_repository.go:1343`
+  - Service contract for non-inbound lot movements: `internal/app/inventory/service.go:837`
+  - API contract for downstream lot movements: `cmd/server/api_server.go:533`
+  - Integration continuity test (inbound `IN` + downstream `OUT` same lot): `internal/infrastructure/db/sqlite_inventory_repository_test.go:358`
+  - API contract tests for create/list lot movements: `cmd/server/api_server_test.go:1003`, `cmd/server/api_server_test.go:1054`
+- AC Coverage Update:
+  - AC3 now IMPLEMENTED (downstream non-inbound lot-reference persistence and exposure verified).
+  - Story acceptance criteria are fully satisfied.

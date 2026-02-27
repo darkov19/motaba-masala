@@ -31,6 +31,9 @@ var (
 	ErrGRNLinesRequired    = errors.New("at least one grn line is required")
 	ErrGRNLineItemID       = errors.New("grn line item id is required")
 	ErrGRNLineQuantity     = errors.New("grn line quantity must be greater than zero")
+	ErrLotNumberRequired   = errors.New("lot number is required")
+	ErrMovementTypeInvalid = errors.New("movement type must be OUT or ADJUSTMENT")
+	ErrMovementQtyInvalid  = errors.New("movement quantity must be greater than zero")
 )
 
 func ParseItemType(value string) ItemType {
@@ -204,6 +207,42 @@ type MaterialLotListFilter struct {
 	GRNNumber  string
 	ActiveOnly bool
 	Search     string
+}
+
+type StockLedgerMovement struct {
+	ID              int64     `json:"id"`
+	ItemID          int64     `json:"item_id"`
+	TransactionType string    `json:"transaction_type"`
+	Quantity        float64   `json:"quantity"`
+	ReferenceID     string    `json:"reference_id"`
+	LotNumber       string    `json:"lot_number"`
+	Notes           string    `json:"notes"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+type StockLedgerMovementListFilter struct {
+	LotNumber string
+}
+
+func (m *StockLedgerMovement) ValidateNonInbound() error {
+	if m == nil {
+		return errors.New("movement is nil")
+	}
+	m.TransactionType = strings.ToUpper(strings.TrimSpace(m.TransactionType))
+	m.ReferenceID = strings.TrimSpace(m.ReferenceID)
+	m.LotNumber = strings.TrimSpace(m.LotNumber)
+	m.Notes = strings.TrimSpace(m.Notes)
+
+	if m.LotNumber == "" {
+		return ErrLotNumberRequired
+	}
+	if m.TransactionType != "OUT" && m.TransactionType != "ADJUSTMENT" {
+		return ErrMovementTypeInvalid
+	}
+	if m.Quantity <= 0 {
+		return ErrMovementQtyInvalid
+	}
+	return nil
 }
 
 func (g *GRN) Validate() error {

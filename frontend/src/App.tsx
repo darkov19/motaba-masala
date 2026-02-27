@@ -21,6 +21,7 @@ import { RecipeForm } from "./components/forms/RecipeForm";
 import { PartyMasterForm } from "./components/forms/PartyMasterForm";
 import { PackagingProfileForm } from "./components/forms/PackagingProfileForm";
 import { AdminUserForm } from "./components/forms/AdminUserForm";
+import { ProcurementLotsPage } from "./components/forms/ProcurementLotsPage";
 import { useUnsavedChanges } from "./hooks/useUnsavedChanges";
 import { AppShell } from "./shell/AppShell";
 import {
@@ -239,6 +240,7 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         "recipe-master": false,
         "party-master": false,
         grn: false,
+        "procurement-lots": false,
         batch: false,
         "packaging-profile": false,
         "system-users": false,
@@ -404,6 +406,7 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
             || dirtyByView["party-master"]
             || dirtyByView["packaging-profile"]
             || dirtyByView["system-users"]
+            || dirtyByView["procurement-lots"]
             || dirtyByView.placeholder,
         [dirtyByView],
     );
@@ -437,6 +440,10 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
 
     const onBatchDirtyChange = useCallback((isDirty: boolean) => {
         setDirtyFor("batch", isDirty);
+    }, [setDirtyFor]);
+
+    const onProcurementLotsDirtyChange = useCallback((isDirty: boolean) => {
+        setDirtyFor("procurement-lots", isDirty);
     }, [setDirtyFor]);
 
     const onItemMasterDirtyChange = useCallback((isDirty: boolean) => {
@@ -607,6 +614,12 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                         userKey={role}
                         writeDisabled={writeDisabled}
                         onDirtyChange={onGRNDirtyChange}
+                    />
+                );
+            case "procurement-lots":
+                return (
+                    <ProcurementLotsPage
+                        onDirtyChange={onProcurementLotsDirtyChange}
                     />
                 );
             case "batch":

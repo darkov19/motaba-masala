@@ -432,6 +432,36 @@ Role and module access assumptions must remain consistent with `docs/navigation-
 
 **Technical Notes:** Lot Table: ID, ItemID, GRN_Ref, Qty, ExpiryDate.
 
+### Story 3.2B: Procurement Lots Route Enablement
+
+**As a** Quality Manager and Data Entry Operator,
+**I want** the `procurement.lots` route to render an operational lot lookup surface with role-safe access,
+**So that** inbound lot traceability is usable from the shell contract instead of remaining a placeholder.
+
+**Acceptance Criteria:**
+
+- **Given** an authenticated Admin or Data Entry Operator
+- **When** they open route `procurement.lots`
+- **Then** the application renders a functional lots page (not placeholder messaging)
+- **And** it lists lot records with core traceability fields (Lot Number, GRN Reference, Supplier, Item, Quantity, Created At)
+- **And** keyboard-first navigation supports filter input and search submission
+
+- **Given** the lots page is used for lookup
+- **When** the user applies filters (`search`, `lot_number`, `grn_number`, `supplier`, optional `item_id`)
+- **Then** results are fetched via backend lot-listing contract and displayed deterministically
+- **And** empty/error states are explicit and non-spammy
+
+- **Given** route and action authorization boundaries
+- **When** unauthorized or forbidden access is attempted
+- **Then** backend-authoritative access controls are enforced (`401/403`)
+- **And** frontend role guards do not bypass server authorization behavior
+
+- **Given** this story is completed
+- **When** automated tests run
+- **Then** route rendering, filtering behavior, and `400/401/403` contract mappings are covered by frontend/API tests
+
+**Technical Notes:** Reuse Story 3.2 lot query contracts (`ListMaterialLots`, `/inventory/lots/list`) and complete only the route/page enablement and UX conformance gap.
+
 ### Story 3.3: Third-Party Bulk Procurement
 
 **As a** Store Keeper,

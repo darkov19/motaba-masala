@@ -34,6 +34,8 @@ type stubServerAPIApplication struct {
 	updatePartyFn            func(input appInventory.UpdatePartyInput) (app.PartyResult, error)
 	listPartiesFn            func(input appInventory.ListPartiesInput) ([]app.PartyResult, error)
 	listMaterialLotsFn       func(input appInventory.ListMaterialLotsInput) ([]app.MaterialLotResult, error)
+	recordLotMovementFn      func(input appInventory.RecordLotStockMovementInput) (app.LotStockMovementResult, error)
+	listLotMovementsFn       func(input appInventory.ListLotStockMovementsInput) ([]app.LotStockMovementResult, error)
 	createGRNFn              func(input appInventory.CreateGRNInput) (app.GRNResult, error)
 	createConversionRuleFn   func(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error)
 	listConversionRulesFn    func(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error)
@@ -256,6 +258,20 @@ func (s stubServerAPIApplication) CreateGRN(input appInventory.CreateGRNInput) (
 func (s stubServerAPIApplication) ListMaterialLots(input appInventory.ListMaterialLotsInput) ([]app.MaterialLotResult, error) {
 	if s.listMaterialLotsFn != nil {
 		return s.listMaterialLotsFn(input)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) RecordLotStockMovement(input appInventory.RecordLotStockMovementInput) (app.LotStockMovementResult, error) {
+	if s.recordLotMovementFn != nil {
+		return s.recordLotMovementFn(input)
+	}
+	return app.LotStockMovementResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) ListLotStockMovements(input appInventory.ListLotStockMovementsInput) ([]app.LotStockMovementResult, error) {
+	if s.listLotMovementsFn != nil {
+		return s.listLotMovementsFn(input)
 	}
 	return nil, errors.New("not implemented")
 }
@@ -936,6 +952,39 @@ func TestServerAPI_ListMaterialLotsSuccess(t *testing.T) {
 	}
 }
 
+func TestServerAPI_ListMaterialLotsForwardsFilterContract(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		listMaterialLotsFn: func(input appInventory.ListMaterialLotsInput) ([]app.MaterialLotResult, error) {
+			if input.AuthToken != "operator-token" {
+				t.Fatalf("expected operator auth token, got %q", input.AuthToken)
+			}
+			if input.Search != "LOT-20260227" || input.LotNumber != "LOT-20260227-001" || input.GRNNumber != "GRN-3001" || input.Supplier != "Acme Supplier" {
+				t.Fatalf("unexpected text filters: %+v", input)
+			}
+			if input.ItemID == nil || *input.ItemID != 11 {
+				t.Fatalf("expected item_id=11, got %+v", input.ItemID)
+			}
+			if input.ActiveOnly {
+				t.Fatalf("expected active_only=false in payload, got true")
+			}
+			return []app.MaterialLotResult{}, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/lots/list", map[string]interface{}{
+		"auth_token":  "operator-token",
+		"search":      "LOT-20260227",
+		"lot_number":  "LOT-20260227-001",
+		"grn_number":  "GRN-3001",
+		"supplier":    "Acme Supplier",
+		"item_id":     11,
+		"active_only": false,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+}
+
 func TestServerAPI_ListMaterialLotsUnauthorizedReturnsUnauthorized(t *testing.T) {
 	router := buildServerAPIRouter(stubServerAPIApplication{
 		listMaterialLotsFn: func(_ appInventory.ListMaterialLotsInput) ([]app.MaterialLotResult, error) {
@@ -982,6 +1031,93 @@ func TestServerAPI_ListMaterialLotsValidationReturnsBadRequest(t *testing.T) {
 		"auth_token": "operator-token",
 	})
 	assertErrorStatusAndMessage(t, rec, http.StatusBadRequest, "invalid lot query filter")
+}
+
+func TestServerAPI_RecordLotStockMovementSuccess(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		recordLotMovementFn: func(input appInventory.RecordLotStockMovementInput) (app.LotStockMovementResult, error) {
+			if input.AuthToken != "operator-token" || input.LotNumber != "LOT-20260227-001" || input.TransactionType != "OUT" {
+				t.Fatalf("unexpected record lot movement input: %+v", input)
+			}
+			return app.LotStockMovementResult{
+				ID:              20,
+				ItemID:          11,
+				TransactionType: "OUT",
+				Quantity:        2.5,
+				ReferenceID:     "PK-1001",
+				LotNumber:       "LOT-20260227-001",
+				Notes:           "packing consumption",
+				CreatedAt:       "2026-02-27T10:30:00Z",
+			}, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/lots/movements/create", map[string]interface{}{
+		"auth_token":       "operator-token",
+		"lot_number":       "LOT-20260227-001",
+		"transaction_type": "OUT",
+		"quantity":         2.5,
+		"reference_id":     "PK-1001",
+		"notes":            "packing consumption",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+}
+
+func TestServerAPI_RecordLotStockMovementValidationReturnsBadRequest(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		recordLotMovementFn: func(_ appInventory.RecordLotStockMovementInput) (app.LotStockMovementResult, error) {
+			return app.LotStockMovementResult{}, &appInventory.ServiceError{
+				Code:    "validation_failed",
+				Message: "lot movement validation failed",
+			}
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/lots/movements/create", map[string]interface{}{
+		"auth_token":       "operator-token",
+		"lot_number":       "",
+		"transaction_type": "OUT",
+		"quantity":         2.5,
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusBadRequest, "lot movement validation failed")
+}
+
+func TestServerAPI_ListLotStockMovementsSuccess(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		listLotMovementsFn: func(input appInventory.ListLotStockMovementsInput) ([]app.LotStockMovementResult, error) {
+			if input.AuthToken != "operator-token" || input.LotNumber != "LOT-20260227-001" {
+				t.Fatalf("unexpected list lot movements input: %+v", input)
+			}
+			return []app.LotStockMovementResult{
+				{
+					ID:              1,
+					ItemID:          11,
+					TransactionType: "IN",
+					Quantity:        40,
+					ReferenceID:     "GRN-3001",
+					LotNumber:       "LOT-20260227-001",
+				},
+				{
+					ID:              20,
+					ItemID:          11,
+					TransactionType: "OUT",
+					Quantity:        2.5,
+					ReferenceID:     "PK-1001",
+					LotNumber:       "LOT-20260227-001",
+				},
+			}, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/lots/movements/list", map[string]interface{}{
+		"auth_token": "operator-token",
+		"lot_number": "LOT-20260227-001",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
 }
 
 func TestServerAPI_CreateUnitConversionRuleSuccess(t *testing.T) {

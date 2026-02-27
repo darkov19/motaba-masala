@@ -297,3 +297,5 @@ Internal integration points:
 - Story 3.1: Add GRN-specific read-only license write-denial coverage to prove procurement writes are blocked under grace/read-only mode.
 - Story 3.1: Add frontend integration assertions for keyboard-first rapid GRN flow (focus order, Enter-submit cadence, repeat entry).
 - Story 3.1: Add frontend/integration proof that RAW and PACKING_MATERIAL line items remain discrete and produce independent stock effects at intake.
+- Story 3.2: Implement lot-reference persistence for downstream non-inbound stock movements/adjustments and expose in traceability queries (Review blocker; AC5/Story AC3 continuity). **Resolved 2026-02-27**.
+- Story 3.2: Add integration/API tests proving lot-reference continuity across at least one downstream non-inbound movement path. **Resolved 2026-02-27**.

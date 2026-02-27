@@ -729,6 +729,17 @@ type MaterialLotResult struct {
 	CreatedAt        string  `json:"created_at"`
 }
 
+type LotStockMovementResult struct {
+	ID              int64   `json:"id"`
+	ItemID          int64   `json:"item_id"`
+	TransactionType string  `json:"transaction_type"`
+	Quantity        float64 `json:"quantity"`
+	ReferenceID     string  `json:"reference_id"`
+	LotNumber       string  `json:"lot_number"`
+	Notes           string  `json:"notes"`
+	CreatedAt       string  `json:"created_at"`
+}
+
 type UnitConversionRuleResult struct {
 	ID             int64   `json:"id"`
 	ItemID         *int64  `json:"item_id,omitempty"`
@@ -1140,6 +1151,66 @@ func (a *App) ListMaterialLots(input appInventory.ListMaterialLotsInput) ([]Mate
 			SupplierName:     lot.SupplierName,
 			QuantityReceived: lot.QuantityReceived,
 			CreatedAt:        lot.CreatedAt.Format(time.RFC3339Nano),
+		})
+	}
+	return result, nil
+}
+
+func (a *App) RecordLotStockMovement(input appInventory.RecordLotStockMovementInput) (LotStockMovementResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result LotStockMovementResult
+		if err := postToServerAPI("/inventory/lots/movements/create", input, &result); err != nil {
+			return LotStockMovementResult{}, err
+		}
+		return result, nil
+	}
+	if a.inventoryService == nil {
+		return LotStockMovementResult{}, fmt.Errorf("inventory service is not configured")
+	}
+
+	movement, err := a.inventoryService.RecordLotStockMovement(input)
+	if err != nil {
+		return LotStockMovementResult{}, err
+	}
+	return LotStockMovementResult{
+		ID:              movement.ID,
+		ItemID:          movement.ItemID,
+		TransactionType: movement.TransactionType,
+		Quantity:        movement.Quantity,
+		ReferenceID:     movement.ReferenceID,
+		LotNumber:       movement.LotNumber,
+		Notes:           movement.Notes,
+		CreatedAt:       movement.CreatedAt.Format(time.RFC3339Nano),
+	}, nil
+}
+
+func (a *App) ListLotStockMovements(input appInventory.ListLotStockMovementsInput) ([]LotStockMovementResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result []LotStockMovementResult
+		if err := postToServerAPI("/inventory/lots/movements/list", input, &result); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+	if a.inventoryService == nil {
+		return nil, fmt.Errorf("inventory service is not configured")
+	}
+
+	movements, err := a.inventoryService.ListLotStockMovements(input)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]LotStockMovementResult, 0, len(movements))
+	for _, movement := range movements {
+		result = append(result, LotStockMovementResult{
+			ID:              movement.ID,
+			ItemID:          movement.ItemID,
+			TransactionType: movement.TransactionType,
+			Quantity:        movement.Quantity,
+			ReferenceID:     movement.ReferenceID,
+			LotNumber:       movement.LotNumber,
+			Notes:           movement.Notes,
+			CreatedAt:       movement.CreatedAt.Format(time.RFC3339Nano),
 		})
 	}
 	return result, nil
