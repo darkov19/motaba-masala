@@ -700,6 +700,22 @@ type PartyResult struct {
 	UpdatedAt    string `json:"updated_at"`
 }
 
+type GRNLineResult struct {
+	LineNo           int     `json:"line_no"`
+	ItemID           int64   `json:"item_id"`
+	QuantityReceived float64 `json:"quantity_received"`
+}
+
+type GRNResult struct {
+	ID           int64           `json:"id"`
+	GRNNumber    string          `json:"grn_number"`
+	SupplierName string          `json:"supplier_name"`
+	InvoiceNo    string          `json:"invoice_no"`
+	Notes        string          `json:"notes"`
+	UpdatedAt    string          `json:"updated_at"`
+	Lines        []GRNLineResult `json:"lines"`
+}
+
 type UnitConversionRuleResult struct {
 	ID             int64   `json:"id"`
 	ItemID         *int64  `json:"item_id,omitempty"`
@@ -1081,6 +1097,41 @@ func (a *App) ListParties(input appInventory.ListPartiesInput) ([]PartyResult, e
 		})
 	}
 	return result, nil
+}
+
+func (a *App) CreateGRN(input appInventory.CreateGRNInput) (GRNResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result GRNResult
+		if err := postToServerAPI("/inventory/grns/create", input, &result); err != nil {
+			return GRNResult{}, err
+		}
+		return result, nil
+	}
+	if a.inventoryService == nil {
+		return GRNResult{}, fmt.Errorf("inventory service is not configured")
+	}
+
+	grn, err := a.inventoryService.CreateGRNRecord(input)
+	if err != nil {
+		return GRNResult{}, err
+	}
+	lines := make([]GRNLineResult, 0, len(grn.Lines))
+	for _, line := range grn.Lines {
+		lines = append(lines, GRNLineResult{
+			LineNo:           line.LineNo,
+			ItemID:           line.ItemID,
+			QuantityReceived: line.QuantityReceived,
+		})
+	}
+	return GRNResult{
+		ID:           grn.ID,
+		GRNNumber:    grn.GRNNumber,
+		SupplierName: grn.SupplierName,
+		InvoiceNo:    grn.InvoiceNo,
+		Notes:        grn.Notes,
+		UpdatedAt:    grn.UpdatedAt.Format(time.RFC3339Nano),
+		Lines:        lines,
+	}, nil
 }
 
 func (a *App) CreateUnitConversionRule(input appInventory.CreateUnitConversionRuleInput) (UnitConversionRuleResult, error) {

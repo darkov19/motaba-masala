@@ -52,6 +52,7 @@ type serverAPIApplication interface {
 	CreateParty(input appInventory.CreatePartyInput) (app.PartyResult, error)
 	UpdateParty(input appInventory.UpdatePartyInput) (app.PartyResult, error)
 	ListParties(input appInventory.ListPartiesInput) ([]app.PartyResult, error)
+	CreateGRN(input appInventory.CreateGRNInput) (app.GRNResult, error)
 	CreateUnitConversionRule(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error)
 	ListUnitConversionRules(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error)
 	ConvertQuantity(input appInventory.ConvertQuantityInput) (app.UnitConversionResult, error)
@@ -486,6 +487,26 @@ func buildServerAPIRouter(application serverAPIApplication) *http.ServeMux {
 		writeServerJSON(w, http.StatusOK, result)
 	})
 
+	mux.HandleFunc("/inventory/grns/create", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input appInventory.CreateGRNInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.CreateGRN(input)
+		if err != nil {
+			writeMappedServerError(w, "Server inventory create grn failed", err)
+			return
+		}
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
 	mux.HandleFunc("/inventory/conversions/rules/create", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -615,6 +636,8 @@ func mapHTTPStatus(message string) int {
 		strings.Contains(msg, "forbidden"),
 		strings.Contains(msg, "not allowed"),
 		strings.Contains(msg, "disabled"):
+		return http.StatusForbidden
+	case strings.Contains(msg, "read-only"), strings.Contains(msg, "license expired"):
 		return http.StatusForbidden
 	case strings.Contains(msg, "record modified"), strings.Contains(msg, "concurrency"):
 		return http.StatusConflict

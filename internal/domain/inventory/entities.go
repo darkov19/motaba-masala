@@ -26,6 +26,11 @@ var (
 	ErrProfileComponents   = errors.New("at least one packaging component is required")
 	ErrComponentItemID     = errors.New("packing material item id is required")
 	ErrComponentQty        = errors.New("component qty_per_unit must be greater than zero")
+	ErrGRNNumberRequired   = errors.New("grn number is required")
+	ErrGRNSupplierRequired = errors.New("supplier reference is required")
+	ErrGRNLinesRequired    = errors.New("at least one grn line is required")
+	ErrGRNLineItemID       = errors.New("grn line item id is required")
+	ErrGRNLineQuantity     = errors.New("grn line quantity must be greater than zero")
 )
 
 func ParseItemType(value string) ItemType {
@@ -166,6 +171,48 @@ type GRN struct {
 	SupplierName string    `json:"supplier_name"`
 	InvoiceNo    string    `json:"invoice_no"`
 	Notes        string    `json:"notes"`
+	Lines        []GRNLine `json:"lines"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type GRNLine struct {
+	ID               int64   `json:"id"`
+	GRNID            int64   `json:"grn_id"`
+	LineNo           int     `json:"line_no"`
+	ItemID           int64   `json:"item_id"`
+	QuantityReceived float64 `json:"quantity_received"`
+}
+
+func (g *GRN) Validate() error {
+	if g == nil {
+		return errors.New("grn is nil")
+	}
+	g.GRNNumber = strings.TrimSpace(g.GRNNumber)
+	g.SupplierName = strings.TrimSpace(g.SupplierName)
+	g.InvoiceNo = strings.TrimSpace(g.InvoiceNo)
+	g.Notes = strings.TrimSpace(g.Notes)
+
+	if g.GRNNumber == "" {
+		return ErrGRNNumberRequired
+	}
+	if g.SupplierName == "" {
+		return ErrGRNSupplierRequired
+	}
+	if len(g.Lines) == 0 {
+		return ErrGRNLinesRequired
+	}
+	for i := range g.Lines {
+		line := &g.Lines[i]
+		if line.LineNo <= 0 {
+			line.LineNo = i + 1
+		}
+		if line.ItemID <= 0 {
+			return ErrGRNLineItemID
+		}
+		if line.QuantityReceived <= 0 {
+			return ErrGRNLineQuantity
+		}
+	}
+	return nil
 }

@@ -290,3 +290,10 @@ Internal integration points:
 - AC coverage strategy:
 - Maintain direct mapping from AC1-AC12 to automated tests (at least one test per AC).
 - Prioritize critical-path regressions first: inbound stock accuracy, lot traceability, and reconciliation audit integrity.
+
+## Post-Review Follow-ups
+
+- Story 3.1: Add explicit negative-quantity (`< 0`) coverage for GRN validation in service/API/frontend test suites; current evidence is zero-quantity focused.
+- Story 3.1: Add GRN-specific read-only license write-denial coverage to prove procurement writes are blocked under grace/read-only mode.
+- Story 3.1: Add frontend integration assertions for keyboard-first rapid GRN flow (focus order, Enter-submit cadence, repeat entry).
+- Story 3.1: Add frontend/integration proof that RAW and PACKING_MATERIAL line items remain discrete and produce independent stock effects at intake.

@@ -10,6 +10,7 @@ import (
 
 	"masala_inventory_managment/internal/app"
 	appInventory "masala_inventory_managment/internal/app/inventory"
+	appLicenseMode "masala_inventory_managment/internal/app/licensemode"
 )
 
 type stubServerAPIApplication struct {
@@ -32,6 +33,7 @@ type stubServerAPIApplication struct {
 	createPartyFn            func(input appInventory.CreatePartyInput) (app.PartyResult, error)
 	updatePartyFn            func(input appInventory.UpdatePartyInput) (app.PartyResult, error)
 	listPartiesFn            func(input appInventory.ListPartiesInput) ([]app.PartyResult, error)
+	createGRNFn              func(input appInventory.CreateGRNInput) (app.GRNResult, error)
 	createConversionRuleFn   func(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error)
 	listConversionRulesFn    func(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error)
 	convertQuantityFn        func(input appInventory.ConvertQuantityInput) (app.UnitConversionResult, error)
@@ -241,6 +243,13 @@ func (s stubServerAPIApplication) ListParties(input appInventory.ListPartiesInpu
 		return s.listPartiesFn(input)
 	}
 	return nil, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) CreateGRN(input appInventory.CreateGRNInput) (app.GRNResult, error) {
+	if s.createGRNFn != nil {
+		return s.createGRNFn(input)
+	}
+	return app.GRNResult{}, errors.New("not implemented")
 }
 
 func (s stubServerAPIApplication) CreateUnitConversionRule(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error) {
@@ -722,6 +731,162 @@ func TestServerAPI_ListPartiesSuccess(t *testing.T) {
 	if len(payload) != 1 || payload[0].ID != 51 || payload[0].Name != "Acme Supplier" {
 		t.Fatalf("unexpected response payload: %#v", payload)
 	}
+}
+
+func TestServerAPI_CreateGRNSuccess(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		createGRNFn: func(input appInventory.CreateGRNInput) (app.GRNResult, error) {
+			if input.GRNNumber != "GRN-3001" || input.AuthToken != "operator-token" || len(input.Lines) != 2 {
+				t.Fatalf("unexpected create grn input: %+v", input)
+			}
+			return app.GRNResult{
+				ID:           3001,
+				GRNNumber:    input.GRNNumber,
+				SupplierName: input.SupplierName,
+				InvoiceNo:    input.InvoiceNo,
+				Notes:        input.Notes,
+				Lines: []app.GRNLineResult{
+					{LineNo: 1, ItemID: 11, QuantityReceived: 40},
+					{LineNo: 2, ItemID: 12, QuantityReceived: 15},
+				},
+			}, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/grns/create", map[string]interface{}{
+		"grn_number":    "GRN-3001",
+		"supplier_name": "Acme Supplier",
+		"invoice_no":    "INV-3001",
+		"notes":         "Dock receipt",
+		"auth_token":    "operator-token",
+		"lines": []map[string]interface{}{
+			{"item_id": 11, "quantity_received": 40},
+			{"item_id": 12, "quantity_received": 15},
+		},
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var payload app.GRNResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.ID != 3001 || len(payload.Lines) != 2 {
+		t.Fatalf("unexpected response payload: %#v", payload)
+	}
+}
+
+func TestServerAPI_CreateGRNValidationReturnsBadRequest(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		createGRNFn: func(_ appInventory.CreateGRNInput) (app.GRNResult, error) {
+			return app.GRNResult{}, &appInventory.ServiceError{
+				Code:    "validation_failed",
+				Message: "grn validation failed",
+			}
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/grns/create", map[string]interface{}{
+		"grn_number":    "GRN-3001",
+		"supplier_name": "Acme Supplier",
+		"auth_token":    "admin-token",
+		"lines":         []map[string]interface{}{{"item_id": 11, "quantity_received": 0}},
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusBadRequest, "grn validation failed")
+}
+
+func TestServerAPI_CreateGRNNegativeQuantityReturnsBadRequest(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		createGRNFn: func(_ appInventory.CreateGRNInput) (app.GRNResult, error) {
+			return app.GRNResult{}, &appInventory.ServiceError{
+				Code:    "validation_failed",
+				Message: "grn validation failed",
+			}
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/grns/create", map[string]interface{}{
+		"grn_number":    "GRN-3001",
+		"supplier_name": "Acme Supplier",
+		"auth_token":    "admin-token",
+		"lines":         []map[string]interface{}{{"item_id": 11, "quantity_received": -1}},
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusBadRequest, "grn validation failed")
+}
+
+func TestServerAPI_CreateGRNUnauthorizedReturnsUnauthorized(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		createGRNFn: func(_ appInventory.CreateGRNInput) (app.GRNResult, error) {
+			return app.GRNResult{}, &appInventory.ServiceError{
+				Code:    "unauthorized",
+				Message: "invalid or expired authentication token",
+			}
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/grns/create", map[string]interface{}{
+		"grn_number":    "GRN-3001",
+		"supplier_name": "Acme Supplier",
+		"auth_token":    "stale-token",
+		"lines":         []map[string]interface{}{{"item_id": 11, "quantity_received": 1}},
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusUnauthorized, "invalid or expired authentication token")
+}
+
+func TestServerAPI_CreateGRNForbiddenReturnsForbidden(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		createGRNFn: func(_ appInventory.CreateGRNInput) (app.GRNResult, error) {
+			return app.GRNResult{}, &appInventory.ServiceError{
+				Code:    "forbidden",
+				Message: "role is not allowed to read master data",
+			}
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/grns/create", map[string]interface{}{
+		"grn_number":    "GRN-3001",
+		"supplier_name": "Acme Supplier",
+		"auth_token":    "viewer-token",
+		"lines":         []map[string]interface{}{{"item_id": 11, "quantity_received": 1}},
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusForbidden, "role is not allowed to read master data")
+}
+
+func TestServerAPI_CreateGRNReadOnlyLicenseReturnsForbidden(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		createGRNFn: func(_ appInventory.CreateGRNInput) (app.GRNResult, error) {
+			return app.GRNResult{}, appLicenseMode.ErrReadOnlyMode
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/grns/create", map[string]interface{}{
+		"grn_number":    "GRN-3001",
+		"supplier_name": "Acme Supplier",
+		"auth_token":    "operator-token",
+		"lines":         []map[string]interface{}{{"item_id": 11, "quantity_received": 1}},
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusForbidden, appLicenseMode.ErrReadOnlyMode.Error())
+}
+
+func TestServerAPI_CreateGRNConflictReturnsConflict(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		createGRNFn: func(_ appInventory.CreateGRNInput) (app.GRNResult, error) {
+			return app.GRNResult{}, &appInventory.ServiceError{
+				Code:    "conflict",
+				Message: "grn_number already exists",
+			}
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/grns/create", map[string]interface{}{
+		"grn_number":    "GRN-3001",
+		"supplier_name": "Acme Supplier",
+		"auth_token":    "admin-token",
+		"lines":         []map[string]interface{}{{"item_id": 11, "quantity_received": 1}},
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusConflict, "grn_number already exists")
 }
 
 func TestServerAPI_CreateUnitConversionRuleSuccess(t *testing.T) {

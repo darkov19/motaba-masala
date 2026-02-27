@@ -123,12 +123,16 @@ func TestSqliteInventoryRepository_UpdateBatch_ConcurrencyConflict(t *testing.T)
 
 func TestSqliteInventoryRepository_UpdateGRN_ConcurrencyConflict(t *testing.T) {
 	repo, manager := setupInventoryRepo(t)
+	rawID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-100", "Raw Turmeric", "kg")
 
 	grn := &domainInventory.GRN{
 		GRNNumber:    "GRN-100",
 		SupplierName: "Supplier A",
 		InvoiceNo:    "INV-100",
 		Notes:        "Initial",
+		Lines: []domainInventory.GRNLine{
+			{LineNo: 1, ItemID: rawID, QuantityReceived: 10},
+		},
 	}
 	if err := repo.CreateGRN(grn); err != nil {
 		t.Fatalf("CreateGRN failed: %v", err)
@@ -148,6 +152,129 @@ func TestSqliteInventoryRepository_UpdateGRN_ConcurrencyConflict(t *testing.T) {
 	err := repo.UpdateGRN(&stale)
 	if !errors.Is(err, domainErrors.ErrConcurrencyConflict) {
 		t.Fatalf("Expected ErrConcurrencyConflict, got %v", err)
+	}
+}
+
+func createTestInventoryItem(t *testing.T, repo *SqliteInventoryRepository, itemType domainInventory.ItemType, sku, name, baseUnit string) int64 {
+	t.Helper()
+
+	item := &domainInventory.Item{
+		SKU:      sku,
+		Name:     name,
+		ItemType: itemType,
+		BaseUnit: baseUnit,
+		IsActive: true,
+	}
+	if err := repo.CreateItem(item); err != nil {
+		t.Fatalf("CreateItem failed: %v", err)
+	}
+	return item.ID
+}
+
+func TestSqliteInventoryRepository_CreateGRN_PersistsLinesAndStockLedger(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	rawID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-10", "Raw Chili", "kg")
+	packID := createTestInventoryItem(t, repo, domainInventory.ItemTypePackingMaterial, "PACK-20", "Pouch Film", "pcs")
+
+	grn := &domainInventory.GRN{
+		GRNNumber:    "GRN-3001",
+		SupplierName: "Acme Supplier",
+		InvoiceNo:    "INV-3001",
+		Notes:        "Dock receipt",
+		Lines: []domainInventory.GRNLine{
+			{LineNo: 1, ItemID: rawID, QuantityReceived: 40},
+			{LineNo: 2, ItemID: packID, QuantityReceived: 15},
+		},
+	}
+	if err := repo.CreateGRN(grn); err != nil {
+		t.Fatalf("CreateGRN failed: %v", err)
+	}
+
+	var lineCount int
+	if err := manager.GetDB().QueryRow("SELECT COUNT(1) FROM grn_lines WHERE grn_id = ?", grn.ID).Scan(&lineCount); err != nil {
+		t.Fatalf("failed to count grn lines: %v", err)
+	}
+	if lineCount != 2 {
+		t.Fatalf("expected 2 grn lines, got %d", lineCount)
+	}
+
+	var ledgerCount int
+	if err := manager.GetDB().QueryRow("SELECT COUNT(1) FROM stock_ledger WHERE reference_id = ?", grn.GRNNumber).Scan(&ledgerCount); err != nil {
+		t.Fatalf("failed to count stock ledger rows: %v", err)
+	}
+	if ledgerCount != 2 {
+		t.Fatalf("expected 2 stock ledger rows, got %d", ledgerCount)
+	}
+}
+
+func TestSqliteInventoryRepository_CreateGRN_RollsBackOnInvalidLineItemType(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	rawID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-11", "Raw Coriander", "kg")
+	finishedID := createTestInventoryItem(t, repo, domainInventory.ItemTypeFinishedGood, "FG-30", "Finished Pack", "pcs")
+
+	grn := &domainInventory.GRN{
+		GRNNumber:    "GRN-3002",
+		SupplierName: "Acme Supplier",
+		InvoiceNo:    "INV-3002",
+		Lines: []domainInventory.GRNLine{
+			{LineNo: 1, ItemID: rawID, QuantityReceived: 10},
+			{LineNo: 2, ItemID: finishedID, QuantityReceived: 2},
+		},
+	}
+	if err := repo.CreateGRN(grn); err == nil {
+		t.Fatalf("expected invalid item type error")
+	}
+
+	var headerCount int
+	if err := manager.GetDB().QueryRow("SELECT COUNT(1) FROM grns WHERE grn_number = ?", "GRN-3002").Scan(&headerCount); err != nil {
+		t.Fatalf("failed to query grn header count: %v", err)
+	}
+	if headerCount != 0 {
+		t.Fatalf("expected header rollback, found %d rows", headerCount)
+	}
+
+	var lineCount int
+	if err := manager.GetDB().QueryRow("SELECT COUNT(1) FROM grn_lines").Scan(&lineCount); err != nil {
+		t.Fatalf("failed to query grn lines count: %v", err)
+	}
+	if lineCount != 0 {
+		t.Fatalf("expected line rollback, found %d rows", lineCount)
+	}
+
+	var ledgerCount int
+	if err := manager.GetDB().QueryRow("SELECT COUNT(1) FROM stock_ledger WHERE reference_id = ?", "GRN-3002").Scan(&ledgerCount); err != nil {
+		t.Fatalf("failed to query stock ledger count: %v", err)
+	}
+	if ledgerCount != 0 {
+		t.Fatalf("expected ledger rollback, found %d rows", ledgerCount)
+	}
+}
+
+func TestSqliteInventoryRepository_CreateGRN_PersistsSupplierAndInvoice(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	rawID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-12", "Raw Pepper", "kg")
+
+	grn := &domainInventory.GRN{
+		GRNNumber:    "GRN-3003",
+		SupplierName: "Supplier Ref A",
+		InvoiceNo:    "INV-3003",
+		Lines: []domainInventory.GRNLine{
+			{LineNo: 1, ItemID: rawID, QuantityReceived: 11},
+		},
+	}
+	if err := repo.CreateGRN(grn); err != nil {
+		t.Fatalf("CreateGRN failed: %v", err)
+	}
+
+	var supplier, invoice string
+	if err := manager.GetDB().QueryRow("SELECT supplier_name, invoice_no FROM grns WHERE id = ?", grn.ID).Scan(&supplier, &invoice); err != nil {
+		t.Fatalf("failed to query persisted grn header: %v", err)
+	}
+	if supplier != "Supplier Ref A" || invoice != "INV-3003" {
+		t.Fatalf("unexpected persisted supplier/invoice: %q / %q", supplier, invoice)
 	}
 }
 

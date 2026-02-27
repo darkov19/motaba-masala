@@ -29,11 +29,23 @@ type fakeInventoryRepo struct {
 	recipes             []domainInventory.Recipe
 	parties             []domainInventory.Party
 	conversionRules     []domainInventory.UnitConversionRule
+	lastCreatedGRN      *domainInventory.GRN
 }
 
 func (f *fakeInventoryRepo) CreateItem(*domainInventory.Item) error   { return f.createItemErr }
 func (f *fakeInventoryRepo) CreateBatch(*domainInventory.Batch) error { return f.createBatchErr }
-func (f *fakeInventoryRepo) CreateGRN(*domainInventory.GRN) error     { return f.createGRNErr }
+func (f *fakeInventoryRepo) CreateGRN(grn *domainInventory.GRN) error {
+	if f.createGRNErr != nil {
+		return f.createGRNErr
+	}
+	if grn != nil {
+		copyGRN := *grn
+		copyGRN.Lines = append([]domainInventory.GRNLine(nil), grn.Lines...)
+		f.lastCreatedGRN = &copyGRN
+		grn.ID = 1
+	}
+	return nil
+}
 
 func (f *fakeInventoryRepo) UpdateItem(*domainInventory.Item) error   { return f.updateItemErr }
 func (f *fakeInventoryRepo) UpdateBatch(*domainInventory.Batch) error { return f.updateBatchErr }
@@ -229,6 +241,147 @@ func TestService_CreateGRN_PassesThroughRepoErrors(t *testing.T) {
 	err := svc.CreateGRN(&domainInventory.GRN{ID: 1})
 	if !errors.Is(err, expected) {
 		t.Fatalf("expected passthrough error %v, got %v", expected, err)
+	}
+}
+
+func TestService_CreateGRNRecord_ValidationErrorPayload(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+
+	_, err := svc.CreateGRNRecord(CreateGRNInput{
+		GRNNumber:    "GRN-3001",
+		SupplierName: "Acme Supplier",
+		AuthToken:    "admin-token",
+		Lines: []GRNLineInput{
+			{ItemID: 10, QuantityReceived: 0},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected validation error")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok {
+		t.Fatalf("expected ServiceError, got %T", err)
+	}
+	if typed.Code != "validation_failed" {
+		t.Fatalf("expected validation_failed, got %s", typed.Code)
+	}
+}
+
+func TestService_CreateGRNRecord_NegativeQuantityValidationError(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+
+	_, err := svc.CreateGRNRecord(CreateGRNInput{
+		GRNNumber:    "GRN-3001",
+		SupplierName: "Acme Supplier",
+		AuthToken:    "admin-token",
+		Lines: []GRNLineInput{
+			{ItemID: 10, QuantityReceived: -2},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected validation error")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok {
+		t.Fatalf("expected ServiceError, got %T", err)
+	}
+	if typed.Code != "validation_failed" {
+		t.Fatalf("expected validation_failed, got %s", typed.Code)
+	}
+	if len(typed.Fields) == 0 || typed.Fields[0].Field != "lines.quantity_received" {
+		t.Fatalf("expected lines.quantity_received field error, got %+v", typed.Fields)
+	}
+}
+
+func TestService_CreateGRNRecord_OperatorAllowed(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	repo := &fakeInventoryRepo{}
+	svc := NewService(repo, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+
+	_, err := svc.CreateGRNRecord(CreateGRNInput{
+		GRNNumber:    "GRN-3001",
+		SupplierName: "Acme Supplier",
+		InvoiceNo:    "INV-3001",
+		Notes:        "Dock receipt",
+		AuthToken:    "operator-token",
+		Lines: []GRNLineInput{
+			{ItemID: 10, QuantityReceived: 40},
+			{ItemID: 20, QuantityReceived: 15},
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if repo.lastCreatedGRN == nil || len(repo.lastCreatedGRN.Lines) != 2 {
+		t.Fatalf("expected grn lines to be persisted through repo, got %+v", repo.lastCreatedGRN)
+	}
+	if repo.lastCreatedGRN.Lines[0].LineNo != 1 || repo.lastCreatedGRN.Lines[1].LineNo != 2 {
+		t.Fatalf("expected sequential line numbers, got %+v", repo.lastCreatedGRN.Lines)
+	}
+}
+
+func TestService_CreateGRNRecord_UnauthorizedWithoutToken(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+
+	_, err := svc.CreateGRNRecord(CreateGRNInput{
+		GRNNumber:    "GRN-3001",
+		SupplierName: "Acme Supplier",
+		Lines: []GRNLineInput{
+			{ItemID: 10, QuantityReceived: 1},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected unauthorized error")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok || typed.Code != "unauthorized" {
+		t.Fatalf("expected unauthorized ServiceError, got %v", err)
+	}
+}
+
+func TestService_CreateGRNRecord_ForbiddenRole(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.Role("Viewer"), nil))
+
+	_, err := svc.CreateGRNRecord(CreateGRNInput{
+		GRNNumber:    "GRN-3001",
+		SupplierName: "Acme Supplier",
+		AuthToken:    "viewer-token",
+		Lines: []GRNLineInput{
+			{ItemID: 10, QuantityReceived: 1},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected forbidden error")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok || typed.Code != "forbidden" {
+		t.Fatalf("expected forbidden ServiceError, got %v", err)
+	}
+}
+
+func TestService_CreateGRNRecord_BlockedInReadOnlyGracePeriod(t *testing.T) {
+	t.Cleanup(func() {
+		appLicenseMode.SetWriteEnforcer(nil)
+	})
+	appLicenseMode.SetWriteEnforcer(func() error {
+		return appLicenseMode.ErrReadOnlyMode
+	})
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+
+	_, err := svc.CreateGRNRecord(CreateGRNInput{
+		GRNNumber:    "GRN-3001",
+		SupplierName: "Acme Supplier",
+		AuthToken:    "admin-token",
+		Lines: []GRNLineInput{
+			{ItemID: 10, QuantityReceived: 1},
+		},
+	})
+	if !errors.Is(err, appLicenseMode.ErrReadOnlyMode) {
+		t.Fatalf("expected read-only error, got %v", err)
 	}
 }
 

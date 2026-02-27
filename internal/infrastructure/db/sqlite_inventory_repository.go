@@ -1075,7 +1075,28 @@ func (r *SqliteInventoryRepository) ListUnitConversionRules(filter domainInvento
 	return rules, rows.Err()
 }
 
+func (r *SqliteInventoryRepository) validateGRNLineItemTx(tx *sql.Tx, itemID int64) error {
+	var matches int
+	err := tx.QueryRowContext(
+		context.Background(),
+		`SELECT COUNT(1)
+		 FROM items
+		 WHERE id = ? AND is_active = 1 AND item_type IN ('RAW', 'PACKING_MATERIAL')`,
+		itemID,
+	).Scan(&matches)
+	if err != nil {
+		return err
+	}
+	if matches == 0 {
+		return fmt.Errorf("invalid grn line item: %d", itemID)
+	}
+	return nil
+}
+
 func (r *SqliteInventoryRepository) CreateGRN(grn *domainInventory.GRN) error {
+	if err := grn.Validate(); err != nil {
+		return err
+	}
 	if grn.CreatedAt.IsZero() {
 		grn.CreatedAt = time.Now().UTC()
 	}
@@ -1083,7 +1104,18 @@ func (r *SqliteInventoryRepository) CreateGRN(grn *domainInventory.GRN) error {
 		grn.UpdatedAt = grn.CreatedAt
 	}
 
-	res, err := r.db.ExecContext(
+	tx, err := r.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	res, err := tx.ExecContext(
 		context.Background(),
 		`INSERT INTO grns (grn_number, supplier_name, invoice_no, notes, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?)`,
@@ -1098,6 +1130,47 @@ func (r *SqliteInventoryRepository) CreateGRN(grn *domainInventory.GRN) error {
 		return err
 	}
 	grn.ID = id
+
+	for i := range grn.Lines {
+		line := &grn.Lines[i]
+		if err := r.validateGRNLineItemTx(tx, line.ItemID); err != nil {
+			return err
+		}
+
+		lineRes, err := tx.ExecContext(
+			context.Background(),
+			`INSERT INTO grn_lines (grn_id, line_no, item_id, quantity_received, created_at)
+			 VALUES (?, ?, ?, ?, ?)`,
+			grn.ID, line.LineNo, line.ItemID, line.QuantityReceived, grn.CreatedAt,
+		)
+		if err != nil {
+			return err
+		}
+		lineID, err := lineRes.LastInsertId()
+		if err != nil {
+			return err
+		}
+		line.ID = lineID
+		line.GRNID = grn.ID
+
+		if _, err := tx.ExecContext(
+			context.Background(),
+			`INSERT INTO stock_ledger (item_id, transaction_type, quantity, reference_id, notes, created_at)
+			 VALUES (?, 'IN', ?, ?, ?, ?)`,
+			line.ItemID,
+			line.QuantityReceived,
+			grn.GRNNumber,
+			grn.Notes,
+			grn.CreatedAt,
+		); err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
 	return nil
 }
 

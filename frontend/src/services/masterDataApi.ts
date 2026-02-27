@@ -129,6 +129,34 @@ export type UpdatePartyPayload = {
     auth_token?: string;
 };
 
+export type GRNLine = {
+    line_no: number;
+    item_id: number;
+    quantity_received: number;
+};
+
+export type GRN = {
+    id: number;
+    grn_number: string;
+    supplier_name: string;
+    invoice_no: string;
+    notes: string;
+    updated_at: string;
+    lines: GRNLine[];
+};
+
+export type CreateGRNPayload = {
+    grn_number: string;
+    supplier_name: string;
+    invoice_no?: string;
+    notes?: string;
+    lines: Array<{
+        item_id: number;
+        quantity_received: number;
+    }>;
+    auth_token?: string;
+};
+
 export type CreateRecipePayload = {
     recipe_code: string;
     output_item_id: number;
@@ -205,6 +233,7 @@ type AppBinding = {
     CreateParty?: (input: CreatePartyPayload) => Promise<Party>;
     UpdateParty?: (input: UpdatePartyPayload) => Promise<Party>;
     ListParties?: (input: { active_only?: boolean; party_type?: PartyType; search?: string; auth_token?: string }) => Promise<Party[]>;
+    CreateGRN?: (input: CreateGRNPayload) => Promise<GRN>;
     CreateUnitConversionRule?: (input: CreateConversionRulePayload) => Promise<ConversionRule>;
     ListUnitConversionRules?: (input: { active_only?: boolean; item_id?: number; from_unit?: string; to_unit?: string; auth_token?: string }) => Promise<ConversionRule[]>;
     ConvertQuantity?: (input: ConvertQuantityPayload) => Promise<ConvertQuantityResult>;
@@ -396,6 +425,21 @@ export async function updateParty(payload: UpdatePartyPayload): Promise<Party> {
     const fn = getBinding().UpdateParty;
     if (typeof fn !== "function") {
         throw new Error("UpdateParty binding is unavailable");
+    }
+    try {
+        return await fn({
+            auth_token: resolveAuthToken(),
+            ...payload,
+        });
+    } catch (error) {
+        throw mapServiceError(error);
+    }
+}
+
+export async function createGRN(payload: CreateGRNPayload): Promise<GRN> {
+    const fn = getBinding().CreateGRN;
+    if (typeof fn !== "function") {
+        throw new Error("CreateGRN binding is unavailable");
     }
     try {
         return await fn({

@@ -151,6 +151,20 @@ type ListPartiesInput struct {
 	AuthToken  string `json:"auth_token"`
 }
 
+type GRNLineInput struct {
+	ItemID           int64   `json:"item_id"`
+	QuantityReceived float64 `json:"quantity_received"`
+}
+
+type CreateGRNInput struct {
+	GRNNumber    string         `json:"grn_number"`
+	SupplierName string         `json:"supplier_name"`
+	InvoiceNo    string         `json:"invoice_no"`
+	Notes        string         `json:"notes"`
+	Lines        []GRNLineInput `json:"lines"`
+	AuthToken    string         `json:"auth_token"`
+}
+
 type CreateUnitConversionRuleInput struct {
 	ItemID         *int64  `json:"item_id,omitempty"`
 	FromUnit       string  `json:"from_unit"`
@@ -298,6 +312,16 @@ func mapValidationError(err error) error {
 		return &ServiceError{Code: "validation_failed", Message: "party validation failed", Fields: []FieldError{{Field: "lead_time_days", Message: domainInventory.ErrPartyLeadTimeInvalid.Error()}}}
 	case errors.Is(err, domainInventory.ErrPartyLeadTimeDisallowed):
 		return &ServiceError{Code: "validation_failed", Message: "party validation failed", Fields: []FieldError{{Field: "lead_time_days", Message: domainInventory.ErrPartyLeadTimeDisallowed.Error()}}}
+	case errors.Is(err, domainInventory.ErrGRNNumberRequired):
+		return &ServiceError{Code: "validation_failed", Message: "grn validation failed", Fields: []FieldError{{Field: "grn_number", Message: domainInventory.ErrGRNNumberRequired.Error()}}}
+	case errors.Is(err, domainInventory.ErrGRNSupplierRequired):
+		return &ServiceError{Code: "validation_failed", Message: "grn validation failed", Fields: []FieldError{{Field: "supplier_name", Message: domainInventory.ErrGRNSupplierRequired.Error()}}}
+	case errors.Is(err, domainInventory.ErrGRNLinesRequired):
+		return &ServiceError{Code: "validation_failed", Message: "grn validation failed", Fields: []FieldError{{Field: "lines", Message: domainInventory.ErrGRNLinesRequired.Error()}}}
+	case errors.Is(err, domainInventory.ErrGRNLineItemID):
+		return &ServiceError{Code: "validation_failed", Message: "grn validation failed", Fields: []FieldError{{Field: "lines.item_id", Message: domainInventory.ErrGRNLineItemID.Error()}}}
+	case errors.Is(err, domainInventory.ErrGRNLineQuantity):
+		return &ServiceError{Code: "validation_failed", Message: "grn validation failed", Fields: []FieldError{{Field: "lines.quantity_received", Message: domainInventory.ErrGRNLineQuantity.Error()}}}
 	case errors.Is(err, domainInventory.ErrConversionFromUnitRequired):
 		return &ServiceError{Code: "validation_failed", Message: "conversion rule validation failed", Fields: []FieldError{{Field: "from_unit", Message: domainInventory.ErrConversionFromUnitRequired.Error()}}}
 	case errors.Is(err, domainInventory.ErrConversionToUnitRequired):
@@ -681,6 +705,33 @@ func (s *Service) ListParties(input ListPartiesInput) ([]domainInventory.Party, 
 		Search:     strings.TrimSpace(input.Search),
 	}
 	return s.repo.ListParties(filter)
+}
+
+func (s *Service) CreateGRNRecord(input CreateGRNInput) (*domainInventory.GRN, error) {
+	if err := s.requireWriteAccess(input.AuthToken); err != nil {
+		return nil, err
+	}
+	grn := &domainInventory.GRN{
+		GRNNumber:    input.GRNNumber,
+		SupplierName: input.SupplierName,
+		InvoiceNo:    input.InvoiceNo,
+		Notes:        input.Notes,
+		Lines:        make([]domainInventory.GRNLine, 0, len(input.Lines)),
+	}
+	for i, line := range input.Lines {
+		grn.Lines = append(grn.Lines, domainInventory.GRNLine{
+			LineNo:           i + 1,
+			ItemID:           line.ItemID,
+			QuantityReceived: line.QuantityReceived,
+		})
+	}
+	if err := grn.Validate(); err != nil {
+		return nil, mapValidationError(err)
+	}
+	if err := s.repo.CreateGRN(grn); err != nil {
+		return nil, mapValidationError(err)
+	}
+	return grn, nil
 }
 
 func (s *Service) CreateUnitConversionRule(input CreateUnitConversionRuleInput) (*domainInventory.UnitConversionRule, error) {
