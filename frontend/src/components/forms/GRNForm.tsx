@@ -2,7 +2,7 @@ import { Button, Form, Input, InputNumber, Select, Space, message } from "antd";
 import type { InputRef } from "antd";
 import { KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAutoSave } from "../../hooks/useAutoSave";
-import { createGRN, ItemMaster, listItems } from "../../services/masterDataApi";
+import { createGRN, ItemMaster, Party, listItems, listParties } from "../../services/masterDataApi";
 
 type GRNValues = {
     grnNumber?: string;
@@ -19,16 +19,19 @@ type GRNFormProps = {
     userKey: string;
     onDirtyChange: (isDirty: boolean) => void;
     writeDisabled?: boolean;
+    initialValues?: GRNValues;
 };
 
 const EMPTY_GRN_VALUES: GRNValues = {};
 
-export function GRNForm({ userKey, onDirtyChange, writeDisabled = false }: GRNFormProps) {
+export function GRNForm({ userKey, onDirtyChange, writeDisabled = false, initialValues }: GRNFormProps) {
     const [form] = Form.useForm<GRNValues>();
     const grnNumberInputRef = useRef<InputRef>(null);
     const watchedValues = Form.useWatch([], form) ?? EMPTY_GRN_VALUES;
     const [items, setItems] = useState<ItemMaster[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [suppliers, setSuppliers] = useState<Party[]>([]);
+    const [itemsLoading, setItemsLoading] = useState(false);
+    const [suppliersLoading, setSuppliersLoading] = useState(false);
 
     const focusGRNNumber = useCallback(() => {
         setTimeout(() => {
@@ -89,7 +92,7 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false }: GRNFo
     useEffect(() => {
         let mounted = true;
         const loadItems = async () => {
-            setLoading(true);
+            setItemsLoading(true);
             try {
                 const [rawItems, packingItems] = await Promise.all([
                     listItems(true, "RAW"),
@@ -103,7 +106,7 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false }: GRNFo
                 message.error(error instanceof Error ? error.message : "Failed to load items for GRN");
             } finally {
                 if (mounted) {
-                    setLoading(false);
+                    setItemsLoading(false);
                 }
             }
         };
@@ -113,20 +116,58 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false }: GRNFo
         };
     }, []);
 
+    useEffect(() => {
+        let mounted = true;
+        const loadSuppliers = async () => {
+            setSuppliersLoading(true);
+            try {
+                const parties = await listParties({ activeOnly: true, partyType: "SUPPLIER" });
+                if (!mounted) {
+                    return;
+                }
+                setSuppliers(parties);
+            } catch (error) {
+                message.error(error instanceof Error ? error.message : "Failed to load suppliers for GRN");
+            } finally {
+                if (mounted) {
+                    setSuppliersLoading(false);
+                }
+            }
+        };
+        void loadSuppliers();
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
     const itemOptions = useMemo(
         () => items.map(item => ({ label: `${item.name} (${item.item_type})`, value: item.id })),
         [items],
     );
+    const supplierOptions = useMemo(
+        () => suppliers.map(supplier => ({ label: supplier.name, value: supplier.name })),
+        [suppliers],
+    );
+    const resolvedInitialValues = useMemo(
+        () => ({ ...initialValues, lines: initialValues?.lines ?? [{ quantity_received: 1 }] }),
+        [initialValues],
+    );
 
     const onFinish = async (values: GRNValues) => {
+        const supplierName = (values.supplierName || "").trim();
         const lines = (values.lines || []).map((line, index) => ({
             item_id: Number(line.item_id),
             quantity_received: Number(line.quantity_received),
             line_no: index + 1,
         }));
+        const supplierExists = suppliers.some(supplier => supplier.name.trim() === supplierName);
 
         if (lines.length === 0) {
             message.error("At least one GRN line is required");
+            return;
+        }
+        if (!supplierName || !supplierExists) {
+            message.error("Select a supplier from the existing list");
             return;
         }
         if (lines.some(line => !Number.isFinite(line.item_id) || line.item_id <= 0)) {
@@ -141,7 +182,7 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false }: GRNFo
         try {
             await createGRN({
                 grn_number: (values.grnNumber || "").trim(),
-                supplier_name: (values.supplierName || "").trim(),
+                supplier_name: supplierName,
                 invoice_no: (values.invoiceNumber || "").trim(),
                 notes: (values.notes || "").trim(),
                 lines,
@@ -176,7 +217,7 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false }: GRNFo
         <Form
             form={form}
             layout="vertical"
-            initialValues={{ lines: [{ quantity_received: 1 }] }}
+            initialValues={resolvedInitialValues}
             onFinish={onFinish}
             onKeyDown={onFormKeyDown}
         >
@@ -192,7 +233,17 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false }: GRNFo
                 name="supplierName"
                 rules={[{ required: true, message: "Supplier reference is required" }]}
             >
-                <Input placeholder="Acme Supplier" disabled={writeDisabled} />
+                <Select
+                    loading={suppliersLoading}
+                    disabled={writeDisabled}
+                    placeholder="Select supplier"
+                    options={supplierOptions}
+                    showSearch
+                    optionFilterProp="label"
+                    onSearch={value => {
+                        form.setFieldValue("supplierName", value);
+                    }}
+                />
             </Form.Item>
             <Form.Item label="Invoice Number" name="invoiceNumber">
                 <Input placeholder="INV-3001" disabled={writeDisabled} />
@@ -212,7 +263,7 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false }: GRNFo
                                     rules={[{ required: true, message: "Select an item" }]}
                                 >
                                     <Select
-                                        loading={loading}
+                                        loading={itemsLoading}
                                         disabled={writeDisabled}
                                         placeholder="Select RAW or PACKING_MATERIAL item"
                                         options={itemOptions}

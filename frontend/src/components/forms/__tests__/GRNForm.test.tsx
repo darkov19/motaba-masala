@@ -3,17 +3,32 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GRNForm } from "../GRNForm";
 
 const listItemsMock = vi.fn();
+const listPartiesMock = vi.fn();
 const createGRNMock = vi.fn();
 
 vi.mock("../../../services/masterDataApi", () => ({
     listItems: (...args: unknown[]) => listItemsMock(...args),
+    listParties: (...args: unknown[]) => listPartiesMock(...args),
     createGRN: (...args: unknown[]) => createGRNMock(...args),
 }));
 
 describe("GRNForm", () => {
     beforeEach(() => {
         listItemsMock.mockReset();
+        listPartiesMock.mockReset();
         createGRNMock.mockReset();
+        listPartiesMock.mockResolvedValue([
+            {
+                id: 1,
+                party_type: "SUPPLIER",
+                name: "Acme Supplier",
+                phone: "",
+                email: "",
+                address: "",
+                is_active: true,
+                updated_at: new Date().toISOString(),
+            },
+        ]);
         listItemsMock.mockImplementation((_: unknown, itemType: unknown) => {
             if (itemType === "RAW") {
                 return Promise.resolve([
@@ -59,25 +74,23 @@ describe("GRNForm", () => {
     });
 
     it("submits multiline GRN payload as discrete RAW and PACKING_MATERIAL lines", async () => {
-        render(<GRNForm userKey="operator" onDirtyChange={vi.fn()} />);
+        render(
+            <GRNForm
+                userKey="operator"
+                onDirtyChange={vi.fn()}
+                initialValues={{
+                    supplierName: "Acme Supplier",
+                    lines: [
+                        { item_id: 10, quantity_received: 40 },
+                        { item_id: 20, quantity_received: 15 },
+                    ],
+                }}
+            />,
+        );
+        await waitFor(() => expect(listPartiesMock).toHaveBeenCalledTimes(1));
 
         fireEvent.change(screen.getByPlaceholderText("GRN-3001"), { target: { value: "GRN-3001" } });
-        fireEvent.change(screen.getByPlaceholderText("Acme Supplier"), { target: { value: "Acme Supplier" } });
         fireEvent.change(screen.getByPlaceholderText("INV-3001"), { target: { value: "INV-3001" } });
-
-        const addLineButton = screen.getByRole("button", { name: "Add Line" });
-        fireEvent.click(addLineButton);
-
-        let comboboxes = screen.getAllByRole("combobox");
-        fireEvent.mouseDown(comboboxes[0]);
-        fireEvent.click(await screen.findByText("Raw Chili (RAW)"));
-        comboboxes = screen.getAllByRole("combobox");
-        fireEvent.mouseDown(comboboxes[1]);
-        fireEvent.click((await screen.findAllByText("Pouch Film (PACKING_MATERIAL)"))[1]);
-
-        const qtyInputs = screen.getAllByRole("spinbutton");
-        fireEvent.change(qtyInputs[0], { target: { value: "40" } });
-        fireEvent.change(qtyInputs[1], { target: { value: "15" } });
 
         fireEvent.click(screen.getByRole("button", { name: "Submit GRN" }));
 
@@ -96,17 +109,23 @@ describe("GRNForm", () => {
     }, 20000);
 
     it("supports keyboard-first enter submit and rapid repeat entry reset", async () => {
-        render(<GRNForm userKey="operator" onDirtyChange={vi.fn()} />);
+        render(
+            <GRNForm
+                userKey="operator"
+                onDirtyChange={vi.fn()}
+                initialValues={{
+                    supplierName: "Acme Supplier",
+                    lines: [{ item_id: 10, quantity_received: 1 }],
+                }}
+            />,
+        );
+        await waitFor(() => expect(listPartiesMock).toHaveBeenCalledTimes(1));
 
         const grnNumberInput = screen.getByPlaceholderText("GRN-3001");
         expect(grnNumberInput).toHaveFocus();
 
         fireEvent.change(grnNumberInput, { target: { value: "GRN-3010" } });
-        fireEvent.change(screen.getByPlaceholderText("Acme Supplier"), { target: { value: "Acme Supplier" } });
         fireEvent.change(screen.getByPlaceholderText("INV-3001"), { target: { value: "INV-3010" } });
-
-        fireEvent.mouseDown(screen.getAllByRole("combobox")[0]);
-        fireEvent.click(await screen.findByText("Raw Chili (RAW)"));
         const qtyInput = screen.getByRole("spinbutton");
         fireEvent.change(qtyInput, { target: { value: "22" } });
 
@@ -123,13 +142,19 @@ describe("GRNForm", () => {
     }, 20000);
 
     it("blocks submit when any line quantity is zero", async () => {
-        render(<GRNForm userKey="operator" onDirtyChange={vi.fn()} />);
+        render(
+            <GRNForm
+                userKey="operator"
+                onDirtyChange={vi.fn()}
+                initialValues={{
+                    supplierName: "Acme Supplier",
+                    lines: [{ item_id: 10, quantity_received: 1 }],
+                }}
+            />,
+        );
+        await waitFor(() => expect(listPartiesMock).toHaveBeenCalledTimes(1));
 
         fireEvent.change(screen.getByPlaceholderText("GRN-3001"), { target: { value: "GRN-3002" } });
-        fireEvent.change(screen.getByPlaceholderText("Acme Supplier"), { target: { value: "Acme Supplier" } });
-
-        fireEvent.mouseDown(screen.getAllByRole("combobox")[0]);
-        fireEvent.click(await screen.findByText("Raw Chili (RAW)"));
         fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "0" } });
 
         fireEvent.click(screen.getByRole("button", { name: "Submit GRN" }));
@@ -140,13 +165,19 @@ describe("GRNForm", () => {
     }, 20000);
 
     it("blocks submit when any line quantity is negative", async () => {
-        render(<GRNForm userKey="operator" onDirtyChange={vi.fn()} />);
+        render(
+            <GRNForm
+                userKey="operator"
+                onDirtyChange={vi.fn()}
+                initialValues={{
+                    supplierName: "Acme Supplier",
+                    lines: [{ item_id: 10, quantity_received: 1 }],
+                }}
+            />,
+        );
+        await waitFor(() => expect(listPartiesMock).toHaveBeenCalledTimes(1));
 
         fireEvent.change(screen.getByPlaceholderText("GRN-3001"), { target: { value: "GRN-3003" } });
-        fireEvent.change(screen.getByPlaceholderText("Acme Supplier"), { target: { value: "Acme Supplier" } });
-
-        fireEvent.mouseDown(screen.getAllByRole("combobox")[0]);
-        fireEvent.click(await screen.findByText("Raw Chili (RAW)"));
         fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "-3" } });
 
         fireEvent.click(screen.getByRole("button", { name: "Submit GRN" }));
