@@ -16,7 +16,7 @@
 4. **Dev Notes Quality:** Specific guidance with citations, not generic advice
 5. **Task-AC Mapping:** Every AC has tasks, every task references AC, testing subtasks present
 6. **Structure:** Status="drafted", proper story statement, Dev Agent Record sections initialized
-7. **Windows Validation Planning:** Story includes required Windows validation script path and evidence placeholders for WSL2 -> Windows verification
+7. **UX Evidence Planning:** Story includes required UX acceptance evidence section and references to UX design specification
 </expectations>
 
 ## Validation Steps
@@ -142,10 +142,11 @@
 - [ ] Dev Agent Record has required sections:
   - Context Reference, Agent Model Used, Debug Log References, Completion Notes List, File List
   - [ ] Missing sections → **MAJOR ISSUE**
-- [ ] Dev Agent Record includes:
-  - [ ] "Windows Validation Script" section with `scripts/s{{epic_num}}-{{story_num}}-win-test.ps1`
-  - [ ] "Windows Validation Evidence" section with Command/Result/Notes placeholders
-  - [ ] Missing either section → **MAJOR ISSUE**
+- [ ] Story includes "UX Acceptance Evidence (Required)" section
+  - [ ] Section exists → If missing → **MAJOR ISSUE**
+  - [ ] "UI/UX impact" explicitly marked Yes/No → If missing → **MAJOR ISSUE**
+  - [ ] If impact is Yes, references include `docs/ux-design-specification.md` sections → If missing → **MAJOR ISSUE**
+  - [ ] If impact is No, rationale is provided → If missing → **MINOR ISSUE**
 - [ ] Change Log initialized → If missing → **MINOR ISSUE**
 - [ ] File in correct location: {story_dir}/{{story_key}}.md → If not → **MAJOR ISSUE**
 

@@ -19,14 +19,22 @@ so that {{benefit}}.
 - [ ] Task 2 (AC: #)
   - [ ] Subtask 2.1
 
-## Windows Validation (WSL2 -> Windows Required)
+## UX Acceptance Evidence (Required)
 
-- Script Path: `scripts/s{{epic_num}}-{{story_num}}-win-test.ps1`
-- Minimum Coverage:
-  - Build the relevant application target(s)
-  - Launch and validate runtime behavior for this story
-  - Return non-zero exit code on failure
-  - Print explicit PASS/FAIL summary
+- UI/UX impact: [ ] Yes [ ] No
+- If no, state why this story has no UX/UI surface impact:
+- UX spec references used:
+  - [Source: docs/ux-design-specification.md#Section]
+- Role-variant behavior verified (Admin Command Center vs Operator Speed Hub):
+  - Admin:
+  - Operator:
+- Visual conformance checks:
+  - [ ] Theme/tokens (color, spacing, typography)
+  - [ ] Information hierarchy and dashboard comprehension
+  - [ ] Keyboard-first flow and operator speed
+- Evidence artifacts:
+  - Screenshots/recording:
+  - Notes:
 
 ## Dev Notes
 
@@ -58,13 +66,3 @@ so that {{benefit}}.
 ### Completion Notes List
 
 ### File List
-
-### Windows Validation Script
-
-`scripts/s{{epic_num}}-{{story_num}}-win-test.ps1`
-
-### Windows Validation Evidence
-
-- Command:
-- Result:
-- Notes:

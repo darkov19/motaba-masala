@@ -210,6 +210,13 @@ Will update existing story file rather than creating new one.
     <template-output file="{default_output_file}">story_header</template-output>
     <template-output file="{default_output_file}">story_body</template-output>
     <template-output file="{default_output_file}">dev_notes_with_citations</template-output>
+    <action>Populate "UX Acceptance Evidence (Required)" in the story template:
+      - Mark UI/UX impact as Yes/No
+      - If Yes, include relevant references to docs/ux-design-specification.md sections
+      - If Yes, include role-variant behavior expectations (Admin vs Operator) when applicable
+      - If No, include explicit rationale
+      - Use docs/ux-conformance-checklist.md as the quality gate reference
+    </action>
 
     <action>If {{previous_story_learnings}} contains actionable items (not "First story" or "not yet implemented"):
       - Add "Learnings from Previous Story" subsection to Dev Notes
