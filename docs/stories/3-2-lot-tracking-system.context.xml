@@ -1,0 +1,253 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>2</storyId>
+    <title>Lot Tracking System</title>
+    <status>drafted</status>
+    <generatedAt>2026-02-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-2-lot-tracking-system.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Quality Manager</asA>
+    <iWant>each inbound GRN line to receive a unique internal lot number and all subsequent stock movements to carry that lot reference</iWant>
+    <soThat>defects and recalls can be traced back to exact supplier deliveries</soThat>
+    <tasks>
+      <task id="T1" acRefs="AC1,AC2">Extend GRN write flow to create lot entities transactionally with GRN header and lines, including rollback safety on partial failures.</task>
+      <task id="T1.1" acRefs="AC2">Add lot number generator service with date + sequence strategy and conflict retry behavior.</task>
+      <task id="T1.2" acRefs="AC1,AC2">Add repository migration and persistence layer for material_lots and GRN-line linkage.</task>
+      <task id="T2" acRefs="AC3">Add lot-aware stock movement persistence and query surfaces to preserve traceability lifecycle.</task>
+      <task id="T2.1" acRefs="AC3">Add backend/API lot-listing support for procurement lots traceability lookups.</task>
+      <task id="T3" acRefs="AC4">Keep label printing out of scope while exposing generated lot IDs for future workflow compatibility.</task>
+      <task id="T4" acRefs="AC1,AC2,AC3,AC4">Add repository, service, API contract, and frontend tests for lot generation and traceability.</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Saving a GRN generates a unique internal lot number for each inbound material line and persists the lot record linked to the originating GRN reference.</criterion>
+    <criterion id="AC2">Lot identifiers follow a deterministic internal format such as LOT-YYYYMMDD-### and uniqueness is enforced at persistence level.</criterion>
+    <criterion id="AC3">Downstream stock movement records for lot-tracked materials store and expose the lot reference so end-to-end traceability is preserved.</criterion>
+    <criterion id="AC4">Label printing is deferred; this story only generates and stores lot IDs for later label workflows.</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <artifact>
+        <path>docs/tech-spec-epic-3.md</path>
+        <title>Epic Technical Specification: Procurement &amp; Inventory (Inbound)</title>
+        <section>Acceptance Criteria (Authoritative)</section>
+        <snippet>Story 3.2 requires unique lot number generation and lot-linked stock movement traceability. Procurement write actions must remain role- and license-enforced.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/tech-spec-epic-3.md</path>
+        <title>Epic Technical Specification: Procurement &amp; Inventory (Inbound)</title>
+        <section>Data Models and Contracts</section>
+        <snippet>The planned material_lots model defines lot_number as unique with pattern LOT-YYYYMMDD-### and links lots to GRN lines. This is the primary persistence target for this story.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/tech-spec-epic-3.md</path>
+        <title>Epic Technical Specification: Procurement &amp; Inventory (Inbound)</title>
+        <section>Workflows and Sequencing</section>
+        <snippet>Lot IDs are generated after GRN save and must be referenced by subsequent inventory movements. This sequencing is required for recall and audit continuity.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Story 3.2: Lot Tracking System</section>
+        <snippet>Lot numbers are auto-generated when GRN entries are saved, with printing explicitly deferred. All stock movements must track the lot ID.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Functional Requirements</section>
+        <snippet>FR-002 mandates lot tracking for incoming materials and traceability. FR-004 and audit requirements reinforce immutable stock event history and reasoned adjustments.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/navigation-rbac-contract.md</path>
+        <title>Navigation and RBAC Contract</title>
+        <section>Route and Role Access Matrix</section>
+        <snippet>procurement.grn and procurement.lots are owned by Procurement and accessible by Admin + Operator. Story implementation must preserve module ownership and route identity.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/architecture.md</path>
+        <title>Architecture: Masala Inventory Management</title>
+        <section>0. Cohesive App Contract</section>
+        <snippet>Backend services are authoritative for RBAC decisions, with frontend guards used for UX only. Route/module ownership from contract docs must remain stable.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/architecture.md</path>
+        <title>Architecture: Masala Inventory Management</title>
+        <section>2. Database Pattern: Repository &amp; embedded Migrations</section>
+        <snippet>Schema changes are migration-driven and repository-mediated. Story 3.2 should extend this pattern for lot persistence and transactional integrity.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/ux-design-specification.md</path>
+        <title>UX Design Specification</title>
+        <section>2.3 Core Experience Principles / 5.1 Critical User Paths</section>
+        <snippet>GRN flows are speed-first and keyboard-driven for operator throughput. Lot ID visibility must not degrade rapid-entry behavior after submission.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/stories/3-2-lot-tracking-system.md</path>
+        <title>Story 3.2 Draft</title>
+        <section>Dev Notes / Learnings from Previous Story</section>
+        <snippet>Story-specific constraints require reusing GRN service/repository/API seams and carrying forward unresolved testing gaps from Story 3.1.</snippet>
+      </artifact>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>internal/app/inventory/service.go</path>
+        <kind>service</kind>
+        <symbol>func (s *Service) CreateGRNRecord(input CreateGRNInput) (*domainInventory.GRN, error)</symbol>
+        <lines>710-738</lines>
+        <reason>Primary orchestration point for GRN writes; lot generation should integrate here without bypassing validation/licensing flow.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/infrastructure/db/sqlite_inventory_repository.go</path>
+        <kind>repository</kind>
+        <symbol>func (r *SqliteInventoryRepository) CreateGRN(grn *domainInventory.GRN) error</symbol>
+        <lines>1096-1177</lines>
+        <reason>Current transactional GRN + line persistence and inventory movement writes; extend transaction to include lot rows and lot-linked movement references.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/infrastructure/db/sqlite_inventory_repository.go</path>
+        <kind>repository-helper</kind>
+        <symbol>func (r *SqliteInventoryRepository) validateGRNLineItemTx(tx *sql.Tx, itemID int64) error</symbol>
+        <lines>1078-1094</lines>
+        <reason>Validates eligible item types for GRN lines; relevant to enforcing lot creation scope by inbound item category.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/domain/inventory/entities.go</path>
+        <kind>domain-entity</kind>
+        <symbol>type GRN / type GRNLine / func (g *GRN) Validate() error</symbol>
+        <lines>168-216</lines>
+        <reason>Domain invariants for GRN structure and positive quantity validation; lot-related invariants should align with this validation model.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/app/app.go</path>
+        <kind>binding</kind>
+        <symbol>func (a *App) CreateGRN(input appInventory.CreateGRNInput) (GRNResult, error)</symbol>
+        <lines>1102-1134</lines>
+        <reason>Wails app boundary for frontend GRN submission; likely place to expose lot IDs in response model.</reason>
+      </artifact>
+      <artifact>
+        <path>cmd/server/api_server.go</path>
+        <kind>api-handler</kind>
+        <symbol>POST /inventory/grns/create handler and error mapping</symbol>
+        <lines>496-528,640-652</lines>
+        <reason>HTTP contract for GRN creation and status mapping (400/401/403/409); lot behavior should preserve these mappings.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/services/masterDataApi.ts</path>
+        <kind>frontend-service</kind>
+        <symbol>createGRN(payload: CreateGRNPayload): Promise&lt;GRN&gt;</symbol>
+        <lines>132-148,439-446</lines>
+        <reason>Frontend GRN API contract and types; update result model if lot IDs are returned post-submit.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/components/forms/GRNForm.tsx</path>
+        <kind>frontend-component</kind>
+        <symbol>onFinish(values: GRNValues)</symbol>
+        <lines>156-197</lines>
+        <reason>Submission, validation, and keyboard-flow behavior; lot confirmation UX should integrate here without slowing operator workflow.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/components/forms/__tests__/GRNForm.test.tsx</path>
+        <kind>frontend-test</kind>
+        <symbol>GRNForm submission tests</symbol>
+        <lines>76-139</lines>
+        <reason>Existing multiline and keyboard-focus coverage baseline; extend with lot-ID visibility and flow assertions.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/infrastructure/db/migrations/000010_grn_lines.up.sql</path>
+        <kind>migration</kind>
+        <symbol>000010_grn_lines.up.sql</symbol>
+        <lines>1-999</lines>
+        <reason>Nearest migration precedent for inbound GRN line persistence; use same migration conventions for lot schema additions.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <go>
+        <package name="github.com/wailsapp/wails/v2" version="v2.11.0" />
+        <package name="github.com/mattn/go-sqlite3" version="v1.14.34" />
+        <package name="github.com/golang-migrate/migrate/v4" version="v4.18.2" />
+        <package name="github.com/golang-jwt/jwt/v5" version="v5.3.1" />
+      </go>
+      <node>
+        <package name="react" version="^19.0.0" />
+        <package name="react-router-dom" version="^6.30.3" />
+        <package name="antd" version="^6.2.1" />
+        <package name="@tanstack/react-query" version="^5.66.0" />
+        <package name="axios" version="^1.7.9" />
+        <package name="vitest" version="^4.0.18" type="dev" />
+        <package name="@testing-library/react" version="^16.3.0" type="dev" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Use existing GRN extension seams in service, repository, API, and frontend service layers; do not introduce parallel procurement flows.</constraint>
+    <constraint>Lot creation must be part of the same DB transaction as GRN header and lines (commit/rollback as a unit).</constraint>
+    <constraint>Lot identifier uniqueness and deterministic format must be enforced at persistence layer.</constraint>
+    <constraint>Procurement writes must respect backend-authoritative RBAC and license write-access checks.</constraint>
+    <constraint>Preserve optimistic-lock/conflict and validation error semantics exposed by current API mappings.</constraint>
+    <constraint>Keep procurement routes and ownership consistent with navigation-rbac-contract (`procurement.grn`, `procurement.lots`).</constraint>
+    <constraint>Label printing remains out of scope in this story; only generation/storage/display of lot IDs is required.</constraint>
+    <constraint>Operator path remains keyboard-first and fast; lot feedback should not degrade rapid GRN entry flow.</constraint>
+    <constraint>Carry forward prior review gaps: explicit negative quantity coverage, read-only denial tests, and keyboard-first flow assertions.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>CreateGRN Wails Binding</name>
+      <kind>Go function signature</kind>
+      <signature>func (a *App) CreateGRN(input appInventory.CreateGRNInput) (GRNResult, error)</signature>
+      <path>internal/app/app.go</path>
+    </interface>
+    <interface>
+      <name>CreateGRN Service</name>
+      <kind>Go function signature</kind>
+      <signature>func (s *Service) CreateGRNRecord(input CreateGRNInput) (*domainInventory.GRN, error)</signature>
+      <path>internal/app/inventory/service.go</path>
+    </interface>
+    <interface>
+      <name>GRN Create Endpoint</name>
+      <kind>REST endpoint</kind>
+      <signature>POST /inventory/grns/create</signature>
+      <path>cmd/server/api_server.go</path>
+    </interface>
+    <interface>
+      <name>Lots List Endpoint</name>
+      <kind>REST endpoint (planned by spec)</kind>
+      <signature>POST /inventory/lots/list</signature>
+      <path>docs/tech-spec-epic-3.md</path>
+    </interface>
+    <interface>
+      <name>Frontend GRN API</name>
+      <kind>TypeScript function signature</kind>
+      <signature>createGRN(payload: CreateGRNPayload): Promise&lt;GRN&gt;</signature>
+      <path>frontend/src/services/masterDataApi.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Follow Epic 3 testing strategy with layered coverage: repository transaction tests, service validation and license-guard tests, API contract status mapping tests (400/401/403/409), and frontend keyboard-first interaction tests. Maintain story AC traceability and avoid marking tasks complete without explicit test evidence.</standards>
+    <locations>
+      <location>internal/app/inventory/service_test.go</location>
+      <location>internal/infrastructure/db/sqlite_inventory_repository_test.go</location>
+      <location>cmd/server/api_server_test.go</location>
+      <location>internal/infrastructure/db/migrations_test.go</location>
+      <location>frontend/src/components/forms/__tests__/GRNForm.test.tsx</location>
+    </locations>
+    <ideas>
+      <idea acRef="AC1">Create a GRN with two inbound lines and assert exactly one unique lot is created per line and linked to the persisted GRN line IDs.</idea>
+      <idea acRef="AC2">Submit two GRNs on same day and verify lot sequence increments and uniqueness constraints prevent duplicate lot_number values.</idea>
+      <idea acRef="AC3">Execute a downstream stock movement for a lot-tracked item and assert movement rows include lot reference for trace reconstruction.</idea>
+      <idea acRef="AC1,AC2">Force repository failure after header insert and assert full rollback (no orphaned GRN lines or lot rows).</idea>
+      <idea acRef="AC1">Run create-GRN under read-only license mode and assert write is denied with expected forbidden mapping.</idea>
+      <idea acRef="AC4">Verify GRN UI confirms/generated lot IDs without invoking any label-print flow and preserves focus for next entry.</idea>
+    </ideas>
+  </tests>
+</story-context>

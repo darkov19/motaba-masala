@@ -48,5 +48,6 @@ type Repository interface {
 	UpdateBatch(batch *Batch) error
 
 	CreateGRN(grn *GRN) error
+	ListMaterialLots(filter MaterialLotListFilter) ([]MaterialLot, error)
 	UpdateGRN(grn *GRN) error
 }

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1093,6 +1094,35 @@ func (r *SqliteInventoryRepository) validateGRNLineItemTx(tx *sql.Tx, itemID int
 	return nil
 }
 
+func nextLotNumberTx(tx *sql.Tx, createdAt time.Time) (string, error) {
+	datePart := createdAt.UTC().Format("20060102")
+	prefix := "LOT-" + datePart + "-"
+
+	var latest sql.NullString
+	err := tx.QueryRowContext(
+		context.Background(),
+		`SELECT lot_number
+		 FROM material_lots
+		 WHERE lot_number LIKE ?
+		 ORDER BY lot_number DESC
+		 LIMIT 1`,
+		prefix+"%",
+	).Scan(&latest)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
+
+	seq := 1
+	if latest.Valid {
+		suffix := strings.TrimPrefix(latest.String, prefix)
+		if parsed, parseErr := strconv.Atoi(suffix); parseErr == nil && parsed >= 1 {
+			seq = parsed + 1
+		}
+	}
+
+	return fmt.Sprintf("%s%03d", prefix, seq), nil
+}
+
 func (r *SqliteInventoryRepository) CreateGRN(grn *domainInventory.GRN) error {
 	if err := grn.Validate(); err != nil {
 		return err
@@ -1153,13 +1183,41 @@ func (r *SqliteInventoryRepository) CreateGRN(grn *domainInventory.GRN) error {
 		line.ID = lineID
 		line.GRNID = grn.ID
 
+		const lotInsertMaxRetries = 8
+		var lotInserted bool
+		for attempt := 0; attempt < lotInsertMaxRetries; attempt++ {
+			lotNumber, lotErr := nextLotNumberTx(tx, grn.CreatedAt)
+			if lotErr != nil {
+				return lotErr
+			}
+
+			_, lotErr = tx.ExecContext(
+				context.Background(),
+				`INSERT INTO material_lots (lot_number, grn_id, grn_line_id, grn_number, item_id, supplier_name, quantity_received, created_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				lotNumber, grn.ID, line.ID, grn.GRNNumber, line.ItemID, grn.SupplierName, line.QuantityReceived, grn.CreatedAt,
+			)
+			if lotErr == nil {
+				line.LotNumber = lotNumber
+				lotInserted = true
+				break
+			}
+			if !strings.Contains(strings.ToLower(lotErr.Error()), "unique constraint failed: material_lots.lot_number") {
+				return lotErr
+			}
+		}
+		if !lotInserted {
+			return fmt.Errorf("failed to allocate lot number after retries")
+		}
+
 		if _, err := tx.ExecContext(
 			context.Background(),
-			`INSERT INTO stock_ledger (item_id, transaction_type, quantity, reference_id, notes, created_at)
-			 VALUES (?, 'IN', ?, ?, ?, ?)`,
+			`INSERT INTO stock_ledger (item_id, transaction_type, quantity, reference_id, lot_number, notes, created_at)
+			 VALUES (?, 'IN', ?, ?, ?, ?, ?)`,
 			line.ItemID,
 			line.QuantityReceived,
 			grn.GRNNumber,
+			line.LotNumber,
 			grn.Notes,
 			grn.CreatedAt,
 		); err != nil {
@@ -1172,6 +1230,71 @@ func (r *SqliteInventoryRepository) CreateGRN(grn *domainInventory.GRN) error {
 	}
 	committed = true
 	return nil
+}
+
+func (r *SqliteInventoryRepository) ListMaterialLots(filter domainInventory.MaterialLotListFilter) ([]domainInventory.MaterialLot, error) {
+	args := make([]any, 0, 8)
+	clauses := make([]string, 0, 8)
+
+	if filter.ItemID != nil && *filter.ItemID > 0 {
+		clauses = append(clauses, "ml.item_id = ?")
+		args = append(args, *filter.ItemID)
+	}
+	if supplier := strings.TrimSpace(filter.Supplier); supplier != "" {
+		clauses = append(clauses, "LOWER(ml.supplier_name) LIKE ?")
+		args = append(args, "%"+strings.ToLower(supplier)+"%")
+	}
+	if lotNumber := strings.TrimSpace(filter.LotNumber); lotNumber != "" {
+		clauses = append(clauses, "LOWER(ml.lot_number) LIKE ?")
+		args = append(args, "%"+strings.ToLower(lotNumber)+"%")
+	}
+	if grnNumber := strings.TrimSpace(filter.GRNNumber); grnNumber != "" {
+		clauses = append(clauses, "LOWER(ml.grn_number) LIKE ?")
+		args = append(args, "%"+strings.ToLower(grnNumber)+"%")
+	}
+	if search := strings.TrimSpace(filter.Search); search != "" {
+		clauses = append(clauses, "(LOWER(ml.lot_number) LIKE ? OR LOWER(ml.grn_number) LIKE ? OR LOWER(ml.supplier_name) LIKE ?)")
+		pattern := "%" + strings.ToLower(search) + "%"
+		args = append(args, pattern, pattern, pattern)
+	}
+	if filter.ActiveOnly {
+		clauses = append(clauses, "i.is_active = 1")
+	}
+
+	query := `SELECT ml.id, ml.lot_number, ml.grn_id, ml.grn_line_id, ml.grn_number, ml.item_id, ml.supplier_name, ml.quantity_received, ml.created_at
+		FROM material_lots ml
+		INNER JOIN items i ON i.id = ml.item_id`
+	if len(clauses) > 0 {
+		query += " WHERE " + strings.Join(clauses, " AND ")
+	}
+	query += " ORDER BY ml.created_at DESC, ml.id DESC"
+
+	rows, err := r.db.QueryContext(context.Background(), query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	lots := make([]domainInventory.MaterialLot, 0)
+	for rows.Next() {
+		var lot domainInventory.MaterialLot
+		if err := rows.Scan(
+			&lot.ID,
+			&lot.LotNumber,
+			&lot.GRNID,
+			&lot.GRNLineID,
+			&lot.GRNNumber,
+			&lot.ItemID,
+			&lot.SupplierName,
+			&lot.QuantityReceived,
+			&lot.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		lots = append(lots, lot)
+	}
+
+	return lots, rows.Err()
 }
 
 func (r *SqliteInventoryRepository) UpdateGRN(grn *domainInventory.GRN) error {

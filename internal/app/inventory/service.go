@@ -165,6 +165,16 @@ type CreateGRNInput struct {
 	AuthToken    string         `json:"auth_token"`
 }
 
+type ListMaterialLotsInput struct {
+	ItemID     *int64 `json:"item_id,omitempty"`
+	Supplier   string `json:"supplier"`
+	LotNumber  string `json:"lot_number"`
+	GRNNumber  string `json:"grn_number"`
+	ActiveOnly bool   `json:"active_only"`
+	Search     string `json:"search"`
+	AuthToken  string `json:"auth_token"`
+}
+
 type CreateUnitConversionRuleInput struct {
 	ItemID         *int64  `json:"item_id,omitempty"`
 	FromUnit       string  `json:"from_unit"`
@@ -427,6 +437,42 @@ func mapPartyPersistenceError(err error) error {
 			Code:    "conflict",
 			Message: "party already exists for this type",
 			Fields:  []FieldError{{Field: "name", Message: "duplicate party name"}},
+		}
+	default:
+		return mapValidationError(err)
+	}
+}
+
+func mapGRNPersistenceError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	lowered := strings.ToLower(strings.TrimSpace(err.Error()))
+	switch {
+	case strings.Contains(lowered, "unique constraint failed: grns.grn_number"):
+		return &ServiceError{
+			Code:    "conflict",
+			Message: "grn_number already exists",
+			Fields:  []FieldError{{Field: "grn_number", Message: "duplicate grn_number"}},
+		}
+	case strings.Contains(lowered, "unique constraint failed: material_lots.lot_number"):
+		return &ServiceError{
+			Code:    "conflict",
+			Message: "lot_number already exists",
+			Fields:  []FieldError{{Field: "lot_number", Message: "duplicate lot_number"}},
+		}
+	case strings.Contains(lowered, "invalid grn line item"):
+		return &ServiceError{
+			Code:    "validation_failed",
+			Message: "grn validation failed",
+			Fields:  []FieldError{{Field: "lines.item_id", Message: "line item must be an active RAW or PACKING_MATERIAL item"}},
+		}
+	case strings.Contains(lowered, "foreign key constraint failed"):
+		return &ServiceError{
+			Code:    "validation_failed",
+			Message: "grn validation failed",
+			Fields:  []FieldError{{Field: "lines.item_id", Message: "line item must reference an existing item"}},
 		}
 	default:
 		return mapValidationError(err)
@@ -729,9 +775,25 @@ func (s *Service) CreateGRNRecord(input CreateGRNInput) (*domainInventory.GRN, e
 		return nil, mapValidationError(err)
 	}
 	if err := s.repo.CreateGRN(grn); err != nil {
-		return nil, mapValidationError(err)
+		return nil, mapGRNPersistenceError(err)
 	}
 	return grn, nil
+}
+
+func (s *Service) ListMaterialLots(input ListMaterialLotsInput) ([]domainInventory.MaterialLot, error) {
+	if err := s.requireReadAccess(input.AuthToken); err != nil {
+		return nil, err
+	}
+
+	filter := domainInventory.MaterialLotListFilter{
+		ItemID:     input.ItemID,
+		Supplier:   strings.TrimSpace(input.Supplier),
+		LotNumber:  strings.TrimSpace(input.LotNumber),
+		GRNNumber:  strings.TrimSpace(input.GRNNumber),
+		ActiveOnly: input.ActiveOnly,
+		Search:     strings.TrimSpace(input.Search),
+	}
+	return s.repo.ListMaterialLots(filter)
 }
 
 func (s *Service) CreateUnitConversionRule(input CreateUnitConversionRuleInput) (*domainInventory.UnitConversionRule, error) {

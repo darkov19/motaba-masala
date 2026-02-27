@@ -133,6 +133,7 @@ export type GRNLine = {
     line_no: number;
     item_id: number;
     quantity_received: number;
+    lot_number: string;
 };
 
 export type GRN = {
@@ -155,6 +156,18 @@ export type CreateGRNPayload = {
         quantity_received: number;
     }>;
     auth_token?: string;
+};
+
+export type MaterialLot = {
+    id: number;
+    lot_number: string;
+    grn_id: number;
+    grn_line_id: number;
+    grn_number: string;
+    item_id: number;
+    supplier_name: string;
+    quantity_received: number;
+    created_at: string;
 };
 
 export type CreateRecipePayload = {
@@ -233,6 +246,15 @@ type AppBinding = {
     CreateParty?: (input: CreatePartyPayload) => Promise<Party>;
     UpdateParty?: (input: UpdatePartyPayload) => Promise<Party>;
     ListParties?: (input: { active_only?: boolean; party_type?: PartyType; search?: string; auth_token?: string }) => Promise<Party[]>;
+    ListMaterialLots?: (input: {
+        active_only?: boolean;
+        item_id?: number;
+        supplier?: string;
+        lot_number?: string;
+        grn_number?: string;
+        search?: string;
+        auth_token?: string;
+    }) => Promise<MaterialLot[]>;
     CreateGRN?: (input: CreateGRNPayload) => Promise<GRN>;
     CreateUnitConversionRule?: (input: CreateConversionRulePayload) => Promise<ConversionRule>;
     ListUnitConversionRules?: (input: { active_only?: boolean; item_id?: number; from_unit?: string; to_unit?: string; auth_token?: string }) => Promise<ConversionRule[]>;
@@ -445,6 +467,33 @@ export async function createGRN(payload: CreateGRNPayload): Promise<GRN> {
         return await fn({
             auth_token: resolveAuthToken(),
             ...payload,
+        });
+    } catch (error) {
+        throw mapServiceError(error);
+    }
+}
+
+export async function listMaterialLots(params?: {
+    activeOnly?: boolean;
+    itemId?: number;
+    supplier?: string;
+    lotNumber?: string;
+    grnNumber?: string;
+    search?: string;
+}): Promise<MaterialLot[]> {
+    const fn = getBinding().ListMaterialLots;
+    if (typeof fn !== "function") {
+        return [];
+    }
+    try {
+        return await fn({
+            active_only: params?.activeOnly ?? true,
+            item_id: params?.itemId,
+            supplier: params?.supplier?.trim() || undefined,
+            lot_number: params?.lotNumber?.trim() || undefined,
+            grn_number: params?.grnNumber?.trim() || undefined,
+            search: params?.search?.trim() || undefined,
+            auth_token: resolveAuthToken(),
         });
     } catch (error) {
         throw mapServiceError(error);

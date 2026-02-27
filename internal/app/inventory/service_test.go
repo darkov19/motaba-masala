@@ -29,6 +29,7 @@ type fakeInventoryRepo struct {
 	recipes             []domainInventory.Recipe
 	parties             []domainInventory.Party
 	conversionRules     []domainInventory.UnitConversionRule
+	materialLots        []domainInventory.MaterialLot
 	lastCreatedGRN      *domainInventory.GRN
 }
 
@@ -154,6 +155,9 @@ func (f *fakeInventoryRepo) FindUnitConversionRule(lookup domainInventory.UnitCo
 }
 func (f *fakeInventoryRepo) ListUnitConversionRules(domainInventory.UnitConversionRuleFilter) ([]domainInventory.UnitConversionRule, error) {
 	return f.conversionRules, nil
+}
+func (f *fakeInventoryRepo) ListMaterialLots(domainInventory.MaterialLotListFilter) ([]domainInventory.MaterialLot, error) {
+	return f.materialLots, nil
 }
 
 func fixedRoleResolver(role domainAuth.Role, err error) func(string) (domainAuth.Role, error) {
@@ -382,6 +386,25 @@ func TestService_CreateGRNRecord_BlockedInReadOnlyGracePeriod(t *testing.T) {
 	})
 	if !errors.Is(err, appLicenseMode.ErrReadOnlyMode) {
 		t.Fatalf("expected read-only error, got %v", err)
+	}
+}
+
+func TestService_ListMaterialLots_OperatorAllowed(t *testing.T) {
+	svc := NewService(&fakeInventoryRepo{
+		materialLots: []domainInventory.MaterialLot{
+			{ID: 1, LotNumber: "LOT-20260227-001", GRNNumber: "GRN-3001"},
+		},
+	}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+
+	lots, err := svc.ListMaterialLots(ListMaterialLotsInput{
+		AuthToken: "operator-token",
+		Search:    "20260227",
+	})
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if len(lots) != 1 || lots[0].LotNumber != "LOT-20260227-001" {
+		t.Fatalf("unexpected lots response: %+v", lots)
 	}
 }
 

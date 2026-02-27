@@ -182,6 +182,28 @@ type GRNLine struct {
 	LineNo           int     `json:"line_no"`
 	ItemID           int64   `json:"item_id"`
 	QuantityReceived float64 `json:"quantity_received"`
+	LotNumber        string  `json:"lot_number"`
+}
+
+type MaterialLot struct {
+	ID               int64     `json:"id"`
+	LotNumber        string    `json:"lot_number"`
+	GRNID            int64     `json:"grn_id"`
+	GRNLineID        int64     `json:"grn_line_id"`
+	GRNNumber        string    `json:"grn_number"`
+	ItemID           int64     `json:"item_id"`
+	SupplierName     string    `json:"supplier_name"`
+	QuantityReceived float64   `json:"quantity_received"`
+	CreatedAt        time.Time `json:"created_at"`
+}
+
+type MaterialLotListFilter struct {
+	ItemID     *int64
+	Supplier   string
+	LotNumber  string
+	GRNNumber  string
+	ActiveOnly bool
+	Search     string
 }
 
 func (g *GRN) Validate() error {

@@ -52,6 +52,7 @@ type serverAPIApplication interface {
 	CreateParty(input appInventory.CreatePartyInput) (app.PartyResult, error)
 	UpdateParty(input appInventory.UpdatePartyInput) (app.PartyResult, error)
 	ListParties(input appInventory.ListPartiesInput) ([]app.PartyResult, error)
+	ListMaterialLots(input appInventory.ListMaterialLotsInput) ([]app.MaterialLotResult, error)
 	CreateGRN(input appInventory.CreateGRNInput) (app.GRNResult, error)
 	CreateUnitConversionRule(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error)
 	ListUnitConversionRules(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error)
@@ -502,6 +503,26 @@ func buildServerAPIRouter(application serverAPIApplication) *http.ServeMux {
 		result, err := application.CreateGRN(input)
 		if err != nil {
 			writeMappedServerError(w, "Server inventory create grn failed", err)
+			return
+		}
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("/inventory/lots/list", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input appInventory.ListMaterialLotsInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.ListMaterialLots(input)
+		if err != nil {
+			writeMappedServerError(w, "Server inventory list lots failed", err)
 			return
 		}
 		writeServerJSON(w, http.StatusOK, result)

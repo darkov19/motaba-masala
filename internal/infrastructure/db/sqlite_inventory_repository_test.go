@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"masala_inventory_managment"
@@ -206,6 +207,25 @@ func TestSqliteInventoryRepository_CreateGRN_PersistsLinesAndStockLedger(t *test
 	if ledgerCount != 2 {
 		t.Fatalf("expected 2 stock ledger rows, got %d", ledgerCount)
 	}
+
+	var lotCount int
+	if err := manager.GetDB().QueryRow("SELECT COUNT(1) FROM material_lots WHERE grn_id = ?", grn.ID).Scan(&lotCount); err != nil {
+		t.Fatalf("failed to count material lots: %v", err)
+	}
+	if lotCount != 2 {
+		t.Fatalf("expected 2 material lots, got %d", lotCount)
+	}
+
+	var ledgerLotCount int
+	if err := manager.GetDB().QueryRow(
+		"SELECT COUNT(1) FROM stock_ledger WHERE reference_id = ? AND lot_number IS NOT NULL AND lot_number != ''",
+		grn.GRNNumber,
+	).Scan(&ledgerLotCount); err != nil {
+		t.Fatalf("failed to count stock ledger lots: %v", err)
+	}
+	if ledgerLotCount != 2 {
+		t.Fatalf("expected 2 stock ledger lot references, got %d", ledgerLotCount)
+	}
 }
 
 func TestSqliteInventoryRepository_CreateGRN_RollsBackOnInvalidLineItemType(t *testing.T) {
@@ -249,6 +269,89 @@ func TestSqliteInventoryRepository_CreateGRN_RollsBackOnInvalidLineItemType(t *t
 	}
 	if ledgerCount != 0 {
 		t.Fatalf("expected ledger rollback, found %d rows", ledgerCount)
+	}
+
+	var lotCount int
+	if err := manager.GetDB().QueryRow("SELECT COUNT(1) FROM material_lots WHERE grn_number = ?", "GRN-3002").Scan(&lotCount); err != nil {
+		t.Fatalf("failed to query material lot rollback count: %v", err)
+	}
+	if lotCount != 0 {
+		t.Fatalf("expected material lot rollback, found %d rows", lotCount)
+	}
+}
+
+func TestSqliteInventoryRepository_CreateGRN_GeneratesDeterministicUniqueLotNumbers(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+	rawID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-21", "Raw Cumin", "kg")
+
+	first := &domainInventory.GRN{
+		GRNNumber:    "GRN-3101",
+		SupplierName: "Supplier A",
+		Lines: []domainInventory.GRNLine{
+			{LineNo: 1, ItemID: rawID, QuantityReceived: 10},
+		},
+	}
+	if err := repo.CreateGRN(first); err != nil {
+		t.Fatalf("CreateGRN first failed: %v", err)
+	}
+
+	second := &domainInventory.GRN{
+		GRNNumber:    "GRN-3102",
+		SupplierName: "Supplier A",
+		Lines: []domainInventory.GRNLine{
+			{LineNo: 1, ItemID: rawID, QuantityReceived: 12},
+		},
+	}
+	if err := repo.CreateGRN(second); err != nil {
+		t.Fatalf("CreateGRN second failed: %v", err)
+	}
+
+	if first.Lines[0].LotNumber == "" || second.Lines[0].LotNumber == "" {
+		t.Fatalf("expected lot numbers on persisted lines, got first=%q second=%q", first.Lines[0].LotNumber, second.Lines[0].LotNumber)
+	}
+	if first.Lines[0].LotNumber == second.Lines[0].LotNumber {
+		t.Fatalf("expected unique lot numbers, got %q", first.Lines[0].LotNumber)
+	}
+	if !strings.HasPrefix(first.Lines[0].LotNumber, "LOT-") || !strings.HasPrefix(second.Lines[0].LotNumber, "LOT-") {
+		t.Fatalf("expected LOT-prefixed lot numbers, got %q and %q", first.Lines[0].LotNumber, second.Lines[0].LotNumber)
+	}
+
+	var distinctLots int
+	if err := manager.GetDB().QueryRow("SELECT COUNT(DISTINCT lot_number) FROM material_lots WHERE grn_number IN ('GRN-3101','GRN-3102')").Scan(&distinctLots); err != nil {
+		t.Fatalf("failed to count distinct lots: %v", err)
+	}
+	if distinctLots != 2 {
+		t.Fatalf("expected 2 distinct lots, got %d", distinctLots)
+	}
+}
+
+func TestSqliteInventoryRepository_ListMaterialLots_FiltersAndReturnsNewestFirst(t *testing.T) {
+	repo, _ := setupInventoryRepo(t)
+	rawID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-31", "Raw Cardamom", "kg")
+
+	grn := &domainInventory.GRN{
+		GRNNumber:    "GRN-3201",
+		SupplierName: "Trace Supplier",
+		Lines: []domainInventory.GRNLine{
+			{LineNo: 1, ItemID: rawID, QuantityReceived: 14},
+		},
+	}
+	if err := repo.CreateGRN(grn); err != nil {
+		t.Fatalf("CreateGRN failed: %v", err)
+	}
+
+	lots, err := repo.ListMaterialLots(domainInventory.MaterialLotListFilter{
+		Search:     "trace supplier",
+		ActiveOnly: true,
+	})
+	if err != nil {
+		t.Fatalf("ListMaterialLots failed: %v", err)
+	}
+	if len(lots) == 0 {
+		t.Fatalf("expected at least one lot")
+	}
+	if lots[0].LotNumber == "" || lots[0].GRNNumber != "GRN-3201" {
+		t.Fatalf("unexpected lot payload: %+v", lots[0])
 	}
 }
 

@@ -704,6 +704,7 @@ type GRNLineResult struct {
 	LineNo           int     `json:"line_no"`
 	ItemID           int64   `json:"item_id"`
 	QuantityReceived float64 `json:"quantity_received"`
+	LotNumber        string  `json:"lot_number"`
 }
 
 type GRNResult struct {
@@ -714,6 +715,18 @@ type GRNResult struct {
 	Notes        string          `json:"notes"`
 	UpdatedAt    string          `json:"updated_at"`
 	Lines        []GRNLineResult `json:"lines"`
+}
+
+type MaterialLotResult struct {
+	ID               int64   `json:"id"`
+	LotNumber        string  `json:"lot_number"`
+	GRNID            int64   `json:"grn_id"`
+	GRNLineID        int64   `json:"grn_line_id"`
+	GRNNumber        string  `json:"grn_number"`
+	ItemID           int64   `json:"item_id"`
+	SupplierName     string  `json:"supplier_name"`
+	QuantityReceived float64 `json:"quantity_received"`
+	CreatedAt        string  `json:"created_at"`
 }
 
 type UnitConversionRuleResult struct {
@@ -1099,6 +1112,39 @@ func (a *App) ListParties(input appInventory.ListPartiesInput) ([]PartyResult, e
 	return result, nil
 }
 
+func (a *App) ListMaterialLots(input appInventory.ListMaterialLotsInput) ([]MaterialLotResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result []MaterialLotResult
+		if err := postToServerAPI("/inventory/lots/list", input, &result); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+	if a.inventoryService == nil {
+		return nil, fmt.Errorf("inventory service is not configured")
+	}
+
+	lots, err := a.inventoryService.ListMaterialLots(input)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]MaterialLotResult, 0, len(lots))
+	for _, lot := range lots {
+		result = append(result, MaterialLotResult{
+			ID:               lot.ID,
+			LotNumber:        lot.LotNumber,
+			GRNID:            lot.GRNID,
+			GRNLineID:        lot.GRNLineID,
+			GRNNumber:        lot.GRNNumber,
+			ItemID:           lot.ItemID,
+			SupplierName:     lot.SupplierName,
+			QuantityReceived: lot.QuantityReceived,
+			CreatedAt:        lot.CreatedAt.Format(time.RFC3339Nano),
+		})
+	}
+	return result, nil
+}
+
 func (a *App) CreateGRN(input appInventory.CreateGRNInput) (GRNResult, error) {
 	if !a.isServer && a.inventoryService == nil {
 		var result GRNResult
@@ -1121,6 +1167,7 @@ func (a *App) CreateGRN(input appInventory.CreateGRNInput) (GRNResult, error) {
 			LineNo:           line.LineNo,
 			ItemID:           line.ItemID,
 			QuantityReceived: line.QuantityReceived,
+			LotNumber:        line.LotNumber,
 		})
 	}
 	return GRNResult{

@@ -36,6 +36,7 @@ func TestMigrator_RunMigrations_Integration(t *testing.T) {
 		"batches",
 		"grns",
 		"grn_lines",
+		"material_lots",
 		"packaging_profiles",
 		"packaging_profile_components",
 		"unit_conversions",

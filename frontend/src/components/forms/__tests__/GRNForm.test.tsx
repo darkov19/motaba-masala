@@ -67,8 +67,8 @@ describe("GRNForm", () => {
             notes: "Dock receipt",
             updated_at: new Date().toISOString(),
             lines: [
-                { line_no: 1, item_id: 10, quantity_received: 40 },
-                { line_no: 2, item_id: 20, quantity_received: 15 },
+                { line_no: 1, item_id: 10, quantity_received: 40, lot_number: "LOT-20260227-001" },
+                { line_no: 2, item_id: 20, quantity_received: 15, lot_number: "LOT-20260227-002" },
             ],
         });
     });
@@ -184,6 +184,31 @@ describe("GRNForm", () => {
 
         await waitFor(() => {
             expect(createGRNMock).not.toHaveBeenCalled();
+        });
+    }, 20000);
+
+    it("shows generated lot IDs and deferred printing notice after submit", async () => {
+        render(
+            <GRNForm
+                userKey="operator"
+                onDirtyChange={vi.fn()}
+                initialValues={{
+                    supplierName: "Acme Supplier",
+                    lines: [{ item_id: 10, quantity_received: 3 }],
+                }}
+            />,
+        );
+        await waitFor(() => expect(listPartiesMock).toHaveBeenCalledTimes(1));
+
+        fireEvent.change(screen.getByPlaceholderText("GRN-3001"), { target: { value: "GRN-3011" } });
+        fireEvent.change(screen.getByPlaceholderText("INV-3001"), { target: { value: "INV-3011" } });
+        fireEvent.click(screen.getByRole("button", { name: "Submit GRN" }));
+
+        await waitFor(() => {
+            expect(createGRNMock).toHaveBeenCalledTimes(1);
+            expect(screen.getByText("Generated Lot IDs (copyable)")).toBeInTheDocument();
+            expect(screen.getByText("LOT-20260227-001")).toBeInTheDocument();
+            expect(screen.getByText("Lot labels are deferred in this release. Use these IDs for traceability.")).toBeInTheDocument();
         });
     }, 20000);
 });

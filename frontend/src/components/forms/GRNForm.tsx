@@ -1,4 +1,4 @@
-import { Button, Form, Input, InputNumber, Select, Space, message } from "antd";
+import { Button, Form, Input, InputNumber, Select, Space, Typography, message } from "antd";
 import type { InputRef } from "antd";
 import { KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAutoSave } from "../../hooks/useAutoSave";
@@ -32,6 +32,7 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false, initial
     const [suppliers, setSuppliers] = useState<Party[]>([]);
     const [itemsLoading, setItemsLoading] = useState(false);
     const [suppliersLoading, setSuppliersLoading] = useState(false);
+    const [latestLotNumbers, setLatestLotNumbers] = useState<string[]>([]);
 
     const focusGRNNumber = useCallback(() => {
         setTimeout(() => {
@@ -180,14 +181,18 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false, initial
         }
 
         try {
-            await createGRN({
+            const result = await createGRN({
                 grn_number: (values.grnNumber || "").trim(),
                 supplier_name: supplierName,
                 invoice_no: (values.invoiceNumber || "").trim(),
                 notes: (values.notes || "").trim(),
                 lines,
             });
-            message.success(`GRN submitted for ${values.supplierName || "supplier"}`);
+            const generatedLots = (result.lines || [])
+                .map(line => line.lot_number)
+                .filter((lotNumber): lotNumber is string => typeof lotNumber === "string" && lotNumber.trim().length > 0);
+            setLatestLotNumbers(generatedLots);
+            message.success(`GRN submitted for ${values.supplierName || "supplier"}${generatedLots.length > 0 ? ` with ${generatedLots.length} lot ID(s)` : ""}. Label printing is deferred.`);
             clearDraft();
             form.resetFields();
             form.setFieldsValue({ lines: [{ quantity_received: 1 }] });
@@ -303,6 +308,19 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false, initial
                     </Space>
                 )}
             </Form.List>
+            {latestLotNumbers.length > 0 && (
+                <Space orientation="vertical" size={4} style={{ width: "100%", marginBottom: 16 }}>
+                    <Typography.Text strong>Generated Lot IDs (copyable)</Typography.Text>
+                    {latestLotNumbers.map(lotNumber => (
+                        <Typography.Text key={lotNumber} copyable={{ text: lotNumber }} code>
+                            {lotNumber}
+                        </Typography.Text>
+                    ))}
+                    <Typography.Text type="secondary">
+                        Lot labels are deferred in this release. Use these IDs for traceability.
+                    </Typography.Text>
+                </Space>
+            )}
             <Space>
                 <Button type="primary" htmlType="submit" disabled={writeDisabled}>
                     Submit GRN

@@ -33,6 +33,7 @@ type stubServerAPIApplication struct {
 	createPartyFn            func(input appInventory.CreatePartyInput) (app.PartyResult, error)
 	updatePartyFn            func(input appInventory.UpdatePartyInput) (app.PartyResult, error)
 	listPartiesFn            func(input appInventory.ListPartiesInput) ([]app.PartyResult, error)
+	listMaterialLotsFn       func(input appInventory.ListMaterialLotsInput) ([]app.MaterialLotResult, error)
 	createGRNFn              func(input appInventory.CreateGRNInput) (app.GRNResult, error)
 	createConversionRuleFn   func(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error)
 	listConversionRulesFn    func(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error)
@@ -250,6 +251,13 @@ func (s stubServerAPIApplication) CreateGRN(input appInventory.CreateGRNInput) (
 		return s.createGRNFn(input)
 	}
 	return app.GRNResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) ListMaterialLots(input appInventory.ListMaterialLotsInput) ([]app.MaterialLotResult, error) {
+	if s.listMaterialLotsFn != nil {
+		return s.listMaterialLotsFn(input)
+	}
+	return nil, errors.New("not implemented")
 }
 
 func (s stubServerAPIApplication) CreateUnitConversionRule(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error) {
@@ -887,6 +895,93 @@ func TestServerAPI_CreateGRNConflictReturnsConflict(t *testing.T) {
 		"lines":         []map[string]interface{}{{"item_id": 11, "quantity_received": 1}},
 	})
 	assertErrorStatusAndMessage(t, rec, http.StatusConflict, "grn_number already exists")
+}
+
+func TestServerAPI_ListMaterialLotsSuccess(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		listMaterialLotsFn: func(input appInventory.ListMaterialLotsInput) ([]app.MaterialLotResult, error) {
+			if input.AuthToken != "operator-token" || input.Search != "LOT-20260227" {
+				t.Fatalf("unexpected list lots input: %+v", input)
+			}
+			return []app.MaterialLotResult{
+				{
+					ID:               1,
+					LotNumber:        "LOT-20260227-001",
+					GRNID:            3001,
+					GRNLineID:        1,
+					GRNNumber:        "GRN-3001",
+					ItemID:           11,
+					SupplierName:     "Acme Supplier",
+					QuantityReceived: 40,
+					CreatedAt:        "2026-02-27T10:00:00Z",
+				},
+			}, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/lots/list", map[string]interface{}{
+		"auth_token": "operator-token",
+		"search":     "LOT-20260227",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var payload []app.MaterialLotResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if len(payload) != 1 || payload[0].LotNumber != "LOT-20260227-001" {
+		t.Fatalf("unexpected response payload: %#v", payload)
+	}
+}
+
+func TestServerAPI_ListMaterialLotsUnauthorizedReturnsUnauthorized(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		listMaterialLotsFn: func(_ appInventory.ListMaterialLotsInput) ([]app.MaterialLotResult, error) {
+			return nil, &appInventory.ServiceError{
+				Code:    "unauthorized",
+				Message: "invalid or expired authentication token",
+			}
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/lots/list", map[string]interface{}{
+		"auth_token": "stale-token",
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusUnauthorized, "invalid or expired authentication token")
+}
+
+func TestServerAPI_ListMaterialLotsForbiddenReturnsForbidden(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		listMaterialLotsFn: func(_ appInventory.ListMaterialLotsInput) ([]app.MaterialLotResult, error) {
+			return nil, &appInventory.ServiceError{
+				Code:    "forbidden",
+				Message: "role is not allowed to read master data",
+			}
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/lots/list", map[string]interface{}{
+		"auth_token": "viewer-token",
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusForbidden, "role is not allowed to read master data")
+}
+
+func TestServerAPI_ListMaterialLotsValidationReturnsBadRequest(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		listMaterialLotsFn: func(_ appInventory.ListMaterialLotsInput) ([]app.MaterialLotResult, error) {
+			return nil, &appInventory.ServiceError{
+				Code:    "validation_failed",
+				Message: "invalid lot query filter",
+			}
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/lots/list", map[string]interface{}{
+		"auth_token": "operator-token",
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusBadRequest, "invalid lot query filter")
 }
 
 func TestServerAPI_CreateUnitConversionRuleSuccess(t *testing.T) {
