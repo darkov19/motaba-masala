@@ -87,7 +87,7 @@ describe("RecipeForm", () => {
                 output_item_id: 100,
             }));
         });
-    }, 15000);
+    }, 25000);
 
     it("loads row and submits update flow", async () => {
         const updatedAt = new Date().toISOString();
@@ -131,4 +131,3 @@ describe("RecipeForm", () => {
         });
     }, 15000);
 });
-

@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { RouterProvider } from "react-router-dom";
+import { createFutureMemoryRouter } from "../test/router";
 import type { ReactNode } from "react";
 import App from "../App";
 
@@ -64,17 +65,17 @@ describe("App shell fixed chrome layout", () => {
     });
 
     it("keeps titlebar outside the scroll region while workspace content renders inside it", async () => {
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [
                 {
                     path: "*",
                     element: <App />,
                 },
             ],
-            { initialEntries: ["/dashboard"] },
+            ["/dashboard"],
         );
 
-        render(<RouterProvider router={router} />);
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
 
         expect(await screen.findByText("Admin Shell")).toBeInTheDocument();
 

@@ -18,6 +18,7 @@ import { GRNForm } from "./components/forms/GRNForm";
 import { BatchForm } from "./components/forms/BatchForm";
 import { ItemMasterForm } from "./components/forms/ItemMasterForm";
 import { RecipeForm } from "./components/forms/RecipeForm";
+import { PartyMasterForm } from "./components/forms/PartyMasterForm";
 import { PackagingProfileForm } from "./components/forms/PackagingProfileForm";
 import { AdminUserForm } from "./components/forms/AdminUserForm";
 import { useUnsavedChanges } from "./hooks/useUnsavedChanges";
@@ -236,6 +237,7 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         placeholder: false,
         "item-master": false,
         "recipe-master": false,
+        "party-master": false,
         grn: false,
         batch: false,
         "packaging-profile": false,
@@ -399,6 +401,7 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
             || dirtyByView.batch
             || dirtyByView["item-master"]
             || dirtyByView["recipe-master"]
+            || dirtyByView["party-master"]
             || dirtyByView["packaging-profile"]
             || dirtyByView["system-users"]
             || dirtyByView.placeholder,
@@ -444,6 +447,10 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         setDirtyFor("recipe-master", isDirty);
     }, [setDirtyFor]);
 
+    const onPartyMasterDirtyChange = useCallback((isDirty: boolean) => {
+        setDirtyFor("party-master", isDirty);
+    }, [setDirtyFor]);
+
     const onPackagingProfileDirtyChange = useCallback((isDirty: boolean) => {
         setDirtyFor("packaging-profile", isDirty);
     }, [setDirtyFor]);
@@ -465,10 +472,14 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         || activeView === "batch"
         || activeView === "item-master"
         || activeView === "recipe-master"
+        || activeView === "party-master"
         || activeView === "packaging-profile";
     const canCreateInMasters = canPerformAction(role, "masters", "create");
     const canCreateInPacking = canPerformAction(role, "packing", "create");
-    const isMasterSplitView = activeView === "item-master" || activeView === "recipe-master" || activeView === "packaging-profile";
+    const isMasterSplitView = activeView === "item-master"
+        || activeView === "recipe-master"
+        || activeView === "party-master"
+        || activeView === "packaging-profile";
 
     const renderLicenseBanner = () => {
         if (licenseStatus.status === "expiring") {
@@ -620,6 +631,14 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                         writeDisabled={writeDisabled}
                         readOnly={!canCreateInMasters}
                         onDirtyChange={onRecipeMasterDirtyChange}
+                    />
+                );
+            case "party-master":
+                return (
+                    <PartyMasterForm
+                        writeDisabled={writeDisabled}
+                        readOnly={!canCreateInMasters}
+                        onDirtyChange={onPartyMasterDirtyChange}
                     />
                 );
             case "packaging-profile":

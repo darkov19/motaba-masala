@@ -1,0 +1,155 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>4</storyId>
+    <title>Supplier &amp; Customer Masters</title>
+    <status>drafted</status>
+    <generatedAt>2026-02-26T20:04:43Z</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-4-supplier-customer-masters.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Admin</asA>
+    <iWant>to create and maintain supplier and customer master records with the required contact and lead-time fields</iWant>
+    <soThat>procurement and sales flows can reference validated parties consistently</soThat>
+    <tasks>
+      <task id="1">Implement party master domain contracts and validation rules (AC: 1, 2, 3)</task>
+      <task id="1.1">Define supplier/customer create-update-list DTOs with required contact fields and optional supplier lead time</task>
+      <task id="1.2">Enforce `party_type` enum and duplicate/invalid payload validation behavior</task>
+      <task id="2">Implement party persistence and migration-safe storage behavior (AC: 1, 2, 3, 4)</task>
+      <task id="2.1">Add or verify `parties` schema and constraints aligned to Epic 2 contract</task>
+      <task id="2.2">Implement repository create/update/list flows using rollback-safe transaction handling patterns</task>
+      <task id="3">Implement service + API + binding flow under existing masters module seams (AC: 1, 2, 4, 5)</task>
+      <task id="3.1">Add application service methods for `CreateParty`, `UpdateParty`, and `ListParties` with backend authorization checks</task>
+      <task id="3.2">Wire server API/bindings and frontend API service calls for `masters.parties` without introducing new module identities</task>
+      <task id="4">Implement `masters.parties` UI behavior by role contract (AC: 1, 2, 4, 5)</task>
+      <task id="4.1">Admin UX supports supplier/customer create and edit flows</task>
+      <task id="4.2">Operator UX remains list/read-only, with backend-denied handling for write attempts</task>
+      <task id="5">Add automated tests mapped to acceptance criteria (AC: 1, 2, 3, 4, 5)</task>
+      <task id="5.1">Unit tests for enum/required-field/contact validation rules</task>
+      <task id="5.2">Integration tests for constraints, duplicate handling, and transactional failure safety</task>
+      <task id="5.3">API contract tests for create/update/list success + error paths and role-denial behavior</task>
+      <task id="5.4">Frontend tests for `masters.parties` form/list behavior and role-aware UI constraints</task>
+      <task id="6">Add Windows validation automation for this story (AC: 1, 2, 3, 4, 5)</task>
+      <task id="6.1">Create `scripts/s2-4-win-test.ps1` with build/runtime checks and explicit PASS/FAIL output</task>
+      <task id="6.2">Ensure script returns non-zero exit code on failure</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Supplier master records can be created and updated with contact details and optional lead-time metadata. [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative); docs/epics.md#Story 2.4: Supplier &amp; Customer Masters]</criterion>
+    <criterion id="2">Customer master records can be created and updated with contact details. [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative); docs/epics.md#Story 2.4: Supplier &amp; Customer Masters]</criterion>
+    <criterion id="3">Party persistence enforces `party_type` domain validity (`SUPPLIER` or `CUSTOMER`) and returns actionable validation errors for invalid/duplicate requests. [Source: docs/tech-spec-epic-2.md#Data Models and Contracts; docs/tech-spec-epic-2.md#APIs and Interfaces]</criterion>
+    <criterion id="4">Party master data is discoverable through list/query interfaces for downstream inbound/outbound workflows. [Source: docs/tech-spec-epic-2.md#Acceptance Criteria (Authoritative); docs/tech-spec-epic-2.md#Workflows and Sequencing]</criterion>
+    <criterion id="5">Route/module behavior for this story remains aligned to the canonical `masters.parties` contract and backend-authoritative RBAC enforcement. [Source: docs/epics.md#Story 2.4: Supplier &amp; Customer Masters; docs/navigation-rbac-contract.md#Canonical Route Map (Stable IDs and Paths); docs/navigation-rbac-contract.md#Frontend vs Backend Authority (Canonical Rule)]</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-2.md" title="Tech Spec Epic 2" section="Acceptance Criteria (Authoritative)">
+        <snippet>Supplier master records can be created and updated with contact details and optional lead-time metadata. Customer master records can be created and updated with contact details. Master data created in this epic is discoverable and usable by downstream workflows via list/query interfaces.</snippet>
+      </doc>
+      <doc path="docs/tech-spec-epic-2.md" title="Tech Spec Epic 2" section="APIs and Interfaces">
+        <snippet>`CreateParty` is defined as `PartyService.CreateParty(input)` with `party_type`, `name`, contact, and lead time, and returns `party_id`. `ListParties` is defined as `PartyService.ListParties(filter)` and returns a paged parties list; authorization notes keep master writes backend-denied for Data Entry.</snippet>
+      </doc>
+      <doc path="docs/tech-spec-epic-2.md" title="Tech Spec Epic 2" section="Workflows and Sequencing">
+        <snippet>Supplier/customer registration states Admin creates supplier/customer records with contacts and optional supplier lead-time. Operational readiness requires downstream modules to query active items, conversions, recipes, and parties, and missing masters must block dependent transactions with actionable validation errors.</snippet>
+      </doc>
+      <doc path="docs/navigation-rbac-contract.md" title="Navigation and RBAC Contract" section="Canonical Route Map (Stable IDs and Paths)">
+        <snippet>The canonical route map defines `masters.parties` on path `/masters/parties` in module `Masters` for Admin + Operator shell visibility. Route IDs are immutable once consumed by implementation stories/tests.</snippet>
+      </doc>
+      <doc path="docs/navigation-rbac-contract.md" title="Navigation and RBAC Contract" section="RBAC Contract and Frontend vs Backend Authority">
+        <snippet>For operator role, Masters create/edit/delete are `UI-hidden / backend-denied`. The canonical rule states backend authorization is the security authority and hidden UI must never be treated as authorization.</snippet>
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="Project Structure and Cohesive App Contract">
+        <snippet>The project follows Hexagonal Architecture with domain, app, and infrastructure layers in Go. The cohesive app contract requires route ownership from `docs/navigation-rbac-contract.md` and keeps backend services as source of truth for RBAC decisions.</snippet>
+      </doc>
+      <doc path="docs/epics.md" title="Epics" section="Story 2.4: Supplier &amp; Customer Masters">
+        <snippet>Story 2.4 defines Admin managing suppliers and customers so purchases and sales link to specific entities. Technical notes require standard CRUD and consistency with `docs/navigation-rbac-contract.md`.</snippet>
+      </doc>
+      <doc path="docs/PRD.md" title="Product Requirements Document" section="Data Integrity &amp; Security">
+        <snippet>RBAC grants Admin full access and restricts Data Entry Operator from valuation visibility. PRD also requires an immutable audit trail for all stock adjustments with who edited and when.</snippet>
+      </doc>
+      <doc path="docs/testing/windows-story-script-standard.md" title="Windows Story Script Standard" section="Script Contract (Mandatory)">
+        <snippet>Each implemented story must include a per-story Windows validation script and execute runtime validation in the real target environment. The script contract requires non-zero exit on failure and an explicit PASS/FAIL summary.</snippet>
+      </doc>
+      <doc path="docs/stories/2-3-recipe-bom-management.md" title="Story 2.3 - Recipe BOM Management" section="Completion Notes and File List">
+        <snippet>Story 2.3 expanded shared seams in `internal/app/inventory/service.go`, `cmd/server/api_server.go`, and `frontend/src/services/masterDataApi.ts`. The next story should extend these seams instead of introducing parallel entry points.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact path="internal/domain/inventory/entities.go" kind="domain-model" symbol="ItemType / ValidateMasterContract" lines="10-106" reason="Existing enum + validation pattern for master contracts; party `party_type` validation should follow this style and error-shaping approach." />
+      <artifact path="internal/domain/inventory/repository.go" kind="repository-interface" symbol="Repository" lines="21-42" reason="Central inventory repository contract is the seam to extend with party persistence methods instead of creating a parallel repository." />
+      <artifact path="internal/app/inventory/service.go" kind="application-service" symbol="CreateItemMaster / ListItems / CreateRecipe / UpdateRecipe / ListRecipes" lines="349-548" reason="Master service methods already enforce role checks (`requireMasterWriteAccess` / `requireReadAccess`) and map validation/persistence errors; party service methods should align." />
+      <artifact path="internal/app/app.go" kind="wails-binding" symbol="CreateRecipe / UpdateRecipe / ListRecipes proxy-capable app methods" lines="869-980" reason="App layer already supports direct-server and client-proxy flows; party bindings should reuse this request/response mapping pattern." />
+      <artifact path="cmd/server/api_server.go" kind="http-adapter" symbol="serverAPIApplication + /inventory/* handlers" lines="35-55,258-424" reason="Server API routing and decode/map/write pattern should be reused for `/inventory/parties/*` endpoints." />
+      <artifact path="frontend/src/services/masterDataApi.ts" kind="frontend-service" symbol="listItems / createItem / updateItem / listRecipes / createRecipe / updateRecipe" lines="184-315" reason="Frontend master-data API wrappers already inject auth token and map service errors; party API methods should be added in this module." />
+      <artifact path="frontend/src/shell/rbac.ts" kind="rbac-contract-implementation" symbol="ROUTE_REGISTRY + matrix + canAccessRoute" lines="18-23,44-64,80-112" reason="`masters.parties` route is already registered and operator Masters write actions are not granted; story UI behavior must keep this contract." />
+      <artifact path="internal/infrastructure/db/sqlite_inventory_repository.go" kind="sqlite-repository" symbol="CreateRecipe / UpdateRecipe transaction pattern" lines="445-609" reason="Repository uses explicit transaction + rollback guard pattern; party create/update should preserve this safety model." />
+      <artifact path="internal/infrastructure/db/migrations/000008_recipes.up.sql" kind="migration-pattern" symbol="CREATE TABLE with checks/FKs/indexes" lines="1-26" reason="Recent master-domain migration shows constraint/index style to mirror for `parties` schema migration." />
+      <artifact path="cmd/server/api_server_test.go" kind="api-contract-tests" symbol="Recipe endpoint success/error tests" lines="356-520" reason="Tests demonstrate expected API contract coverage style for create/update/list success and authorization/error paths." />
+      <artifact path="scripts/s2-3-win-test.ps1" kind="windows-validation-script" symbol="Story script contract implementation" lines="1-104" reason="Reusable pattern for story-level Windows validation checks, PASS/FAIL reporting, and non-zero failure exit." />
+    </code>
+    <dependencies>
+      <ecosystem name="go" manifest="go.mod">
+        <package name="go" version="1.26" />
+        <package name="github.com/wailsapp/wails/v2" version="v2.11.0" />
+        <package name="github.com/mattn/go-sqlite3" version="v1.14.34" />
+        <package name="github.com/golang-migrate/migrate/v4" version="v4.18.2" />
+        <package name="github.com/golang-jwt/jwt/v5" version="v5.3.1" />
+      </ecosystem>
+      <ecosystem name="node" manifest="frontend/package.json">
+        <package name="react" version="^19.0.0" />
+        <package name="react-router-dom" version="^6.30.3" />
+        <package name="antd" version="^6.2.1" />
+        <package name="@tanstack/react-query" version="^5.66.0" />
+        <package name="axios" version="^1.7.9" />
+        <package name="vite" version="^6.1.0" />
+        <package name="vitest" version="^4.0.18" />
+      </ecosystem>
+      <ecosystem name="platform">
+        <package name="wails_client.json" version="present" />
+        <package name="wails_server.json" version="present" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Implement supplier/customer logic in backend domain/application layers (`internal/domain`, `internal/app`) and keep validation/authorization server-authoritative within the existing hexagonal structure.</constraint>
+    <constraint>Keep route/module ownership on `masters.parties`; do not introduce alternate module names or route identities.</constraint>
+    <constraint>Backend authorization is canonical: Admin writes are allowed, operator writes must be backend-denied even if UI visibility changes.</constraint>
+    <constraint>Enforce `party_type` domain validity as `SUPPLIER` or `CUSTOMER` with actionable validation and duplicate-handling errors.</constraint>
+    <constraint>Use rollback-safe transaction handling for persistence changes and align migration/repository behavior with existing inventory patterns.</constraint>
+    <constraint>Extend existing seams (`internal/app/inventory/service.go`, `cmd/server/api_server.go`, `frontend/src/services/masterDataApi.ts`) rather than creating parallel service entry points.</constraint>
+    <constraint>Provide `scripts/s2-4-win-test.ps1` and ensure script output includes explicit PASS/FAIL with non-zero exit on failure.</constraint>
+  </constraints>
+  <interfaces>
+    <interface name="InventoryService.CreateItemMaster" kind="function signature" signature="CreateItemMaster(input CreateItemInput) (*inventory.Item, error)" path="internal/app/inventory/service.go" />
+    <interface name="InventoryService.ListItems" kind="function signature" signature="ListItems(input ListItemsInput) ([]inventory.Item, error)" path="internal/app/inventory/service.go" />
+    <interface name="PartyService.CreateParty" kind="service contract" signature="PartyService.CreateParty(input) -> party_id" path="docs/tech-spec-epic-2.md" />
+    <interface name="PartyService.ListParties" kind="service contract" signature="PartyService.ListParties(filter) -> paged parties list" path="docs/tech-spec-epic-2.md" />
+    <interface name="Server inventory endpoint pattern" kind="REST endpoint pattern" signature="POST /inventory/{domain}/{action} with JSON request/response + mapped service errors" path="cmd/server/api_server.go" />
+    <interface name="masters.parties route contract" kind="route contract" signature="route_id=masters.parties, path=/masters/parties, module=masters" path="docs/navigation-rbac-contract.md" />
+  </interfaces>
+  <tests>
+    <standards>Follow the Epic 2 strategy split: unit tests for domain validation/enums/required fields, integration tests for repository transactions and constraints, API contract tests for create/update/list success and error payloads, and frontend component tests for role-aware form/list behavior. Keep tests deterministic and isolated (no hard waits, explicit assertions, cleanup for parallel runs) and preserve backend-authoritative RBAC checks. Include a Windows story script that validates runtime behavior and returns explicit PASS/FAIL with non-zero exit on failure.</standards>
+    <locations>
+      <location>internal/domain/inventory/*_test.go</location>
+      <location>internal/app/inventory/service_test.go</location>
+      <location>internal/infrastructure/db/sqlite_inventory_repository_test.go</location>
+      <location>cmd/server/api_server_test.go</location>
+      <location>frontend/src/components/forms/__tests__/*.test.tsx</location>
+      <location>frontend/src/__tests__/*.test.tsx</location>
+      <location>scripts/s2-4-win-test.ps1</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Unit + API tests: creating/updating supplier with contact and optional lead time persists and returns expected fields.</idea>
+      <idea ac="2">Unit + API tests: creating/updating customer with contact details persists and returns expected fields.</idea>
+      <idea ac="3">Domain/service tests: reject invalid `party_type`, missing required fields, and duplicates with actionable validation errors.</idea>
+      <idea ac="4">Repository + API tests: list/query returns suppliers/customers by type/search and is available for downstream read flows.</idea>
+      <idea ac="5">RBAC tests: admin write succeeds, operator write is backend-denied, and `masters.parties` route identity remains unchanged.</idea>
+      <idea ac="1,2,3,4,5">Windows script test: `scripts/s2-4-win-test.ps1` performs build/runtime checks and emits explicit PASS/FAIL with non-zero failure exit.</idea>
+    </ideas>
+  </tests>
+</story-context>

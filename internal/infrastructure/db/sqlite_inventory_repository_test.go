@@ -825,3 +825,110 @@ func TestSqliteInventoryRepository_UpdateRecipe_ConcurrencyConflict(t *testing.T
 		t.Fatalf("expected concurrency conflict, got %v", err)
 	}
 }
+
+func TestSqliteInventoryRepository_CreateAndListParties(t *testing.T) {
+	repo, _ := setupInventoryRepo(t)
+
+	supplierLead := 7
+	supplier := &domainInventory.Party{
+		PartyType:    domainInventory.PartyTypeSupplier,
+		Name:         "Acme Supplier",
+		Phone:        "9998887777",
+		Email:        "acme@supplier.test",
+		Address:      "Market Road",
+		LeadTimeDays: &supplierLead,
+		IsActive:     true,
+	}
+	customer := &domainInventory.Party{
+		PartyType: domainInventory.PartyTypeCustomer,
+		Name:      "Metro Distributor",
+		Phone:     "8887776666",
+		Address:   "Retail Street",
+		IsActive:  true,
+	}
+
+	if err := repo.CreateParty(supplier); err != nil {
+		t.Fatalf("CreateParty supplier failed: %v", err)
+	}
+	if err := repo.CreateParty(customer); err != nil {
+		t.Fatalf("CreateParty customer failed: %v", err)
+	}
+
+	partyRows, err := repo.ListParties(domainInventory.PartyListFilter{
+		ActiveOnly: true,
+		PartyType:  domainInventory.PartyTypeSupplier,
+		Search:     "acme",
+	})
+	if err != nil {
+		t.Fatalf("ListParties failed: %v", err)
+	}
+	if len(partyRows) != 1 {
+		t.Fatalf("expected 1 supplier row, got %d", len(partyRows))
+	}
+	if partyRows[0].PartyType != domainInventory.PartyTypeSupplier {
+		t.Fatalf("expected supplier type, got %s", partyRows[0].PartyType)
+	}
+	if partyRows[0].LeadTimeDays == nil || *partyRows[0].LeadTimeDays != 7 {
+		t.Fatalf("expected lead time 7, got %+v", partyRows[0].LeadTimeDays)
+	}
+}
+
+func TestSqliteInventoryRepository_CreateParty_DuplicateNameByTypeRejected(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	first := &domainInventory.Party{
+		PartyType: domainInventory.PartyTypeSupplier,
+		Name:      "Acme Supplier",
+		Phone:     "9998887777",
+		IsActive:  true,
+	}
+	second := &domainInventory.Party{
+		PartyType: domainInventory.PartyTypeSupplier,
+		Name:      " acme supplier ",
+		Phone:     "1112223333",
+		IsActive:  true,
+	}
+
+	if err := repo.CreateParty(first); err != nil {
+		t.Fatalf("CreateParty first failed: %v", err)
+	}
+	if err := repo.CreateParty(second); err == nil {
+		t.Fatalf("expected duplicate-party error")
+	}
+
+	var count int
+	if err := manager.GetDB().QueryRow("SELECT COUNT(1) FROM parties").Scan(&count); err != nil {
+		t.Fatalf("failed to query parties count: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected one persisted row after duplicate rejection, got %d", count)
+	}
+}
+
+func TestSqliteInventoryRepository_UpdateParty_ConcurrencyConflict(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	party := &domainInventory.Party{
+		PartyType: domainInventory.PartyTypeSupplier,
+		Name:      "Acme Supplier",
+		Phone:     "9998887777",
+		IsActive:  true,
+	}
+	if err := repo.CreateParty(party); err != nil {
+		t.Fatalf("CreateParty failed: %v", err)
+	}
+	if err := manager.GetDB().QueryRow("SELECT updated_at FROM parties WHERE id = ?", party.ID).Scan(&party.UpdatedAt); err != nil {
+		t.Fatalf("failed to query party updated_at: %v", err)
+	}
+
+	stale := *party
+	party.Phone = "0001112222"
+	if err := repo.UpdateParty(party); err != nil {
+		t.Fatalf("UpdateParty failed: %v", err)
+	}
+
+	stale.Phone = "5556667777"
+	if err := repo.UpdateParty(&stale); !errors.Is(err, domainErrors.ErrConcurrencyConflict) {
+		t.Fatalf("expected concurrency conflict, got %v", err)
+	}
+}

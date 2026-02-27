@@ -688,6 +688,18 @@ type RecipeResult struct {
 	Components         []RecipeComponentResult `json:"components"`
 }
 
+type PartyResult struct {
+	ID           int64  `json:"id"`
+	PartyType    string `json:"party_type"`
+	Name         string `json:"name"`
+	Phone        string `json:"phone"`
+	Email        string `json:"email"`
+	Address      string `json:"address"`
+	LeadTimeDays *int   `json:"lead_time_days,omitempty"`
+	IsActive     bool   `json:"is_active"`
+	UpdatedAt    string `json:"updated_at"`
+}
+
 type UnitConversionRuleResult struct {
 	ID             int64   `json:"id"`
 	ItemID         *int64  `json:"item_id,omitempty"`
@@ -975,6 +987,97 @@ func (a *App) ListRecipes(input appInventory.ListRecipesInput) ([]RecipeResult, 
 			IsActive:           recipe.IsActive,
 			UpdatedAt:          recipe.UpdatedAt.Format(time.RFC3339Nano),
 			Components:         components,
+		})
+	}
+	return result, nil
+}
+
+func (a *App) CreateParty(input appInventory.CreatePartyInput) (PartyResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result PartyResult
+		if err := postToServerAPI("/inventory/parties/create", input, &result); err != nil {
+			return PartyResult{}, err
+		}
+		return result, nil
+	}
+	if a.inventoryService == nil {
+		return PartyResult{}, fmt.Errorf("inventory service is not configured")
+	}
+
+	party, err := a.inventoryService.CreateParty(input)
+	if err != nil {
+		return PartyResult{}, err
+	}
+	return PartyResult{
+		ID:           party.ID,
+		PartyType:    string(party.PartyType),
+		Name:         party.Name,
+		Phone:        party.Phone,
+		Email:        party.Email,
+		Address:      party.Address,
+		LeadTimeDays: party.LeadTimeDays,
+		IsActive:     party.IsActive,
+		UpdatedAt:    party.UpdatedAt.Format(time.RFC3339Nano),
+	}, nil
+}
+
+func (a *App) UpdateParty(input appInventory.UpdatePartyInput) (PartyResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result PartyResult
+		if err := postToServerAPI("/inventory/parties/update", input, &result); err != nil {
+			return PartyResult{}, err
+		}
+		return result, nil
+	}
+	if a.inventoryService == nil {
+		return PartyResult{}, fmt.Errorf("inventory service is not configured")
+	}
+
+	party, err := a.inventoryService.UpdateParty(input)
+	if err != nil {
+		return PartyResult{}, err
+	}
+	return PartyResult{
+		ID:           party.ID,
+		PartyType:    string(party.PartyType),
+		Name:         party.Name,
+		Phone:        party.Phone,
+		Email:        party.Email,
+		Address:      party.Address,
+		LeadTimeDays: party.LeadTimeDays,
+		IsActive:     party.IsActive,
+		UpdatedAt:    party.UpdatedAt.Format(time.RFC3339Nano),
+	}, nil
+}
+
+func (a *App) ListParties(input appInventory.ListPartiesInput) ([]PartyResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result []PartyResult
+		if err := postToServerAPI("/inventory/parties/list", input, &result); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+	if a.inventoryService == nil {
+		return nil, fmt.Errorf("inventory service is not configured")
+	}
+
+	parties, err := a.inventoryService.ListParties(input)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]PartyResult, 0, len(parties))
+	for _, party := range parties {
+		result = append(result, PartyResult{
+			ID:           party.ID,
+			PartyType:    string(party.PartyType),
+			Name:         party.Name,
+			Phone:        party.Phone,
+			Email:        party.Email,
+			Address:      party.Address,
+			LeadTimeDays: party.LeadTimeDays,
+			IsActive:     party.IsActive,
+			UpdatedAt:    party.UpdatedAt.Format(time.RFC3339Nano),
 		})
 	}
 	return result, nil

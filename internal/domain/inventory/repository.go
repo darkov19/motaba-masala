@@ -18,6 +18,12 @@ type RecipeListFilter struct {
 	Search       string
 }
 
+type PartyListFilter struct {
+	ActiveOnly bool
+	PartyType  PartyType
+	Search     string
+}
+
 type Repository interface {
 	CreateItem(item *Item) error
 	UpdateItem(item *Item) error
@@ -29,6 +35,10 @@ type Repository interface {
 	CreateRecipe(recipe *Recipe) error
 	UpdateRecipe(recipe *Recipe) error
 	ListRecipes(filter RecipeListFilter) ([]Recipe, error)
+
+	CreateParty(party *Party) error
+	UpdateParty(party *Party) error
+	ListParties(filter PartyListFilter) ([]Party, error)
 
 	CreateUnitConversionRule(rule *UnitConversionRule) error
 	FindUnitConversionRule(lookup UnitConversionLookup) (*UnitConversionRule, error)

@@ -722,6 +722,183 @@ func (r *SqliteInventoryRepository) ListRecipes(filter domainInventory.RecipeLis
 	return recipes, nil
 }
 
+func normalizeOptionalLeadTime(leadTimeDays *int) interface{} {
+	if leadTimeDays == nil {
+		return nil
+	}
+	return *leadTimeDays
+}
+
+func (r *SqliteInventoryRepository) CreateParty(party *domainInventory.Party) error {
+	if err := party.Validate(); err != nil {
+		return err
+	}
+	if party.CreatedAt.IsZero() {
+		party.CreatedAt = time.Now().UTC()
+	}
+	if party.UpdatedAt.IsZero() {
+		party.UpdatedAt = party.CreatedAt
+	}
+
+	tx, err := r.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	res, err := tx.ExecContext(
+		context.Background(),
+		`INSERT INTO parties (party_type, name, phone, email, address, lead_time_days, is_active, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		string(party.PartyType),
+		party.Name,
+		party.Phone,
+		party.Email,
+		party.Address,
+		normalizeOptionalLeadTime(party.LeadTimeDays),
+		party.IsActive,
+		party.CreatedAt,
+		party.UpdatedAt,
+	)
+	if err != nil {
+		return err
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+	party.ID = id
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+	return nil
+}
+
+func (r *SqliteInventoryRepository) UpdateParty(party *domainInventory.Party) error {
+	if party == nil || party.ID <= 0 {
+		return errors.New("party id is required")
+	}
+	if err := party.Validate(); err != nil {
+		return err
+	}
+
+	tx, err := r.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	res, err := tx.ExecContext(
+		context.Background(),
+		`UPDATE parties
+		 SET party_type = ?, name = ?, phone = ?, email = ?, address = ?, lead_time_days = ?, is_active = ?, updated_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')
+		 WHERE id = ? AND updated_at = ?`,
+		string(party.PartyType),
+		party.Name,
+		party.Phone,
+		party.Email,
+		party.Address,
+		normalizeOptionalLeadTime(party.LeadTimeDays),
+		party.IsActive,
+		party.ID,
+		party.UpdatedAt,
+	)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return domainErrors.ErrConcurrencyConflict
+	}
+
+	if err := tx.QueryRowContext(context.Background(), "SELECT updated_at FROM parties WHERE id = ?", party.ID).Scan(&party.UpdatedAt); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+	return nil
+}
+
+func (r *SqliteInventoryRepository) ListParties(filter domainInventory.PartyListFilter) ([]domainInventory.Party, error) {
+	args := make([]any, 0, 4)
+	clauses := make([]string, 0, 3)
+	if filter.ActiveOnly {
+		clauses = append(clauses, "is_active = 1")
+	}
+	if filter.PartyType != "" {
+		clauses = append(clauses, "party_type = ?")
+		args = append(args, string(filter.PartyType))
+	}
+	if strings.TrimSpace(filter.Search) != "" {
+		search := "%" + strings.TrimSpace(filter.Search) + "%"
+		clauses = append(clauses, "(name LIKE ? OR phone LIKE ? OR email LIKE ?)")
+		args = append(args, search, search, search)
+	}
+
+	query := `SELECT id, party_type, name, phone, email, address, lead_time_days, is_active, created_at, updated_at
+		FROM parties`
+	if len(clauses) > 0 {
+		query += " WHERE " + strings.Join(clauses, " AND ")
+	}
+	query += " ORDER BY name COLLATE NOCASE ASC"
+
+	rows, err := r.db.QueryContext(context.Background(), query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	parties := make([]domainInventory.Party, 0)
+	for rows.Next() {
+		var (
+			partyType    string
+			leadTimeDays sql.NullInt64
+			party        domainInventory.Party
+		)
+		if err := rows.Scan(
+			&party.ID,
+			&partyType,
+			&party.Name,
+			&party.Phone,
+			&party.Email,
+			&party.Address,
+			&leadTimeDays,
+			&party.IsActive,
+			&party.CreatedAt,
+			&party.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		party.PartyType = domainInventory.ParsePartyType(partyType)
+		if leadTimeDays.Valid {
+			lead := int(leadTimeDays.Int64)
+			party.LeadTimeDays = &lead
+		}
+		party.Normalize()
+		parties = append(parties, party)
+	}
+	return parties, rows.Err()
+}
+
 func normalizeOptionalItemID(itemID *int64) interface{} {
 	if itemID == nil || *itemID <= 0 {
 		return nil

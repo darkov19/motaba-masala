@@ -12,7 +12,12 @@ const router = createBrowserRouter([
         path: "*",
         element: <App />,
     },
-]);
+], {
+    future: {
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+    },
+});
 
 const container = document.getElementById("root");
 const root = createRoot(container!);

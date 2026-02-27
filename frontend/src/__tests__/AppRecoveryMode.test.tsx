@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { message } from "antd";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { RouterProvider } from "react-router-dom";
+import { createFutureMemoryRouter } from "../test/router";
 import type { ReactNode } from "react";
 import App from "../App";
 
@@ -110,17 +111,17 @@ describe("App recovery and license states", () => {
     });
 
     it("renders recovery mode and restores selected backup", async () => {
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [
                 {
                     path: "*",
                     element: <App />,
                 },
             ],
-            { initialEntries: ["/grn"] },
+            ["/grn"],
         );
 
-        render(<RouterProvider router={router} />);
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
 
         expect(await screen.findByText("Database Recovery Mode")).toBeInTheDocument();
         expect(screen.getByText("Recovery required.")).toBeInTheDocument();
@@ -152,17 +153,17 @@ describe("App recovery and license states", () => {
             configurable: true,
         });
 
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [
                 {
                     path: "*",
                     element: <App />,
                 },
             ],
-            { initialEntries: ["/grn"] },
+            ["/grn"],
         );
 
-        render(<RouterProvider router={router} />);
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
 
         expect(await screen.findByRole("heading", { name: "Hardware ID Mismatch. Application is locked." })).toBeInTheDocument();
         expect(screen.getByText("new-hw-123")).toBeInTheDocument();
@@ -186,17 +187,17 @@ describe("App recovery and license states", () => {
             hardware_id: "expired-hw-999",
         });
 
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [
                 {
                     path: "*",
                     element: <App />,
                 },
             ],
-            { initialEntries: ["/grn"] },
+            ["/grn"],
         );
 
-        render(<RouterProvider router={router} />);
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
 
         expect(await screen.findByRole("heading", { name: "License Expired. Application is locked." })).toBeInTheDocument();
         expect(screen.getByText("expired-hw-999")).toBeInTheDocument();
@@ -228,17 +229,17 @@ describe("App recovery and license states", () => {
                 hardware_id: "runtime-hw-321",
             });
 
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [
                 {
                     path: "*",
                     element: <App />,
                 },
             ],
-            { initialEntries: ["/grn"] },
+            ["/grn"],
         );
 
-        render(<RouterProvider router={router} />);
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
 
         expect(await screen.findByText("License Expired. Read-only mode active for 6 more days.")).toBeInTheDocument();
 

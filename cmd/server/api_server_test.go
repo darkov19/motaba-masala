@@ -29,6 +29,9 @@ type stubServerAPIApplication struct {
 	createRecipeFn           func(input appInventory.CreateRecipeInput) (app.RecipeResult, error)
 	updateRecipeFn           func(input appInventory.UpdateRecipeInput) (app.RecipeResult, error)
 	listRecipesFn            func(input appInventory.ListRecipesInput) ([]app.RecipeResult, error)
+	createPartyFn            func(input appInventory.CreatePartyInput) (app.PartyResult, error)
+	updatePartyFn            func(input appInventory.UpdatePartyInput) (app.PartyResult, error)
+	listPartiesFn            func(input appInventory.ListPartiesInput) ([]app.PartyResult, error)
 	createConversionRuleFn   func(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error)
 	listConversionRulesFn    func(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error)
 	convertQuantityFn        func(input appInventory.ConvertQuantityInput) (app.UnitConversionResult, error)
@@ -215,6 +218,27 @@ func (s stubServerAPIApplication) UpdateRecipe(input appInventory.UpdateRecipeIn
 func (s stubServerAPIApplication) ListRecipes(input appInventory.ListRecipesInput) ([]app.RecipeResult, error) {
 	if s.listRecipesFn != nil {
 		return s.listRecipesFn(input)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) CreateParty(input appInventory.CreatePartyInput) (app.PartyResult, error) {
+	if s.createPartyFn != nil {
+		return s.createPartyFn(input)
+	}
+	return app.PartyResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) UpdateParty(input appInventory.UpdatePartyInput) (app.PartyResult, error) {
+	if s.updatePartyFn != nil {
+		return s.updatePartyFn(input)
+	}
+	return app.PartyResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) ListParties(input appInventory.ListPartiesInput) ([]app.PartyResult, error) {
+	if s.listPartiesFn != nil {
+		return s.listPartiesFn(input)
 	}
 	return nil, errors.New("not implemented")
 }
@@ -518,6 +542,184 @@ func TestServerAPI_ListRecipesSuccess(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 	if len(payload) != 1 || payload[0].RecipeCode != "RCP-GM-1" || len(payload[0].Components) != 1 {
+		t.Fatalf("unexpected response payload: %#v", payload)
+	}
+}
+
+func TestServerAPI_CreatePartySuccess(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		createPartyFn: func(input appInventory.CreatePartyInput) (app.PartyResult, error) {
+			if input.PartyType != "SUPPLIER" || input.Name != "Acme Supplier" || input.AuthToken != "admin-token" {
+				t.Fatalf("unexpected create party input: %+v", input)
+			}
+			lead := 5
+			return app.PartyResult{
+				ID:           51,
+				PartyType:    "SUPPLIER",
+				Name:         "Acme Supplier",
+				Phone:        "9998887777",
+				LeadTimeDays: &lead,
+				IsActive:     true,
+			}, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/parties/create", map[string]interface{}{
+		"party_type":     "SUPPLIER",
+		"name":           "Acme Supplier",
+		"phone":          "9998887777",
+		"lead_time_days": 5,
+		"is_active":      true,
+		"auth_token":     "admin-token",
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var payload app.PartyResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.ID != 51 || payload.PartyType != "SUPPLIER" || payload.Name != "Acme Supplier" {
+		t.Fatalf("unexpected response payload: %#v", payload)
+	}
+}
+
+func TestServerAPI_UpdatePartyConflictReturnsConflict(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		updatePartyFn: func(_ appInventory.UpdatePartyInput) (app.PartyResult, error) {
+			return app.PartyResult{}, errors.New("Record modified by another user. Reload required.")
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/parties/update", map[string]interface{}{
+		"id":         51,
+		"party_type": "SUPPLIER",
+		"name":       "Acme Supplier",
+		"phone":      "9998887777",
+		"updated_at": "2026-02-26T10:00:00Z",
+		"auth_token": "admin-token",
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusConflict, "Record modified by another user. Reload required.")
+}
+
+func TestServerAPI_UpdatePartySuccess(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		updatePartyFn: func(input appInventory.UpdatePartyInput) (app.PartyResult, error) {
+			if input.ID != 51 || input.PartyType != "SUPPLIER" || input.Name != "Acme Supplier Updated" || input.AuthToken != "admin-token" {
+				t.Fatalf("unexpected update party input: %+v", input)
+			}
+			lead := 7
+			return app.PartyResult{
+				ID:           51,
+				PartyType:    "SUPPLIER",
+				Name:         "Acme Supplier Updated",
+				Phone:        "9998887777",
+				LeadTimeDays: &lead,
+				IsActive:     true,
+				UpdatedAt:    "2026-02-26T10:01:00Z",
+			}, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/parties/update", map[string]interface{}{
+		"id":             51,
+		"party_type":     "SUPPLIER",
+		"name":           "Acme Supplier Updated",
+		"phone":          "9998887777",
+		"lead_time_days": 7,
+		"is_active":      true,
+		"updated_at":     "2026-02-26T10:00:00Z",
+		"auth_token":     "admin-token",
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var payload app.PartyResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.ID != 51 || payload.Name != "Acme Supplier Updated" {
+		t.Fatalf("unexpected response payload: %#v", payload)
+	}
+}
+
+func TestServerAPI_CreatePartyForbiddenReturnsForbidden(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		createPartyFn: func(_ appInventory.CreatePartyInput) (app.PartyResult, error) {
+			return app.PartyResult{}, &appInventory.ServiceError{
+				Code:    "forbidden",
+				Message: "forbidden: role operator cannot write master data",
+			}
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/parties/create", map[string]interface{}{
+		"party_type": "SUPPLIER",
+		"name":       "Acme Supplier",
+		"phone":      "9998887777",
+		"auth_token": "operator-token",
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusForbidden, "forbidden: role operator cannot write master data")
+}
+
+func TestServerAPI_ListPartiesUnauthorizedReturnsUnauthorized(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		listPartiesFn: func(_ appInventory.ListPartiesInput) ([]app.PartyResult, error) {
+			return nil, &appInventory.ServiceError{
+				Code:    "unauthorized",
+				Message: "invalid or expired authentication token",
+			}
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/parties/list", map[string]interface{}{
+		"active_only": true,
+		"auth_token":  "stale-token",
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusUnauthorized, "invalid or expired authentication token")
+}
+
+func TestServerAPI_ListPartiesSuccess(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		listPartiesFn: func(input appInventory.ListPartiesInput) ([]app.PartyResult, error) {
+			if input.ActiveOnly != true || input.PartyType != "SUPPLIER" || input.Search != "Acme" || input.AuthToken != "admin-token" {
+				t.Fatalf("unexpected list parties input: %+v", input)
+			}
+			lead := 5
+			return []app.PartyResult{
+				{
+					ID:           51,
+					PartyType:    "SUPPLIER",
+					Name:         "Acme Supplier",
+					Phone:        "9998887777",
+					LeadTimeDays: &lead,
+					IsActive:     true,
+					UpdatedAt:    "2026-02-26T10:00:00Z",
+				},
+			}, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/parties/list", map[string]interface{}{
+		"active_only": true,
+		"party_type":  "SUPPLIER",
+		"search":      "Acme",
+		"auth_token":  "admin-token",
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var payload []app.PartyResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if len(payload) != 1 || payload[0].ID != 51 || payload[0].Name != "Acme Supplier" {
 		t.Fatalf("unexpected response payload: %#v", payload)
 	}
 }

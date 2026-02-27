@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Modal } from "antd";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { RouterProvider } from "react-router-dom";
+import { createFutureMemoryRouter } from "../test/router";
 import App from "../App";
 
 vi.mock("../components/forms/GRNForm", () => ({
@@ -118,17 +119,17 @@ describe("App route-level unsaved navigation blocking", () => {
     });
 
     it("blocks dirty active route transition and allows clean active route transition", async () => {
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [
                 {
                     path: "*",
                     element: <App />,
                 },
             ],
-            { initialEntries: ["/grn"] },
+            ["/grn"],
         );
 
-        const { unmount } = render(<RouterProvider router={router} />);
+        const { unmount } = render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
 
         expect(await screen.findByText("Operator Shell")).toBeInTheDocument();
         fireEvent.click(screen.getByLabelText("GRN Dirty"));

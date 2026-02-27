@@ -49,6 +49,9 @@ type serverAPIApplication interface {
 	CreateRecipe(input appInventory.CreateRecipeInput) (app.RecipeResult, error)
 	UpdateRecipe(input appInventory.UpdateRecipeInput) (app.RecipeResult, error)
 	ListRecipes(input appInventory.ListRecipesInput) ([]app.RecipeResult, error)
+	CreateParty(input appInventory.CreatePartyInput) (app.PartyResult, error)
+	UpdateParty(input appInventory.UpdatePartyInput) (app.PartyResult, error)
+	ListParties(input appInventory.ListPartiesInput) ([]app.PartyResult, error)
 	CreateUnitConversionRule(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error)
 	ListUnitConversionRules(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error)
 	ConvertQuantity(input appInventory.ConvertQuantityInput) (app.UnitConversionResult, error)
@@ -420,6 +423,66 @@ func buildServerAPIRouter(application serverAPIApplication) *http.ServeMux {
 			return
 		}
 
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("/inventory/parties/create", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input appInventory.CreatePartyInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.CreateParty(input)
+		if err != nil {
+			writeMappedServerError(w, "Server inventory create party failed", err)
+			return
+		}
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("/inventory/parties/update", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input appInventory.UpdatePartyInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.UpdateParty(input)
+		if err != nil {
+			writeMappedServerError(w, "Server inventory update party failed", err)
+			return
+		}
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("/inventory/parties/list", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input appInventory.ListPartiesInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.ListParties(input)
+		if err != nil {
+			writeMappedServerError(w, "Server inventory list parties failed", err)
+			return
+		}
 		writeServerJSON(w, http.StatusOK, result)
 	})
 

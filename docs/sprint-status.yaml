@@ -61,7 +61,7 @@ development_status:
     2-2e-authentication-ux-session-lifecycle-admin-user-management: done
     2-2-unit-conversion-engine: done
     2-3-recipe-bom-management: done
-    2-4-supplier-customer-masters: backlog
+    2-4-supplier-customer-masters: review
     epic-2-retrospective: optional
 
     # Epic 3: Procurement & Inventory (Inbound)

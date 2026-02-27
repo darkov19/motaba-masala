@@ -120,6 +120,37 @@ type ListRecipesInput struct {
 	AuthToken    string `json:"auth_token"`
 }
 
+type CreatePartyInput struct {
+	PartyType    string `json:"party_type"`
+	Name         string `json:"name"`
+	Phone        string `json:"phone"`
+	Email        string `json:"email"`
+	Address      string `json:"address"`
+	LeadTimeDays *int   `json:"lead_time_days,omitempty"`
+	IsActive     bool   `json:"is_active"`
+	AuthToken    string `json:"auth_token"`
+}
+
+type UpdatePartyInput struct {
+	ID           int64  `json:"id"`
+	PartyType    string `json:"party_type"`
+	Name         string `json:"name"`
+	Phone        string `json:"phone"`
+	Email        string `json:"email"`
+	Address      string `json:"address"`
+	LeadTimeDays *int   `json:"lead_time_days,omitempty"`
+	IsActive     bool   `json:"is_active"`
+	UpdatedAt    string `json:"updated_at"`
+	AuthToken    string `json:"auth_token"`
+}
+
+type ListPartiesInput struct {
+	ActiveOnly bool   `json:"active_only"`
+	PartyType  string `json:"party_type"`
+	Search     string `json:"search"`
+	AuthToken  string `json:"auth_token"`
+}
+
 type CreateUnitConversionRuleInput struct {
 	ItemID         *int64  `json:"item_id,omitempty"`
 	FromUnit       string  `json:"from_unit"`
@@ -253,6 +284,20 @@ func mapValidationError(err error) error {
 		return &ServiceError{Code: "validation_failed", Message: "recipe validation failed", Fields: []FieldError{{Field: "components.line_no", Message: domainInventory.ErrRecipeComponentLineNo.Error()}}}
 	case errors.Is(err, domainInventory.ErrRecipeComponentLineDup):
 		return &ServiceError{Code: "validation_failed", Message: "recipe validation failed", Fields: []FieldError{{Field: "components.line_no", Message: err.Error()}}}
+	case errors.Is(err, domainInventory.ErrPartyTypeRequired):
+		return &ServiceError{Code: "validation_failed", Message: "party validation failed", Fields: []FieldError{{Field: "party_type", Message: domainInventory.ErrPartyTypeRequired.Error()}}}
+	case errors.Is(err, domainInventory.ErrPartyTypeUnsupported):
+		return &ServiceError{Code: "validation_failed", Message: "party validation failed", Fields: []FieldError{{Field: "party_type", Message: err.Error()}}}
+	case errors.Is(err, domainInventory.ErrPartyNameRequired):
+		return &ServiceError{Code: "validation_failed", Message: "party validation failed", Fields: []FieldError{{Field: "name", Message: domainInventory.ErrPartyNameRequired.Error()}}}
+	case errors.Is(err, domainInventory.ErrPartyContactRequired):
+		return &ServiceError{Code: "validation_failed", Message: "party validation failed", Fields: []FieldError{{Field: "contact", Message: domainInventory.ErrPartyContactRequired.Error()}}}
+	case errors.Is(err, domainInventory.ErrPartyEmailInvalid):
+		return &ServiceError{Code: "validation_failed", Message: "party validation failed", Fields: []FieldError{{Field: "email", Message: domainInventory.ErrPartyEmailInvalid.Error()}}}
+	case errors.Is(err, domainInventory.ErrPartyLeadTimeInvalid):
+		return &ServiceError{Code: "validation_failed", Message: "party validation failed", Fields: []FieldError{{Field: "lead_time_days", Message: domainInventory.ErrPartyLeadTimeInvalid.Error()}}}
+	case errors.Is(err, domainInventory.ErrPartyLeadTimeDisallowed):
+		return &ServiceError{Code: "validation_failed", Message: "party validation failed", Fields: []FieldError{{Field: "lead_time_days", Message: domainInventory.ErrPartyLeadTimeDisallowed.Error()}}}
 	case errors.Is(err, domainInventory.ErrConversionFromUnitRequired):
 		return &ServiceError{Code: "validation_failed", Message: "conversion rule validation failed", Fields: []FieldError{{Field: "from_unit", Message: domainInventory.ErrConversionFromUnitRequired.Error()}}}
 	case errors.Is(err, domainInventory.ErrConversionToUnitRequired):
@@ -340,6 +385,24 @@ func mapRecipePersistenceError(err error) error {
 			Code:    "validation_failed",
 			Message: "recipe validation failed",
 			Fields:  []FieldError{{Field: "components.input_item_id", Message: "component item must be an active item"}},
+		}
+	default:
+		return mapValidationError(err)
+	}
+}
+
+func mapPartyPersistenceError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	lowered := strings.ToLower(strings.TrimSpace(err.Error()))
+	switch {
+	case strings.Contains(lowered, "unique constraint failed"):
+		return &ServiceError{
+			Code:    "conflict",
+			Message: "party already exists for this type",
+			Fields:  []FieldError{{Field: "name", Message: "duplicate party name"}},
 		}
 	default:
 		return mapValidationError(err)
@@ -545,6 +608,79 @@ func (s *Service) ListRecipes(input ListRecipesInput) ([]domainInventory.Recipe,
 		Search:       strings.TrimSpace(input.Search),
 	}
 	return s.repo.ListRecipes(filter)
+}
+
+func (s *Service) CreateParty(input CreatePartyInput) (*domainInventory.Party, error) {
+	if err := s.requireMasterWriteAccess(input.AuthToken); err != nil {
+		return nil, err
+	}
+
+	party := &domainInventory.Party{
+		PartyType:    domainInventory.ParsePartyType(input.PartyType),
+		Name:         input.Name,
+		Phone:        input.Phone,
+		Email:        input.Email,
+		Address:      input.Address,
+		LeadTimeDays: input.LeadTimeDays,
+		IsActive:     input.IsActive,
+	}
+	if err := party.Validate(); err != nil {
+		return nil, mapValidationError(err)
+	}
+	if err := s.repo.CreateParty(party); err != nil {
+		return nil, mapPartyPersistenceError(err)
+	}
+	return party, nil
+}
+
+func (s *Service) UpdateParty(input UpdatePartyInput) (*domainInventory.Party, error) {
+	if err := s.requireMasterWriteAccess(input.AuthToken); err != nil {
+		return nil, err
+	}
+
+	updatedAt, err := parseUpdatedAt(input.UpdatedAt)
+	if err != nil {
+		return nil, &ServiceError{
+			Code:    "validation_failed",
+			Message: "party validation failed",
+			Fields:  []FieldError{{Field: "updated_at", Message: err.Error()}},
+		}
+	}
+
+	party := &domainInventory.Party{
+		ID:           input.ID,
+		PartyType:    domainInventory.ParsePartyType(input.PartyType),
+		Name:         input.Name,
+		Phone:        input.Phone,
+		Email:        input.Email,
+		Address:      input.Address,
+		LeadTimeDays: input.LeadTimeDays,
+		IsActive:     input.IsActive,
+		UpdatedAt:    updatedAt,
+	}
+	if err := party.Validate(); err != nil {
+		return nil, mapValidationError(err)
+	}
+	if err := s.repo.UpdateParty(party); err != nil {
+		if errors.Is(err, domainErrors.ErrConcurrencyConflict) {
+			return nil, errors.New(ErrRecordModified)
+		}
+		return nil, mapPartyPersistenceError(err)
+	}
+	return party, nil
+}
+
+func (s *Service) ListParties(input ListPartiesInput) ([]domainInventory.Party, error) {
+	if err := s.requireReadAccess(input.AuthToken); err != nil {
+		return nil, err
+	}
+
+	filter := domainInventory.PartyListFilter{
+		ActiveOnly: input.ActiveOnly,
+		PartyType:  domainInventory.ParsePartyType(input.PartyType),
+		Search:     strings.TrimSpace(input.Search),
+	}
+	return s.repo.ListParties(filter)
 }
 
 func (s *Service) CreateUnitConversionRule(input CreateUnitConversionRuleInput) (*domainInventory.UnitConversionRule, error) {

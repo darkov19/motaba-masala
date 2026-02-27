@@ -91,6 +91,44 @@ export type Recipe = {
     components: RecipeComponent[];
 };
 
+export type PartyType = "SUPPLIER" | "CUSTOMER";
+
+export type Party = {
+    id: number;
+    party_type: PartyType;
+    name: string;
+    phone: string;
+    email: string;
+    address: string;
+    lead_time_days?: number;
+    is_active: boolean;
+    updated_at: string;
+};
+
+export type CreatePartyPayload = {
+    party_type: PartyType;
+    name: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    lead_time_days?: number;
+    is_active?: boolean;
+    auth_token?: string;
+};
+
+export type UpdatePartyPayload = {
+    id: number;
+    party_type: PartyType;
+    name: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    lead_time_days?: number;
+    is_active?: boolean;
+    updated_at: string;
+    auth_token?: string;
+};
+
 export type CreateRecipePayload = {
     recipe_code: string;
     output_item_id: number;
@@ -164,6 +202,9 @@ type AppBinding = {
     CreateRecipe?: (input: CreateRecipePayload) => Promise<Recipe>;
     UpdateRecipe?: (input: UpdateRecipePayload) => Promise<Recipe>;
     ListRecipes?: (input: { active_only?: boolean; output_item_id?: number; search?: string; auth_token?: string }) => Promise<Recipe[]>;
+    CreateParty?: (input: CreatePartyPayload) => Promise<Party>;
+    UpdateParty?: (input: UpdatePartyPayload) => Promise<Party>;
+    ListParties?: (input: { active_only?: boolean; party_type?: PartyType; search?: string; auth_token?: string }) => Promise<Party[]>;
     CreateUnitConversionRule?: (input: CreateConversionRulePayload) => Promise<ConversionRule>;
     ListUnitConversionRules?: (input: { active_only?: boolean; item_id?: number; from_unit?: string; to_unit?: string; auth_token?: string }) => Promise<ConversionRule[]>;
     ConvertQuantity?: (input: ConvertQuantityPayload) => Promise<ConvertQuantityResult>;
@@ -303,6 +344,58 @@ export async function updateRecipe(payload: UpdateRecipePayload): Promise<Recipe
     const fn = getBinding().UpdateRecipe;
     if (typeof fn !== "function") {
         throw new Error("UpdateRecipe binding is unavailable");
+    }
+    try {
+        return await fn({
+            auth_token: resolveAuthToken(),
+            ...payload,
+        });
+    } catch (error) {
+        throw mapServiceError(error);
+    }
+}
+
+export async function listParties(params?: {
+    activeOnly?: boolean;
+    partyType?: PartyType;
+    search?: string;
+}): Promise<Party[]> {
+    const fn = getBinding().ListParties;
+    if (typeof fn !== "function") {
+        return [];
+    }
+    try {
+        return await fn({
+            active_only: params?.activeOnly ?? true,
+            party_type: params?.partyType,
+            search: params?.search?.trim() || undefined,
+            auth_token: resolveAuthToken(),
+        });
+    } catch (error) {
+        throw mapServiceError(error);
+    }
+}
+
+export async function createParty(payload: CreatePartyPayload): Promise<Party> {
+    const fn = getBinding().CreateParty;
+    if (typeof fn !== "function") {
+        throw new Error("CreateParty binding is unavailable");
+    }
+    try {
+        return await fn({
+            auth_token: resolveAuthToken(),
+            is_active: true,
+            ...payload,
+        });
+    } catch (error) {
+        throw mapServiceError(error);
+    }
+}
+
+export async function updateParty(payload: UpdatePartyPayload): Promise<Party> {
+    const fn = getBinding().UpdateParty;
+    if (typeof fn !== "function") {
+        throw new Error("UpdateParty binding is unavailable");
     }
     try {
         return await fn({

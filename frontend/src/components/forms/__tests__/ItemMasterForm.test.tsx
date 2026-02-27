@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { message } from "antd";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { ItemMasterForm } from "../ItemMasterForm";
 
@@ -30,12 +31,18 @@ describe("ItemMasterForm", () => {
             updated_at: new Date().toISOString(),
             sku: "",
         });
+        vi.spyOn(message, "success").mockImplementation(() => undefined as never);
+        vi.spyOn(message, "error").mockImplementation(() => undefined as never);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     it("shows inline validation and submits successfully", async () => {
         const onDirty = vi.fn();
         render(
-            <MemoryRouter>
+            <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                 <ItemMasterForm onDirtyChange={onDirty} />
             </MemoryRouter>,
         );
@@ -88,7 +95,7 @@ describe("ItemMasterForm", () => {
 
         const onDirty = vi.fn();
         render(
-            <MemoryRouter>
+            <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                 <ItemMasterForm onDirtyChange={onDirty} />
             </MemoryRouter>,
         );

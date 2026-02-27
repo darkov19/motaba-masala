@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { RouterProvider } from "react-router-dom";
+import { createFutureMemoryRouter } from "../test/router";
 import App from "../App";
 
 vi.mock("../components/forms/GRNForm", () => ({
@@ -50,17 +51,17 @@ describe("App license status banners", () => {
         };
         localStorage.setItem("auth_token", "trusted-session-token");
 
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [
                 {
                     path: "*",
                     element: <App />,
                 },
             ],
-            { initialEntries: ["/dashboard"] },
+            ["/dashboard"],
         );
 
-        render(<RouterProvider router={router} />);
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
 
         expect(await screen.findByText("License Expired. Read-only mode active for 5 more days.")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "New GRN" })).toBeDisabled();
@@ -96,17 +97,17 @@ describe("App license status banners", () => {
         };
         localStorage.setItem("auth_token", "trusted-session-token");
 
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [
                 {
                     path: "*",
                     element: <App />,
                 },
             ],
-            { initialEntries: ["/dashboard"] },
+            ["/dashboard"],
         );
 
-        render(<RouterProvider router={router} />);
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
 
         expect(await screen.findByText("Unable to verify license status. Read-only mode is active until verification succeeds.")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "New GRN" })).toBeDisabled();

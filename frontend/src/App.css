@@ -677,6 +677,29 @@
     grid-template-columns: 1fr;
 }
 
+.party-master-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+.party-master-split__table,
+.party-master-split__form {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+}
+
+.party-master-split__table .ant-table-wrapper {
+    width: 100%;
+}
+
+.party-master-split--readonly {
+    grid-template-columns: 1fr;
+}
+
 .packaging-profile-split {
     display: grid;
     grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr);
@@ -842,6 +865,10 @@
     }
 
     .recipe-master-split {
+        grid-template-columns: 1fr;
+    }
+
+    .party-master-split {
         grid-template-columns: 1fr;
     }
 

@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { RouterProvider } from "react-router-dom";
+import { createFutureMemoryRouter } from "../test/router";
 import type { ReactNode } from "react";
 import App from "../App";
 import { AUTH_SESSION_EXPIRED_EVENT } from "../services/authApi";
@@ -83,12 +84,12 @@ describe("Authentication lifecycle", () => {
     });
 
     it("shows login screen when no valid token exists", async () => {
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [{ path: "*", element: <App /> }],
-            { initialEntries: ["/dashboard"] },
+            ["/dashboard"],
         );
 
-        render(<RouterProvider router={router} />);
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
 
         expect(await screen.findByRole("heading", { name: "Sign In" })).toBeInTheDocument();
         expect(screen.queryByText("Operator Shell")).not.toBeInTheDocument();
@@ -104,12 +105,12 @@ describe("Authentication lifecycle", () => {
         });
         getSessionRoleMock.mockResolvedValue("admin");
 
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [{ path: "*", element: <App /> }],
-            { initialEntries: ["/dashboard"] },
+            ["/dashboard"],
         );
 
-        render(<RouterProvider router={router} />);
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
         expect(await screen.findByRole("heading", { name: "Sign In" })).toBeInTheDocument();
 
         fireEvent.change(screen.getByLabelText("Username"), { target: { value: "admin" } });
@@ -126,12 +127,12 @@ describe("Authentication lifecycle", () => {
     it("keeps login state and shows feedback on invalid credentials", async () => {
         loginMock.mockRejectedValue(new Error("invalid credentials"));
 
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [{ path: "*", element: <App /> }],
-            { initialEntries: ["/dashboard"] },
+            ["/dashboard"],
         );
 
-        render(<RouterProvider router={router} />);
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
         expect(await screen.findByRole("heading", { name: "Sign In" })).toBeInTheDocument();
 
         fireEvent.change(screen.getByLabelText("Username"), { target: { value: "admin" } });
@@ -146,12 +147,12 @@ describe("Authentication lifecycle", () => {
     it("shows string-based login errors returned by bindings", async () => {
         loginMock.mockRejectedValue("invalid credentials");
 
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [{ path: "*", element: <App /> }],
-            { initialEntries: ["/dashboard"] },
+            ["/dashboard"],
         );
 
-        render(<RouterProvider router={router} />);
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
         expect(await screen.findByRole("heading", { name: "Sign In" })).toBeInTheDocument();
 
         fireEvent.change(screen.getByLabelText("Username"), { target: { value: "admin" } });
@@ -167,12 +168,12 @@ describe("Authentication lifecycle", () => {
         localStorage.setItem("auth_expires_at", String(Math.floor(Date.now() / 1000) + 3600));
         getSessionRoleMock.mockResolvedValue("operator");
 
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [{ path: "*", element: <App /> }],
-            { initialEntries: ["/dashboard"] },
+            ["/dashboard"],
         );
 
-        render(<RouterProvider router={router} />);
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
         expect(await screen.findByText("Operator Shell")).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole("button", { name: "Logout" }));
@@ -187,17 +188,19 @@ describe("Authentication lifecycle", () => {
         localStorage.setItem("auth_expires_at", String(Math.floor(Date.now() / 1000) + 3600));
         getSessionRoleMock.mockResolvedValue("operator");
 
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [{ path: "*", element: <App /> }],
-            { initialEntries: ["/dashboard"] },
+            ["/dashboard"],
         );
 
-        render(<RouterProvider router={router} />);
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
         expect(await screen.findByText("Operator Shell")).toBeInTheDocument();
 
-        window.dispatchEvent(new CustomEvent(AUTH_SESSION_EXPIRED_EVENT, {
-            detail: { message: "Session expired in protected operation." },
-        }));
+        act(() => {
+            window.dispatchEvent(new CustomEvent(AUTH_SESSION_EXPIRED_EVENT, {
+                detail: { message: "Session expired in protected operation." },
+            }));
+        });
 
         await waitFor(() => {
             expect(screen.getByRole("heading", { name: "Sign In" })).toBeInTheDocument();

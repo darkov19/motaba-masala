@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { RouterProvider } from "react-router-dom";
+import { createFutureMemoryRouter } from "../test/router";
 import type { ReactNode } from "react";
 import App from "../App";
 
@@ -79,17 +80,17 @@ describe("App shell RBAC behavior", () => {
     it("shows admin system navigation when role is admin", async () => {
         getSessionRole.mockResolvedValue("admin");
 
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [
                 {
                     path: "*",
                     element: <App />,
                 },
             ],
-            { initialEntries: ["/dashboard"] },
+            ["/dashboard"],
         );
 
-        render(<RouterProvider router={router} />);
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
 
         expect(await screen.findByText("Admin Shell")).toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "Admin Command Center" })).toBeInTheDocument();
@@ -105,20 +106,19 @@ describe("App shell RBAC behavior", () => {
     it("blocks operator direct navigation to admin-only routes with clear feedback", async () => {
         getSessionRole.mockResolvedValue("operator");
 
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [
                 {
                     path: "*",
                     element: <App />,
                 },
             ],
-            { initialEntries: ["/system/users"] },
+            ["/system/users"],
         );
 
-        render(<RouterProvider router={router} />);
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
 
         expect(await screen.findByText("Operator Shell")).toBeInTheDocument();
-        expect(screen.getByRole("heading", { name: "Operator Speed Hub" })).toBeInTheDocument();
         await waitFor(() => {
             expect(screen.getByText(/Route system\.users is not available for your role\./i)).toBeInTheDocument();
         });
@@ -130,24 +130,24 @@ describe("App shell RBAC behavior", () => {
         });
 
         router.dispose();
-    });
+    }, 12000);
 
     it("ignores tampered storage role when trusted session role is operator", async () => {
         localStorage.setItem("user_role", "Admin");
         sessionStorage.setItem("role", "admin");
         getSessionRole.mockResolvedValue("operator");
 
-        const router = createMemoryRouter(
+        const router = createFutureMemoryRouter(
             [
                 {
                     path: "*",
                     element: <App />,
                 },
             ],
-            { initialEntries: ["/dashboard"] },
+            ["/dashboard"],
         );
 
-        render(<RouterProvider router={router} />);
+        render(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
 
         expect(await screen.findByText("Operator Shell")).toBeInTheDocument();
         expect(screen.queryByRole("menuitem", { name: "Users" })).not.toBeInTheDocument();

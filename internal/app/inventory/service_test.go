@@ -20,11 +20,14 @@ type fakeInventoryRepo struct {
 	updateGRNErr        error
 	createRecipeErr     error
 	updateRecipeErr     error
+	createPartyErr      error
+	updatePartyErr      error
 	createConversionErr error
 	findConversionErr   error
 	items               []domainInventory.Item
 	profiles            []domainInventory.PackagingProfile
 	recipes             []domainInventory.Recipe
+	parties             []domainInventory.Party
 	conversionRules     []domainInventory.UnitConversionRule
 }
 
@@ -71,6 +74,31 @@ func (f *fakeInventoryRepo) UpdateRecipe(recipe *domainInventory.Recipe) error {
 }
 func (f *fakeInventoryRepo) ListRecipes(domainInventory.RecipeListFilter) ([]domainInventory.Recipe, error) {
 	return f.recipes, nil
+}
+func (f *fakeInventoryRepo) CreateParty(party *domainInventory.Party) error {
+	if f.createPartyErr != nil {
+		return f.createPartyErr
+	}
+	copyParty := *party
+	copyParty.ID = int64(len(f.parties) + 1)
+	f.parties = append(f.parties, copyParty)
+	party.ID = copyParty.ID
+	return nil
+}
+func (f *fakeInventoryRepo) UpdateParty(party *domainInventory.Party) error {
+	if f.updatePartyErr != nil {
+		return f.updatePartyErr
+	}
+	for i := range f.parties {
+		if f.parties[i].ID == party.ID {
+			f.parties[i] = *party
+			return nil
+		}
+	}
+	return domainErrors.ErrConcurrencyConflict
+}
+func (f *fakeInventoryRepo) ListParties(domainInventory.PartyListFilter) ([]domainInventory.Party, error) {
+	return f.parties, nil
 }
 func (f *fakeInventoryRepo) CreateUnitConversionRule(rule *domainInventory.UnitConversionRule) error {
 	if f.createConversionErr != nil {
@@ -465,6 +493,85 @@ func TestService_ListRecipes_ReadAllowedForOperator(t *testing.T) {
 	}
 	if len(result) != 1 || result[0].RecipeCode != "RCP-1" {
 		t.Fatalf("unexpected recipes payload: %+v", result)
+	}
+}
+
+func TestService_CreateParty_ValidationErrorPayload(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+
+	_, err := svc.CreateParty(CreatePartyInput{
+		PartyType: "SUPPLIER",
+		Name:      "Acme Supplier",
+		AuthToken: "admin-token",
+	})
+	if err == nil {
+		t.Fatalf("expected validation error")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok {
+		t.Fatalf("expected ServiceError, got %T", err)
+	}
+	if typed.Code != "validation_failed" {
+		t.Fatalf("expected validation_failed, got %s", typed.Code)
+	}
+	if len(typed.Fields) == 0 || typed.Fields[0].Field != "contact" {
+		t.Fatalf("expected contact field error, got %+v", typed.Fields)
+	}
+}
+
+func TestService_CreateParty_OperatorDeniedByBackend(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+
+	_, err := svc.CreateParty(CreatePartyInput{
+		PartyType: "SUPPLIER",
+		Name:      "Acme Supplier",
+		Phone:     "9998887777",
+		AuthToken: "operator-token",
+	})
+	if err == nil {
+		t.Fatalf("expected forbidden error")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok {
+		t.Fatalf("expected ServiceError, got %T", err)
+	}
+	if typed.Code != "forbidden" {
+		t.Fatalf("expected forbidden, got %s", typed.Code)
+	}
+}
+
+func TestService_ListParties_ReadAllowedForOperator(t *testing.T) {
+	svc := NewService(&fakeInventoryRepo{
+		parties: []domainInventory.Party{
+			{ID: 1, PartyType: domainInventory.PartyTypeSupplier, Name: "Acme Supplier", Phone: "9998887777", IsActive: true},
+		},
+	}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+
+	result, err := svc.ListParties(ListPartiesInput{AuthToken: "operator-token", ActiveOnly: true})
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if len(result) != 1 || result[0].Name != "Acme Supplier" {
+		t.Fatalf("unexpected parties payload: %+v", result)
+	}
+}
+
+func TestService_UpdateParty_MapsConcurrencyError(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{updatePartyErr: domainErrors.ErrConcurrencyConflict}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+
+	_, err := svc.UpdateParty(UpdatePartyInput{
+		ID:        1,
+		PartyType: "SUPPLIER",
+		Name:      "Acme Supplier",
+		Phone:     "9998887777",
+		UpdatedAt: "2026-02-26T10:00:00Z",
+		AuthToken: "admin-token",
+	})
+	if err == nil || err.Error() != ErrRecordModified {
+		t.Fatalf("expected %q, got %v", ErrRecordModified, err)
 	}
 }
 
