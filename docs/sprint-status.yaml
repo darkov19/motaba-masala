@@ -66,7 +66,7 @@ development_status:
 
     # Epic 3: Procurement & Inventory (Inbound)
     epic-3: contexted
-    3-1-goods-received-note-grn-standard: review
+    3-1-goods-received-note-grn-standard: done
     3-2-lot-tracking-system: backlog
     3-3-third-party-bulk-procurement: backlog
     3-4-stock-reconciliation-audit: backlog

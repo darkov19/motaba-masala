@@ -1,6 +1,6 @@
 # Story 3.1: Goods Received Note (GRN) - Standard
 
-Status: review
+Status: done
 
 ## Story
 
