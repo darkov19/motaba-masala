@@ -280,7 +280,7 @@ func TestService_CreateGRNRecord_ValidationErrorPayload(t *testing.T) {
 
 	_, err := svc.CreateGRNRecord(CreateGRNInput{
 		GRNNumber:    "GRN-3001",
-		SupplierName: "Acme Supplier",
+		SupplierID: 1,
 		AuthToken:    "admin-token",
 		Lines: []GRNLineInput{
 			{ItemID: 10, QuantityReceived: 0},
@@ -304,7 +304,7 @@ func TestService_CreateGRNRecord_NegativeQuantityValidationError(t *testing.T) {
 
 	_, err := svc.CreateGRNRecord(CreateGRNInput{
 		GRNNumber:    "GRN-3001",
-		SupplierName: "Acme Supplier",
+		SupplierID: 1,
 		AuthToken:    "admin-token",
 		Lines: []GRNLineInput{
 			{ItemID: 10, QuantityReceived: -2},
@@ -332,7 +332,7 @@ func TestService_CreateGRNRecord_OperatorAllowed(t *testing.T) {
 
 	_, err := svc.CreateGRNRecord(CreateGRNInput{
 		GRNNumber:    "GRN-3001",
-		SupplierName: "Acme Supplier",
+		SupplierID: 1,
 		InvoiceNo:    "INV-3001",
 		Notes:        "Dock receipt",
 		AuthToken:    "operator-token",
@@ -358,7 +358,7 @@ func TestService_CreateGRNRecord_UnauthorizedWithoutToken(t *testing.T) {
 
 	_, err := svc.CreateGRNRecord(CreateGRNInput{
 		GRNNumber:    "GRN-3001",
-		SupplierName: "Acme Supplier",
+		SupplierID: 1,
 		Lines: []GRNLineInput{
 			{ItemID: 10, QuantityReceived: 1},
 		},
@@ -378,7 +378,7 @@ func TestService_CreateGRNRecord_ForbiddenRole(t *testing.T) {
 
 	_, err := svc.CreateGRNRecord(CreateGRNInput{
 		GRNNumber:    "GRN-3001",
-		SupplierName: "Acme Supplier",
+		SupplierID: 1,
 		AuthToken:    "viewer-token",
 		Lines: []GRNLineInput{
 			{ItemID: 10, QuantityReceived: 1},
@@ -404,7 +404,7 @@ func TestService_CreateGRNRecord_BlockedInReadOnlyGracePeriod(t *testing.T) {
 
 	_, err := svc.CreateGRNRecord(CreateGRNInput{
 		GRNNumber:    "GRN-3001",
-		SupplierName: "Acme Supplier",
+		SupplierID: 1,
 		AuthToken:    "admin-token",
 		Lines: []GRNLineInput{
 			{ItemID: 10, QuantityReceived: 1},
@@ -889,5 +889,81 @@ func TestService_ConvertQuantity_MissingRuleReturnsValidationError(t *testing.T)
 	}
 	if typed.Code != "validation_failed" {
 		t.Fatalf("expected validation_failed, got %s", typed.Code)
+	}
+}
+
+// --- Story 3.3: Third-Party Bulk Procurement ---
+
+func TestService_CreateGRNRecord_BulkPowder_AcceptedByService(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	repo := &fakeInventoryRepo{}
+	svc := NewService(repo, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+
+	_, err := svc.CreateGRNRecord(CreateGRNInput{
+		GRNNumber:    "GRN-BP-001",
+		SupplierID: 1,
+		AuthToken:    "operator-token",
+		Lines: []GRNLineInput{
+			{ItemID: 42, QuantityReceived: 100, UnitPrice: 55.50},
+		},
+	})
+	// The fake repo accepts any item type; we only care the service layer doesn't reject it.
+	if err != nil {
+		t.Fatalf("expected success (fake repo), got %v", err)
+	}
+	if repo.lastCreatedGRN == nil {
+		t.Fatal("expected GRN to be persisted through repo")
+	}
+	if repo.lastCreatedGRN.Lines[0].UnitPrice != 55.50 {
+		t.Fatalf("expected UnitPrice 55.50 on GRN line, got %v", repo.lastCreatedGRN.Lines[0].UnitPrice)
+	}
+}
+
+func TestService_CreateGRNRecord_BulkPowder_UnitPriceMappedToLine(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	repo := &fakeInventoryRepo{}
+	svc := NewService(repo, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+
+	_, err := svc.CreateGRNRecord(CreateGRNInput{
+		GRNNumber:    "GRN-BP-002",
+		SupplierID: 1,
+		AuthToken:    "admin-token",
+		Lines: []GRNLineInput{
+			{ItemID: 10, QuantityReceived: 200, UnitPrice: 120.75},
+			{ItemID: 20, QuantityReceived: 50, UnitPrice: 0},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if repo.lastCreatedGRN.Lines[0].UnitPrice != 120.75 {
+		t.Fatalf("expected UnitPrice 120.75 on line 0, got %v", repo.lastCreatedGRN.Lines[0].UnitPrice)
+	}
+	if repo.lastCreatedGRN.Lines[1].UnitPrice != 0 {
+		t.Fatalf("expected UnitPrice 0 on line 1, got %v", repo.lastCreatedGRN.Lines[1].UnitPrice)
+	}
+}
+
+func TestService_CreateGRNRecord_BulkPowder_SupplierRequiredValidation(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+
+	_, err := svc.CreateGRNRecord(CreateGRNInput{
+		GRNNumber:    "GRN-BP-003",
+		SupplierID: 0,
+		AuthToken:    "admin-token",
+		Lines: []GRNLineInput{
+			{ItemID: 42, QuantityReceived: 100, UnitPrice: 55.50},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected supplier-required validation error")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok || typed.Code != "validation_failed" {
+		t.Fatalf("expected validation_failed ServiceError, got %v", err)
+	}
+	if len(typed.Fields) == 0 || typed.Fields[0].Field != "supplier_id" {
+		t.Fatalf("expected supplier_id field error, got %+v", typed.Fields)
 	}
 }

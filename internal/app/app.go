@@ -708,13 +708,13 @@ type GRNLineResult struct {
 }
 
 type GRNResult struct {
-	ID           int64           `json:"id"`
-	GRNNumber    string          `json:"grn_number"`
-	SupplierName string          `json:"supplier_name"`
-	InvoiceNo    string          `json:"invoice_no"`
-	Notes        string          `json:"notes"`
-	UpdatedAt    string          `json:"updated_at"`
-	Lines        []GRNLineResult `json:"lines"`
+	ID         int64           `json:"id"`
+	GRNNumber  string          `json:"grn_number"`
+	SupplierID int64           `json:"supplier_id"`
+	InvoiceNo  string          `json:"invoice_no"`
+	Notes      string          `json:"notes"`
+	UpdatedAt  string          `json:"updated_at"`
+	Lines      []GRNLineResult `json:"lines"`
 }
 
 type MaterialLotResult struct {
@@ -724,8 +724,11 @@ type MaterialLotResult struct {
 	GRNLineID        int64   `json:"grn_line_id"`
 	GRNNumber        string  `json:"grn_number"`
 	ItemID           int64   `json:"item_id"`
-	SupplierName     string  `json:"supplier_name"`
+	SupplierID       int64   `json:"supplier_id"`
+	SupplierName     string  `json:"supplier_name"` // display-only, resolved via JOIN
 	QuantityReceived float64 `json:"quantity_received"`
+	SourceType       string  `json:"source_type"`
+	UnitCost         float64 `json:"unit_cost"`
 	CreatedAt        string  `json:"created_at"`
 }
 
@@ -1148,8 +1151,11 @@ func (a *App) ListMaterialLots(input appInventory.ListMaterialLotsInput) ([]Mate
 			GRNLineID:        lot.GRNLineID,
 			GRNNumber:        lot.GRNNumber,
 			ItemID:           lot.ItemID,
+			SupplierID:       lot.SupplierID,
 			SupplierName:     lot.SupplierName,
 			QuantityReceived: lot.QuantityReceived,
+			SourceType:       lot.SourceType,
+			UnitCost:         lot.UnitCost,
 			CreatedAt:        lot.CreatedAt.Format(time.RFC3339Nano),
 		})
 	}
@@ -1242,13 +1248,13 @@ func (a *App) CreateGRN(input appInventory.CreateGRNInput) (GRNResult, error) {
 		})
 	}
 	return GRNResult{
-		ID:           grn.ID,
-		GRNNumber:    grn.GRNNumber,
-		SupplierName: grn.SupplierName,
-		InvoiceNo:    grn.InvoiceNo,
-		Notes:        grn.Notes,
-		UpdatedAt:    grn.UpdatedAt.Format(time.RFC3339Nano),
-		Lines:        lines,
+		ID:         grn.ID,
+		GRNNumber:  grn.GRNNumber,
+		SupplierID: grn.SupplierID,
+		InvoiceNo:  grn.InvoiceNo,
+		Notes:      grn.Notes,
+		UpdatedAt:  grn.UpdatedAt.Format(time.RFC3339Nano),
+		Lines:      lines,
 	}, nil
 }
 

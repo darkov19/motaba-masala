@@ -27,10 +27,11 @@ var (
 	ErrComponentItemID     = errors.New("packing material item id is required")
 	ErrComponentQty        = errors.New("component qty_per_unit must be greater than zero")
 	ErrGRNNumberRequired   = errors.New("grn number is required")
-	ErrGRNSupplierRequired = errors.New("supplier reference is required")
+	ErrGRNSupplierRequired = errors.New("supplier id is required")
 	ErrGRNLinesRequired    = errors.New("at least one grn line is required")
 	ErrGRNLineItemID       = errors.New("grn line item id is required")
 	ErrGRNLineQuantity     = errors.New("grn line quantity must be greater than zero")
+	ErrGRNLineUnitPrice    = errors.New("grn line unit price must not be negative")
 	ErrLotNumberRequired   = errors.New("lot number is required")
 	ErrMovementTypeInvalid = errors.New("movement type must be OUT or ADJUSTMENT")
 	ErrMovementQtyInvalid  = errors.New("movement quantity must be greater than zero")
@@ -169,14 +170,14 @@ func (p *PackagingProfile) Validate() error {
 }
 
 type GRN struct {
-	ID           int64     `json:"id"`
-	GRNNumber    string    `json:"grn_number"`
-	SupplierName string    `json:"supplier_name"`
-	InvoiceNo    string    `json:"invoice_no"`
-	Notes        string    `json:"notes"`
-	Lines        []GRNLine `json:"lines"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID         int64     `json:"id"`
+	GRNNumber  string    `json:"grn_number"`
+	SupplierID int64     `json:"supplier_id"`
+	InvoiceNo  string    `json:"invoice_no"`
+	Notes      string    `json:"notes"`
+	Lines      []GRNLine `json:"lines"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type GRNLine struct {
@@ -185,6 +186,7 @@ type GRNLine struct {
 	LineNo           int     `json:"line_no"`
 	ItemID           int64   `json:"item_id"`
 	QuantityReceived float64 `json:"quantity_received"`
+	UnitPrice        float64 `json:"unit_price"`
 	LotNumber        string  `json:"lot_number"`
 }
 
@@ -195,8 +197,11 @@ type MaterialLot struct {
 	GRNLineID        int64     `json:"grn_line_id"`
 	GRNNumber        string    `json:"grn_number"`
 	ItemID           int64     `json:"item_id"`
-	SupplierName     string    `json:"supplier_name"`
+	SupplierID       int64     `json:"supplier_id"`
+	SupplierName     string    `json:"supplier_name"` // display-only, resolved via JOIN on parties
 	QuantityReceived float64   `json:"quantity_received"`
+	SourceType       string    `json:"source_type"`
+	UnitCost         float64   `json:"unit_cost"`
 	CreatedAt        time.Time `json:"created_at"`
 }
 
@@ -250,14 +255,13 @@ func (g *GRN) Validate() error {
 		return errors.New("grn is nil")
 	}
 	g.GRNNumber = strings.TrimSpace(g.GRNNumber)
-	g.SupplierName = strings.TrimSpace(g.SupplierName)
 	g.InvoiceNo = strings.TrimSpace(g.InvoiceNo)
 	g.Notes = strings.TrimSpace(g.Notes)
 
 	if g.GRNNumber == "" {
 		return ErrGRNNumberRequired
 	}
-	if g.SupplierName == "" {
+	if g.SupplierID <= 0 {
 		return ErrGRNSupplierRequired
 	}
 	if len(g.Lines) == 0 {
@@ -273,6 +277,9 @@ func (g *GRN) Validate() error {
 		}
 		if line.QuantityReceived <= 0 {
 			return ErrGRNLineQuantity
+		}
+		if line.UnitPrice < 0 {
+			return ErrGRNLineUnitPrice
 		}
 	}
 	return nil

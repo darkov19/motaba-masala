@@ -45,24 +45,42 @@ describe("GRNForm", () => {
                     },
                 ]);
             }
-            return Promise.resolve([
-                {
-                    id: 20,
-                    sku: "PACK-20",
-                    name: "Pouch Film",
-                    item_type: "PACKING_MATERIAL",
-                    base_unit: "pcs",
-                    item_subtype: "",
-                    minimum_stock: 0,
-                    is_active: true,
-                    updated_at: new Date().toISOString(),
-                },
-            ]);
+            if (itemType === "PACKING_MATERIAL") {
+                return Promise.resolve([
+                    {
+                        id: 20,
+                        sku: "PACK-20",
+                        name: "Pouch Film",
+                        item_type: "PACKING_MATERIAL",
+                        base_unit: "pcs",
+                        item_subtype: "",
+                        minimum_stock: 0,
+                        is_active: true,
+                        updated_at: new Date().toISOString(),
+                    },
+                ]);
+            }
+            if (itemType === "BULK_POWDER") {
+                return Promise.resolve([
+                    {
+                        id: 30,
+                        sku: "BULK-30",
+                        name: "Bulk Chili Powder",
+                        item_type: "BULK_POWDER",
+                        base_unit: "kg",
+                        item_subtype: "",
+                        minimum_stock: 0,
+                        is_active: true,
+                        updated_at: new Date().toISOString(),
+                    },
+                ]);
+            }
+            return Promise.resolve([]);
         });
         createGRNMock.mockResolvedValue({
             id: 1,
             grn_number: "GRN-3001",
-            supplier_name: "Acme Supplier",
+            supplier_id: 1,
             invoice_no: "INV-3001",
             notes: "Dock receipt",
             updated_at: new Date().toISOString(),
@@ -79,7 +97,7 @@ describe("GRNForm", () => {
                 userKey="operator"
                 onDirtyChange={vi.fn()}
                 initialValues={{
-                    supplierName: "Acme Supplier",
+                    supplierID: 1,
                     lines: [
                         { item_id: 10, quantity_received: 40 },
                         { item_id: 20, quantity_received: 15 },
@@ -98,11 +116,11 @@ describe("GRNForm", () => {
             expect(createGRNMock).toHaveBeenCalledTimes(1);
             expect(createGRNMock).toHaveBeenCalledWith(expect.objectContaining({
                 grn_number: "GRN-3001",
-                supplier_name: "Acme Supplier",
+                supplier_id: 1,
                 invoice_no: "INV-3001",
                 lines: [
-                    { item_id: 10, line_no: 1, quantity_received: 40 },
-                    { item_id: 20, line_no: 2, quantity_received: 15 },
+                    { item_id: 10, line_no: 1, quantity_received: 40, unit_price: 0 },
+                    { item_id: 20, line_no: 2, quantity_received: 15, unit_price: 0 },
                 ],
             }));
         });
@@ -114,7 +132,7 @@ describe("GRNForm", () => {
                 userKey="operator"
                 onDirtyChange={vi.fn()}
                 initialValues={{
-                    supplierName: "Acme Supplier",
+                    supplierID: 1,
                     lines: [{ item_id: 10, quantity_received: 1 }],
                 }}
             />,
@@ -126,7 +144,7 @@ describe("GRNForm", () => {
 
         fireEvent.change(grnNumberInput, { target: { value: "GRN-3010" } });
         fireEvent.change(screen.getByPlaceholderText("INV-3001"), { target: { value: "INV-3010" } });
-        const qtyInput = screen.getByRole("spinbutton");
+        const qtyInput = screen.getAllByRole("spinbutton")[0];
         fireEvent.change(qtyInput, { target: { value: "22" } });
 
         fireEvent.keyDown(qtyInput, { key: "Enter", code: "Enter", charCode: 13 });
@@ -137,7 +155,7 @@ describe("GRNForm", () => {
 
         await waitFor(() => {
             expect(screen.getByPlaceholderText("GRN-3001")).toHaveFocus();
-            expect(screen.getByRole("spinbutton")).toHaveValue("1.0");
+            expect(screen.getAllByRole("spinbutton")[0]).toHaveValue("1.0");
         });
     }, 20000);
 
@@ -147,7 +165,7 @@ describe("GRNForm", () => {
                 userKey="operator"
                 onDirtyChange={vi.fn()}
                 initialValues={{
-                    supplierName: "Acme Supplier",
+                    supplierID: 1,
                     lines: [{ item_id: 10, quantity_received: 1 }],
                 }}
             />,
@@ -155,7 +173,7 @@ describe("GRNForm", () => {
         await waitFor(() => expect(listPartiesMock).toHaveBeenCalledTimes(1));
 
         fireEvent.change(screen.getByPlaceholderText("GRN-3001"), { target: { value: "GRN-3002" } });
-        fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "0" } });
+        fireEvent.change(screen.getAllByRole("spinbutton")[0], { target: { value: "0" } });
 
         fireEvent.click(screen.getByRole("button", { name: "Submit GRN" }));
 
@@ -170,7 +188,7 @@ describe("GRNForm", () => {
                 userKey="operator"
                 onDirtyChange={vi.fn()}
                 initialValues={{
-                    supplierName: "Acme Supplier",
+                    supplierID: 1,
                     lines: [{ item_id: 10, quantity_received: 1 }],
                 }}
             />,
@@ -178,12 +196,62 @@ describe("GRNForm", () => {
         await waitFor(() => expect(listPartiesMock).toHaveBeenCalledTimes(1));
 
         fireEvent.change(screen.getByPlaceholderText("GRN-3001"), { target: { value: "GRN-3003" } });
-        fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "-3" } });
+        fireEvent.change(screen.getAllByRole("spinbutton")[0], { target: { value: "-3" } });
 
         fireEvent.click(screen.getByRole("button", { name: "Submit GRN" }));
 
         await waitFor(() => {
             expect(createGRNMock).not.toHaveBeenCalled();
+        });
+    }, 20000);
+
+    it("loads BULK_POWDER items alongside RAW and PACKING_MATERIAL", async () => {
+        render(
+            <GRNForm
+                userKey="operator"
+                onDirtyChange={vi.fn()}
+            />,
+        );
+        await waitFor(() => expect(listItemsMock).toHaveBeenCalledWith(true, "BULK_POWDER"));
+        expect(listItemsMock).toHaveBeenCalledWith(true, "RAW");
+        expect(listItemsMock).toHaveBeenCalledWith(true, "PACKING_MATERIAL");
+    }, 20000);
+
+    it("submits GRN with unit_price for BULK_POWDER purchase", async () => {
+        createGRNMock.mockResolvedValue({
+            id: 2,
+            grn_number: "GRN-BP-001",
+            supplier_id: 1,
+            invoice_no: "",
+            notes: "",
+            updated_at: new Date().toISOString(),
+            lines: [
+                { line_no: 1, item_id: 30, quantity_received: 100, lot_number: "LOT-20260228-001" },
+            ],
+        });
+        render(
+            <GRNForm
+                userKey="operator"
+                onDirtyChange={vi.fn()}
+                initialValues={{
+                    supplierID: 1,
+                    lines: [{ item_id: 30, quantity_received: 100, unit_price: 55.5 }],
+                }}
+            />,
+        );
+        await waitFor(() => expect(listPartiesMock).toHaveBeenCalledTimes(1));
+
+        fireEvent.change(screen.getByPlaceholderText("GRN-3001"), { target: { value: "GRN-BP-001" } });
+        fireEvent.click(screen.getByRole("button", { name: "Submit GRN" }));
+
+        await waitFor(() => {
+            expect(createGRNMock).toHaveBeenCalledWith(expect.objectContaining({
+                grn_number: "GRN-BP-001",
+                supplier_id: 1,
+                lines: [
+                    { item_id: 30, line_no: 1, quantity_received: 100, unit_price: 55.5 },
+                ],
+            }));
         });
     }, 20000);
 
@@ -193,7 +261,7 @@ describe("GRNForm", () => {
                 userKey="operator"
                 onDirtyChange={vi.fn()}
                 initialValues={{
-                    supplierName: "Acme Supplier",
+                    supplierID: 1,
                     lines: [{ item_id: 10, quantity_received: 3 }],
                 }}
             />,

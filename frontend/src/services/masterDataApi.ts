@@ -139,7 +139,7 @@ export type GRNLine = {
 export type GRN = {
     id: number;
     grn_number: string;
-    supplier_name: string;
+    supplier_id: number;
     invoice_no: string;
     notes: string;
     updated_at: string;
@@ -148,12 +148,13 @@ export type GRN = {
 
 export type CreateGRNPayload = {
     grn_number: string;
-    supplier_name: string;
+    supplier_id: number;
     invoice_no?: string;
     notes?: string;
     lines: Array<{
         item_id: number;
         quantity_received: number;
+        unit_price?: number;
     }>;
     auth_token?: string;
 };
@@ -165,8 +166,11 @@ export type MaterialLot = {
     grn_line_id: number;
     grn_number: string;
     item_id: number;
-    supplier_name: string;
+    supplier_id: number;
+    supplier_name: string; // display-only, resolved via JOIN on parties
     quantity_received: number;
+    source_type: string;
+    unit_cost: number;
     created_at: string;
 };
 

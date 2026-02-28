@@ -154,15 +154,16 @@ type ListPartiesInput struct {
 type GRNLineInput struct {
 	ItemID           int64   `json:"item_id"`
 	QuantityReceived float64 `json:"quantity_received"`
+	UnitPrice        float64 `json:"unit_price"`
 }
 
 type CreateGRNInput struct {
-	GRNNumber    string         `json:"grn_number"`
-	SupplierName string         `json:"supplier_name"`
-	InvoiceNo    string         `json:"invoice_no"`
-	Notes        string         `json:"notes"`
-	Lines        []GRNLineInput `json:"lines"`
-	AuthToken    string         `json:"auth_token"`
+	GRNNumber  string         `json:"grn_number"`
+	SupplierID int64          `json:"supplier_id"`
+	InvoiceNo  string         `json:"invoice_no"`
+	Notes      string         `json:"notes"`
+	Lines      []GRNLineInput `json:"lines"`
+	AuthToken  string         `json:"auth_token"`
 }
 
 type ListMaterialLotsInput struct {
@@ -339,13 +340,15 @@ func mapValidationError(err error) error {
 	case errors.Is(err, domainInventory.ErrGRNNumberRequired):
 		return &ServiceError{Code: "validation_failed", Message: "grn validation failed", Fields: []FieldError{{Field: "grn_number", Message: domainInventory.ErrGRNNumberRequired.Error()}}}
 	case errors.Is(err, domainInventory.ErrGRNSupplierRequired):
-		return &ServiceError{Code: "validation_failed", Message: "grn validation failed", Fields: []FieldError{{Field: "supplier_name", Message: domainInventory.ErrGRNSupplierRequired.Error()}}}
+		return &ServiceError{Code: "validation_failed", Message: "grn validation failed", Fields: []FieldError{{Field: "supplier_id", Message: domainInventory.ErrGRNSupplierRequired.Error()}}}
 	case errors.Is(err, domainInventory.ErrGRNLinesRequired):
 		return &ServiceError{Code: "validation_failed", Message: "grn validation failed", Fields: []FieldError{{Field: "lines", Message: domainInventory.ErrGRNLinesRequired.Error()}}}
 	case errors.Is(err, domainInventory.ErrGRNLineItemID):
 		return &ServiceError{Code: "validation_failed", Message: "grn validation failed", Fields: []FieldError{{Field: "lines.item_id", Message: domainInventory.ErrGRNLineItemID.Error()}}}
 	case errors.Is(err, domainInventory.ErrGRNLineQuantity):
 		return &ServiceError{Code: "validation_failed", Message: "grn validation failed", Fields: []FieldError{{Field: "lines.quantity_received", Message: domainInventory.ErrGRNLineQuantity.Error()}}}
+	case errors.Is(err, domainInventory.ErrGRNLineUnitPrice):
+		return &ServiceError{Code: "validation_failed", Message: "grn validation failed", Fields: []FieldError{{Field: "lines.unit_price", Message: domainInventory.ErrGRNLineUnitPrice.Error()}}}
 	case errors.Is(err, domainInventory.ErrLotNumberRequired):
 		return &ServiceError{Code: "validation_failed", Message: "lot movement validation failed", Fields: []FieldError{{Field: "lot_number", Message: domainInventory.ErrLotNumberRequired.Error()}}}
 	case errors.Is(err, domainInventory.ErrMovementTypeInvalid):
@@ -486,13 +489,13 @@ func mapGRNPersistenceError(err error) error {
 		return &ServiceError{
 			Code:    "validation_failed",
 			Message: "grn validation failed",
-			Fields:  []FieldError{{Field: "lines.item_id", Message: "line item must be an active RAW or PACKING_MATERIAL item"}},
+			Fields:  []FieldError{{Field: "lines.item_id", Message: "line item must be an active RAW, PACKING_MATERIAL, or BULK_POWDER item"}},
 		}
 	case strings.Contains(lowered, "foreign key constraint failed"):
 		return &ServiceError{
 			Code:    "validation_failed",
 			Message: "grn validation failed",
-			Fields:  []FieldError{{Field: "lines.item_id", Message: "line item must reference an existing item"}},
+			Fields:  []FieldError{{Field: "supplier_id", Message: "supplier_id must reference an existing supplier party"}},
 		}
 	default:
 		return mapValidationError(err)
@@ -796,9 +799,9 @@ func (s *Service) CreateGRNRecord(input CreateGRNInput) (*domainInventory.GRN, e
 		return nil, err
 	}
 	grn := &domainInventory.GRN{
-		GRNNumber:    input.GRNNumber,
-		SupplierName: input.SupplierName,
-		InvoiceNo:    input.InvoiceNo,
+		GRNNumber:  input.GRNNumber,
+		SupplierID: input.SupplierID,
+		InvoiceNo:  input.InvoiceNo,
 		Notes:        input.Notes,
 		Lines:        make([]domainInventory.GRNLine, 0, len(input.Lines)),
 	}
@@ -807,6 +810,7 @@ func (s *Service) CreateGRNRecord(input CreateGRNInput) (*domainInventory.GRN, e
 			LineNo:           i + 1,
 			ItemID:           line.ItemID,
 			QuantityReceived: line.QuantityReceived,
+			UnitPrice:        line.UnitPrice,
 		})
 	}
 	if err := grn.Validate(); err != nil {

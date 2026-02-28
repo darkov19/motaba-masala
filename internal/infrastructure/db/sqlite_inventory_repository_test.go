@@ -125,10 +125,11 @@ func TestSqliteInventoryRepository_UpdateBatch_ConcurrencyConflict(t *testing.T)
 func TestSqliteInventoryRepository_UpdateGRN_ConcurrencyConflict(t *testing.T) {
 	repo, manager := setupInventoryRepo(t)
 	rawID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-100", "Raw Turmeric", "kg")
+	supplierID := createTestParty(t, repo, "Supplier A")
 
 	grn := &domainInventory.GRN{
-		GRNNumber:    "GRN-100",
-		SupplierName: "Supplier A",
+		GRNNumber:  "GRN-100",
+		SupplierID: supplierID,
 		InvoiceNo:    "INV-100",
 		Notes:        "Initial",
 		Lines: []domainInventory.GRNLine{
@@ -172,15 +173,31 @@ func createTestInventoryItem(t *testing.T, repo *SqliteInventoryRepository, item
 	return item.ID
 }
 
+func createTestParty(t *testing.T, repo *SqliteInventoryRepository, name string) int64 {
+	t.Helper()
+
+	party := &domainInventory.Party{
+		PartyType: "SUPPLIER",
+		Name:      name,
+		Phone:     "0000000000",
+		IsActive:  true,
+	}
+	if err := repo.CreateParty(party); err != nil {
+		t.Fatalf("CreateParty(%q) failed: %v", name, err)
+	}
+	return party.ID
+}
+
 func TestSqliteInventoryRepository_CreateGRN_PersistsLinesAndStockLedger(t *testing.T) {
 	repo, manager := setupInventoryRepo(t)
 
 	rawID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-10", "Raw Chili", "kg")
 	packID := createTestInventoryItem(t, repo, domainInventory.ItemTypePackingMaterial, "PACK-20", "Pouch Film", "pcs")
+	supplierID := createTestParty(t, repo, "Acme Supplier")
 
 	grn := &domainInventory.GRN{
-		GRNNumber:    "GRN-3001",
-		SupplierName: "Acme Supplier",
+		GRNNumber:  "GRN-3001",
+		SupplierID: supplierID,
 		InvoiceNo:    "INV-3001",
 		Notes:        "Dock receipt",
 		Lines: []domainInventory.GRNLine{
@@ -233,10 +250,11 @@ func TestSqliteInventoryRepository_CreateGRN_RollsBackOnInvalidLineItemType(t *t
 
 	rawID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-11", "Raw Coriander", "kg")
 	finishedID := createTestInventoryItem(t, repo, domainInventory.ItemTypeFinishedGood, "FG-30", "Finished Pack", "pcs")
+	supplierID := createTestParty(t, repo, "Acme Supplier")
 
 	grn := &domainInventory.GRN{
-		GRNNumber:    "GRN-3002",
-		SupplierName: "Acme Supplier",
+		GRNNumber:  "GRN-3002",
+		SupplierID: supplierID,
 		InvoiceNo:    "INV-3002",
 		Lines: []domainInventory.GRNLine{
 			{LineNo: 1, ItemID: rawID, QuantityReceived: 10},
@@ -283,10 +301,11 @@ func TestSqliteInventoryRepository_CreateGRN_RollsBackOnInvalidLineItemType(t *t
 func TestSqliteInventoryRepository_CreateGRN_GeneratesDeterministicUniqueLotNumbers(t *testing.T) {
 	repo, manager := setupInventoryRepo(t)
 	rawID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-21", "Raw Cumin", "kg")
+	supplierID := createTestParty(t, repo, "Supplier A")
 
 	first := &domainInventory.GRN{
-		GRNNumber:    "GRN-3101",
-		SupplierName: "Supplier A",
+		GRNNumber:  "GRN-3101",
+		SupplierID: supplierID,
 		Lines: []domainInventory.GRNLine{
 			{LineNo: 1, ItemID: rawID, QuantityReceived: 10},
 		},
@@ -296,8 +315,8 @@ func TestSqliteInventoryRepository_CreateGRN_GeneratesDeterministicUniqueLotNumb
 	}
 
 	second := &domainInventory.GRN{
-		GRNNumber:    "GRN-3102",
-		SupplierName: "Supplier A",
+		GRNNumber:  "GRN-3102",
+		SupplierID: supplierID,
 		Lines: []domainInventory.GRNLine{
 			{LineNo: 1, ItemID: rawID, QuantityReceived: 12},
 		},
@@ -328,10 +347,11 @@ func TestSqliteInventoryRepository_CreateGRN_GeneratesDeterministicUniqueLotNumb
 func TestSqliteInventoryRepository_ListMaterialLots_FiltersAndReturnsNewestFirst(t *testing.T) {
 	repo, _ := setupInventoryRepo(t)
 	rawID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-31", "Raw Cardamom", "kg")
+	supplierID := createTestParty(t, repo, "Trace Supplier")
 
 	grn := &domainInventory.GRN{
-		GRNNumber:    "GRN-3201",
-		SupplierName: "Trace Supplier",
+		GRNNumber:  "GRN-3201",
+		SupplierID: supplierID,
 		Lines: []domainInventory.GRNLine{
 			{LineNo: 1, ItemID: rawID, QuantityReceived: 14},
 		},
@@ -358,10 +378,11 @@ func TestSqliteInventoryRepository_ListMaterialLots_FiltersAndReturnsNewestFirst
 func TestSqliteInventoryRepository_RecordAndListLotStockMovements_TracksNonInboundContinuity(t *testing.T) {
 	repo, _ := setupInventoryRepo(t)
 	rawID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-41", "Raw Fennel", "kg")
+	supplierID := createTestParty(t, repo, "Trace Supplier")
 
 	grn := &domainInventory.GRN{
-		GRNNumber:    "GRN-3301",
-		SupplierName: "Trace Supplier",
+		GRNNumber:  "GRN-3301",
+		SupplierID: supplierID,
 		Lines: []domainInventory.GRNLine{
 			{LineNo: 1, ItemID: rawID, QuantityReceived: 30},
 		},
@@ -417,11 +438,12 @@ func TestSqliteInventoryRepository_CreateGRN_PersistsSupplierAndInvoice(t *testi
 	repo, manager := setupInventoryRepo(t)
 
 	rawID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-12", "Raw Pepper", "kg")
+	partyID := createTestParty(t, repo, "Supplier Ref A")
 
 	grn := &domainInventory.GRN{
-		GRNNumber:    "GRN-3003",
-		SupplierName: "Supplier Ref A",
-		InvoiceNo:    "INV-3003",
+		GRNNumber:  "GRN-3003",
+		SupplierID: partyID,
+		InvoiceNo:  "INV-3003",
 		Lines: []domainInventory.GRNLine{
 			{LineNo: 1, ItemID: rawID, QuantityReceived: 11},
 		},
@@ -430,12 +452,13 @@ func TestSqliteInventoryRepository_CreateGRN_PersistsSupplierAndInvoice(t *testi
 		t.Fatalf("CreateGRN failed: %v", err)
 	}
 
-	var supplier, invoice string
-	if err := manager.GetDB().QueryRow("SELECT supplier_name, invoice_no FROM grns WHERE id = ?", grn.ID).Scan(&supplier, &invoice); err != nil {
+	var persistedSupplierID int64
+	var invoice string
+	if err := manager.GetDB().QueryRow("SELECT supplier_id, invoice_no FROM grns WHERE id = ?", grn.ID).Scan(&persistedSupplierID, &invoice); err != nil {
 		t.Fatalf("failed to query persisted grn header: %v", err)
 	}
-	if supplier != "Supplier Ref A" || invoice != "INV-3003" {
-		t.Fatalf("unexpected persisted supplier/invoice: %q / %q", supplier, invoice)
+	if persistedSupplierID != partyID || invoice != "INV-3003" {
+		t.Fatalf("unexpected persisted supplier_id/invoice: %d / %q", persistedSupplierID, invoice)
 	}
 }
 
@@ -1218,5 +1241,135 @@ func TestSqliteInventoryRepository_UpdateParty_ConcurrencyConflict(t *testing.T)
 	stale.Phone = "5556667777"
 	if err := repo.UpdateParty(&stale); !errors.Is(err, domainErrors.ErrConcurrencyConflict) {
 		t.Fatalf("expected concurrency conflict, got %v", err)
+	}
+}
+
+// --- Story 3.3: Third-Party Bulk Procurement ---
+
+func TestSqliteInventoryRepository_CreateGRN_BulkPowder_CreatesLotWithSourceTypeAndUnitCost(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	bulkID := createTestInventoryItem(t, repo, domainInventory.ItemTypeBulkPowder, "BULK-EXT-01", "Bulk Chili External", "kg")
+	bulkSupplierID := createTestParty(t, repo, "External Bulk Supplier")
+
+	grn := &domainInventory.GRN{
+		GRNNumber:  "GRN-BP-INT-001",
+		SupplierID: bulkSupplierID,
+		InvoiceNo:  "EXT-INV-001",
+		Lines: []domainInventory.GRNLine{
+			{LineNo: 1, ItemID: bulkID, QuantityReceived: 500, UnitPrice: 75.50},
+		},
+	}
+	if err := repo.CreateGRN(grn); err != nil {
+		t.Fatalf("CreateGRN (BULK_POWDER) failed: %v", err)
+	}
+
+	if grn.Lines[0].LotNumber == "" {
+		t.Fatal("expected lot number to be generated for BULK_POWDER line")
+	}
+
+	var sourceType string
+	var unitCost float64
+	var persistedSupplierID int64
+	err := manager.GetDB().QueryRow(
+		"SELECT source_type, unit_cost, supplier_id FROM material_lots WHERE lot_number = ?",
+		grn.Lines[0].LotNumber,
+	).Scan(&sourceType, &unitCost, &persistedSupplierID)
+	if err != nil {
+		t.Fatalf("failed to query material_lot: %v", err)
+	}
+	if sourceType != "SUPPLIER_GRN" {
+		t.Fatalf("expected source_type SUPPLIER_GRN, got %q", sourceType)
+	}
+	if unitCost != 75.50 {
+		t.Fatalf("expected unit_cost 75.50, got %v", unitCost)
+	}
+	if persistedSupplierID != bulkSupplierID {
+		t.Fatalf("expected supplier_id %d, got %d", bulkSupplierID, persistedSupplierID)
+	}
+}
+
+func TestSqliteInventoryRepository_CreateGRN_BulkPowder_AppearsInListMaterialLots(t *testing.T) {
+	repo, _ := setupInventoryRepo(t)
+
+	bulkID := createTestInventoryItem(t, repo, domainInventory.ItemTypeBulkPowder, "BULK-EXT-02", "Bulk Cumin External", "kg")
+	supplierID := createTestParty(t, repo, "Third Party Cumin Co")
+
+	grn := &domainInventory.GRN{
+		GRNNumber:  "GRN-BP-INT-002",
+		SupplierID: supplierID,
+		Lines: []domainInventory.GRNLine{
+			{LineNo: 1, ItemID: bulkID, QuantityReceived: 200, UnitPrice: 45.00},
+		},
+	}
+	if err := repo.CreateGRN(grn); err != nil {
+		t.Fatalf("CreateGRN (BULK_POWDER) failed: %v", err)
+	}
+
+	lots, err := repo.ListMaterialLots(domainInventory.MaterialLotListFilter{
+		ItemID: &bulkID,
+	})
+	if err != nil {
+		t.Fatalf("ListMaterialLots failed: %v", err)
+	}
+	if len(lots) != 1 {
+		t.Fatalf("expected 1 lot for BULK_POWDER item, got %d", len(lots))
+	}
+	lot := lots[0]
+	if lot.SourceType != "SUPPLIER_GRN" {
+		t.Fatalf("expected source_type SUPPLIER_GRN on listed lot, got %q", lot.SourceType)
+	}
+	if lot.UnitCost != 45.00 {
+		t.Fatalf("expected unit_cost 45.00 on listed lot, got %v", lot.UnitCost)
+	}
+	if lot.SupplierName != "Third Party Cumin Co" {
+		t.Fatalf("expected supplier_name 'Third Party Cumin Co', got %q", lot.SupplierName)
+	}
+}
+
+func TestSqliteInventoryRepository_CreateGRN_BulkPowder_FinishedGoodRejected(t *testing.T) {
+	repo, _ := setupInventoryRepo(t)
+
+	finishedID := createTestInventoryItem(t, repo, domainInventory.ItemTypeFinishedGood, "FG-BP-01", "Finished Chili Jar", "pcs")
+	supplierID := createTestParty(t, repo, "Some Supplier")
+
+	grn := &domainInventory.GRN{
+		GRNNumber:  "GRN-BP-INT-003",
+		SupplierID: supplierID,
+		Lines: []domainInventory.GRNLine{
+			{LineNo: 1, ItemID: finishedID, QuantityReceived: 10, UnitPrice: 5.00},
+		},
+	}
+	if err := repo.CreateGRN(grn); err == nil {
+		t.Fatal("expected FINISHED_GOOD item to be rejected in GRN")
+	}
+}
+
+func TestSqliteInventoryRepository_CreateGRN_UnitPricePersistedOnGRNLine(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	rawID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-PRICE-01", "Raw Ginger", "kg")
+	supplierID := createTestParty(t, repo, "Ginger Supplier")
+
+	grn := &domainInventory.GRN{
+		GRNNumber:  "GRN-PRICE-001",
+		SupplierID: supplierID,
+		Lines: []domainInventory.GRNLine{
+			{LineNo: 1, ItemID: rawID, QuantityReceived: 25, UnitPrice: 30.00},
+		},
+	}
+	if err := repo.CreateGRN(grn); err != nil {
+		t.Fatalf("CreateGRN failed: %v", err)
+	}
+
+	var unitPrice float64
+	if err := manager.GetDB().QueryRow(
+		"SELECT unit_price FROM grn_lines WHERE grn_id = ? AND line_no = 1",
+		grn.ID,
+	).Scan(&unitPrice); err != nil {
+		t.Fatalf("failed to query grn_line unit_price: %v", err)
+	}
+	if unitPrice != 30.00 {
+		t.Fatalf("expected unit_price 30.00 on grn_line, got %v", unitPrice)
 	}
 }

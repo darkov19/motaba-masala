@@ -123,4 +123,50 @@ describe("ProcurementLotsPage", () => {
             await screen.findByText("Invalid filter input (400)"),
         ).toBeInTheDocument();
     });
+
+    it("shows External badge for SUPPLIER_GRN lots", async () => {
+        listMaterialLotsMock.mockResolvedValue([
+            {
+                id: 2,
+                lot_number: "LOT-20260228-001",
+                grn_id: 101,
+                grn_line_id: 2,
+                grn_number: "GRN-BP-001",
+                item_id: 11,
+                supplier_name: "Bulk Supplier Co",
+                quantity_received: 100,
+                source_type: "SUPPLIER_GRN",
+                unit_cost: 0,
+                created_at: "2026-02-28T10:00:00Z",
+            },
+        ]);
+
+        render(<ProcurementLotsPage onDirtyChange={vi.fn()} />);
+
+        await waitFor(() => expect(listMaterialLotsMock).toHaveBeenCalledTimes(1));
+        expect(screen.getByText("External")).toBeInTheDocument();
+    });
+
+    it("renders unit_cost value in Unit Cost column", async () => {
+        listMaterialLotsMock.mockResolvedValue([
+            {
+                id: 3,
+                lot_number: "LOT-20260228-002",
+                grn_id: 102,
+                grn_line_id: 3,
+                grn_number: "GRN-BP-002",
+                item_id: 11,
+                supplier_name: "Bulk Supplier Co",
+                quantity_received: 200,
+                source_type: "SUPPLIER_GRN",
+                unit_cost: 55.5,
+                created_at: "2026-02-28T11:00:00Z",
+            },
+        ]);
+
+        render(<ProcurementLotsPage onDirtyChange={vi.fn()} />);
+
+        await waitFor(() => expect(listMaterialLotsMock).toHaveBeenCalledTimes(1));
+        expect(screen.getByText("55.50")).toBeInTheDocument();
+    });
 });

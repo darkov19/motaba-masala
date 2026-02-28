@@ -150,7 +150,19 @@ export function ProcurementLotsPage({ onDirtyChange }: ProcurementLotsPageProps)
     const columns = useMemo<ColumnsType<MaterialLot>>(() => [
         { title: "Lot Number", dataIndex: "lot_number", key: "lot_number", width: 180 },
         { title: "GRN Reference", dataIndex: "grn_number", key: "grn_number", width: 140 },
-        { title: "Supplier", dataIndex: "supplier_name", key: "supplier_name", width: 200 },
+        {
+            title: "Supplier",
+            key: "supplier",
+            width: 200,
+            render: (_: unknown, record: MaterialLot) => (
+                <Space size={4}>
+                    <Typography.Text>{record.supplier_name}</Typography.Text>
+                    {record.source_type === "SUPPLIER_GRN" && (
+                        <Tag color="orange">External</Tag>
+                    )}
+                </Space>
+            ),
+        },
         {
             title: "Item",
             dataIndex: "item_id",
@@ -164,6 +176,13 @@ export function ProcurementLotsPage({ onDirtyChange }: ProcurementLotsPageProps)
             ),
         },
         { title: "Quantity", dataIndex: "quantity_received", key: "quantity_received", width: 120 },
+        {
+            title: "Unit Cost",
+            dataIndex: "unit_cost",
+            key: "unit_cost",
+            width: 110,
+            render: (value: number) => value > 0 ? value.toFixed(2) : "—",
+        },
         {
             title: "Created",
             dataIndex: "created_at",
@@ -229,7 +248,7 @@ export function ProcurementLotsPage({ onDirtyChange }: ProcurementLotsPageProps)
                 dataSource={rows}
                 pagination={{ pageSize: 10 }}
                 size="small"
-                scroll={{ x: 1080 }}
+                scroll={{ x: 1300 }}
             />
         </Space>
     );

@@ -69,7 +69,7 @@ development_status:
     3-1-goods-received-note-grn-standard: done
     3-2-lot-tracking-system: done
     3-2b-procurement-lots-route-enablement: done
-    3-3-third-party-bulk-procurement: ready-for-dev
+    3-3-third-party-bulk-procurement: done
     3-4-stock-reconciliation-audit: backlog
     epic-3-retrospective: optional
 

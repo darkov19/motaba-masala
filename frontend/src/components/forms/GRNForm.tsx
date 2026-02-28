@@ -6,12 +6,13 @@ import { createGRN, ItemMaster, Party, listItems, listParties } from "../../serv
 
 type GRNValues = {
     grnNumber?: string;
-    supplierName?: string;
+    supplierID?: number;
     invoiceNumber?: string;
     notes?: string;
     lines?: Array<{
         item_id?: number;
         quantity_received?: number | null;
+        unit_price?: number | null;
     }>;
 };
 
@@ -95,14 +96,15 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false, initial
         const loadItems = async () => {
             setItemsLoading(true);
             try {
-                const [rawItems, packingItems] = await Promise.all([
+                const [rawItems, packingItems, bulkItems] = await Promise.all([
                     listItems(true, "RAW"),
                     listItems(true, "PACKING_MATERIAL"),
+                    listItems(true, "BULK_POWDER"),
                 ]);
                 if (!mounted) {
                     return;
                 }
-                setItems([...rawItems, ...packingItems]);
+                setItems([...rawItems, ...packingItems, ...bulkItems]);
             } catch (error) {
                 message.error(error instanceof Error ? error.message : "Failed to load items for GRN");
             } finally {
@@ -146,7 +148,7 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false, initial
         [items],
     );
     const supplierOptions = useMemo(
-        () => suppliers.map(supplier => ({ label: supplier.name, value: supplier.name })),
+        () => suppliers.map(supplier => ({ label: supplier.name, value: supplier.id })),
         [suppliers],
     );
     const resolvedInitialValues = useMemo(
@@ -155,19 +157,20 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false, initial
     );
 
     const onFinish = async (values: GRNValues) => {
-        const supplierName = (values.supplierName || "").trim();
+        const supplierID = Number(values.supplierID || 0);
         const lines = (values.lines || []).map((line, index) => ({
             item_id: Number(line.item_id),
             quantity_received: Number(line.quantity_received),
+            unit_price: Number(line.unit_price ?? 0),
             line_no: index + 1,
         }));
-        const supplierExists = suppliers.some(supplier => supplier.name.trim() === supplierName);
+        const supplierRef = suppliers.find(s => s.id === supplierID);
 
         if (lines.length === 0) {
             message.error("At least one GRN line is required");
             return;
         }
-        if (!supplierName || !supplierExists) {
+        if (!supplierID || !supplierRef) {
             message.error("Select a supplier from the existing list");
             return;
         }
@@ -183,7 +186,7 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false, initial
         try {
             const result = await createGRN({
                 grn_number: (values.grnNumber || "").trim(),
-                supplier_name: supplierName,
+                supplier_id: supplierID,
                 invoice_no: (values.invoiceNumber || "").trim(),
                 notes: (values.notes || "").trim(),
                 lines,
@@ -192,7 +195,7 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false, initial
                 .map(line => line.lot_number)
                 .filter((lotNumber): lotNumber is string => typeof lotNumber === "string" && lotNumber.trim().length > 0);
             setLatestLotNumbers(generatedLots);
-            message.success(`GRN submitted for ${values.supplierName || "supplier"}${generatedLots.length > 0 ? ` with ${generatedLots.length} lot ID(s)` : ""}. Label printing is deferred.`);
+            message.success(`GRN submitted for ${supplierRef.name}${generatedLots.length > 0 ? ` with ${generatedLots.length} lot ID(s)` : ""}. Label printing is deferred.`);
             clearDraft();
             form.resetFields();
             form.setFieldsValue({ lines: [{ quantity_received: 1 }] });
@@ -235,7 +238,7 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false, initial
             </Form.Item>
             <Form.Item
                 label="Supplier Reference"
-                name="supplierName"
+                name="supplierID"
                 rules={[{ required: true, message: "Supplier reference is required" }]}
             >
                 <Select
@@ -245,9 +248,6 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false, initial
                     options={supplierOptions}
                     showSearch
                     optionFilterProp="label"
-                    onSearch={value => {
-                        form.setFieldValue("supplierName", value);
-                    }}
                 />
             </Form.Item>
             <Form.Item label="Invoice Number" name="invoiceNumber">
@@ -270,7 +270,7 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false, initial
                                     <Select
                                         loading={itemsLoading}
                                         disabled={writeDisabled}
-                                        placeholder="Select RAW or PACKING_MATERIAL item"
+                                        placeholder="Select RAW, PACKING_MATERIAL, or BULK_POWDER item"
                                         options={itemOptions}
                                         showSearch
                                         optionFilterProp="label"
@@ -286,6 +286,20 @@ export function GRNForm({ userKey, onDirtyChange, writeDisabled = false, initial
                                         min={0.0001}
                                         step={0.1}
                                         style={{ width: "100%" }}
+                                        disabled={writeDisabled}
+                                    />
+                                </Form.Item>
+                                <Form.Item
+                                    style={{ minWidth: 160 }}
+                                    label="Unit Price"
+                                    name={[field.name, "unit_price"]}
+                                >
+                                    <InputNumber
+                                        min={0}
+                                        step={0.01}
+                                        precision={2}
+                                        style={{ width: "100%" }}
+                                        placeholder="0.00"
                                         disabled={writeDisabled}
                                     />
                                 </Form.Item>

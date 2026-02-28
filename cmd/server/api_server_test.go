@@ -764,11 +764,11 @@ func TestServerAPI_CreateGRNSuccess(t *testing.T) {
 				t.Fatalf("unexpected create grn input: %+v", input)
 			}
 			return app.GRNResult{
-				ID:           3001,
-				GRNNumber:    input.GRNNumber,
-				SupplierName: input.SupplierName,
-				InvoiceNo:    input.InvoiceNo,
-				Notes:        input.Notes,
+				ID:         3001,
+				GRNNumber:  input.GRNNumber,
+				SupplierID: input.SupplierID,
+				InvoiceNo:  input.InvoiceNo,
+				Notes:      input.Notes,
 				Lines: []app.GRNLineResult{
 					{LineNo: 1, ItemID: 11, QuantityReceived: 40},
 					{LineNo: 2, ItemID: 12, QuantityReceived: 15},
@@ -779,7 +779,7 @@ func TestServerAPI_CreateGRNSuccess(t *testing.T) {
 
 	rec := postJSON(t, router, "/inventory/grns/create", map[string]interface{}{
 		"grn_number":    "GRN-3001",
-		"supplier_name": "Acme Supplier",
+		"supplier_id": 1,
 		"invoice_no":    "INV-3001",
 		"notes":         "Dock receipt",
 		"auth_token":    "operator-token",
@@ -814,7 +814,7 @@ func TestServerAPI_CreateGRNValidationReturnsBadRequest(t *testing.T) {
 
 	rec := postJSON(t, router, "/inventory/grns/create", map[string]interface{}{
 		"grn_number":    "GRN-3001",
-		"supplier_name": "Acme Supplier",
+		"supplier_id": 1,
 		"auth_token":    "admin-token",
 		"lines":         []map[string]interface{}{{"item_id": 11, "quantity_received": 0}},
 	})
@@ -833,7 +833,7 @@ func TestServerAPI_CreateGRNNegativeQuantityReturnsBadRequest(t *testing.T) {
 
 	rec := postJSON(t, router, "/inventory/grns/create", map[string]interface{}{
 		"grn_number":    "GRN-3001",
-		"supplier_name": "Acme Supplier",
+		"supplier_id": 1,
 		"auth_token":    "admin-token",
 		"lines":         []map[string]interface{}{{"item_id": 11, "quantity_received": -1}},
 	})
@@ -852,7 +852,7 @@ func TestServerAPI_CreateGRNUnauthorizedReturnsUnauthorized(t *testing.T) {
 
 	rec := postJSON(t, router, "/inventory/grns/create", map[string]interface{}{
 		"grn_number":    "GRN-3001",
-		"supplier_name": "Acme Supplier",
+		"supplier_id": 1,
 		"auth_token":    "stale-token",
 		"lines":         []map[string]interface{}{{"item_id": 11, "quantity_received": 1}},
 	})
@@ -871,7 +871,7 @@ func TestServerAPI_CreateGRNForbiddenReturnsForbidden(t *testing.T) {
 
 	rec := postJSON(t, router, "/inventory/grns/create", map[string]interface{}{
 		"grn_number":    "GRN-3001",
-		"supplier_name": "Acme Supplier",
+		"supplier_id": 1,
 		"auth_token":    "viewer-token",
 		"lines":         []map[string]interface{}{{"item_id": 11, "quantity_received": 1}},
 	})
@@ -887,7 +887,7 @@ func TestServerAPI_CreateGRNReadOnlyLicenseReturnsForbidden(t *testing.T) {
 
 	rec := postJSON(t, router, "/inventory/grns/create", map[string]interface{}{
 		"grn_number":    "GRN-3001",
-		"supplier_name": "Acme Supplier",
+		"supplier_id": 1,
 		"auth_token":    "operator-token",
 		"lines":         []map[string]interface{}{{"item_id": 11, "quantity_received": 1}},
 	})
@@ -906,7 +906,7 @@ func TestServerAPI_CreateGRNConflictReturnsConflict(t *testing.T) {
 
 	rec := postJSON(t, router, "/inventory/grns/create", map[string]interface{}{
 		"grn_number":    "GRN-3001",
-		"supplier_name": "Acme Supplier",
+		"supplier_id": 1,
 		"auth_token":    "admin-token",
 		"lines":         []map[string]interface{}{{"item_id": 11, "quantity_received": 1}},
 	})

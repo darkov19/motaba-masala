@@ -52,10 +52,10 @@ Design constraints from PRD/UX/architecture remain binding: offline LAN operatio
 
 Current persisted procurement entity in codebase:
 
-`grns` (implemented)
+`grns` (implemented — migration 000013 updated schema)
 - `id` (INTEGER, PK, autoincrement)
 - `grn_number` (TEXT, UNIQUE, required)
-- `supplier_name` (TEXT, required)
+- `supplier_id` (INTEGER, FK -> `parties.id`, required) ← *was `supplier_name TEXT`; refactored post-review in migration 000013*
 - `invoice_no` (TEXT, nullable)
 - `notes` (TEXT, nullable)
 - `created_at`, `updated_at` (DATETIME)
@@ -86,7 +86,7 @@ Epic 3 procurement model extensions required by PRD/Epic stories:
 - `lot_number` (TEXT, UNIQUE, generated pattern such as `LOT-YYYYMMDD-###`)
 - `grn_line_id` (FK -> `grn_lines.id`)
 - `item_id` (FK -> `items.id`)
-- `supplier_id` (FK -> `parties.id`, nullable when legacy `supplier_name` used)
+- `supplier_id` (FK -> `parties.id`, required — migration 000013; display name resolved via JOIN on `parties`)
 - `received_qty` (REAL > 0)
 - `expiry_date` (DATE, nullable but required where policy applies)
 - `is_external_source` (BOOLEAN for third-party bulk traceability)
@@ -112,7 +112,7 @@ Current procurement-relevant interfaces in repository/service layers:
 
 | Interface/API | Signature/Path | Request Model | Response Model | Error Codes/Behavior |
 | --- | --- | --- | --- | --- |
-| Repository create GRN | `Repository.CreateGRN(grn *GRN) error` | `GRN{grn_number,supplier_name,invoice_no,notes}` | persisted GRN ID/timestamps | DB unique conflict, storage errors |
+| Repository create GRN | `Repository.CreateGRN(grn *GRN) error` | `GRN{grn_number,supplier_id,invoice_no,notes}` | persisted GRN ID/timestamps | DB unique conflict, FK violation, storage errors |
 | Repository update GRN | `Repository.UpdateGRN(grn *GRN) error` | `GRN{...,updated_at}` | updated timestamp | `ErrConcurrencyConflict` mapped when stale `updated_at` |
 | Service create GRN | `Service.CreateGRN(grn *GRN) error` | domain GRN object under license write-access | success/error | blocked in read-only license mode |
 | Service update GRN | `Service.UpdateGRN(grn *GRN) error` | domain GRN object with optimistic-lock token | success/error | returns `"Record modified by another user. Reload required."` on conflict |
@@ -237,7 +237,7 @@ Internal integration points:
 | --- | --- | --- | --- |
 | AC1 | Detailed Design -> Workflows (GRN creation); Data Models | `procurement.grn`, `CreateGRN`, `grns` + planned `grn_lines` | Submit GRN with valid raw/packing lines and assert stock increase events |
 | AC2 | Data Models and Contracts; APIs/Interfaces | GRN validation layer in service/API | Submit line quantity `0` or negative and assert `400 validation_failed` |
-| AC3 | Data Models (`grns`); Workflows | `grns.supplier_name`, `grns.invoice_no` | Create GRN and verify supplier/invoice persisted |
+| AC3 | Data Models (`grns`); Workflows | `grns.supplier_id` (FK), `grns.invoice_no` | Create GRN and verify supplier FK and invoice persisted |
 | AC4 | Data Models (`material_lots` planned); Workflows (lot generation) | Lot generator + GRN linkage | Save GRN and verify generated unique lot number format and FK link |
 | AC5 | Workflows and Sequencing (lot linkage) | lot-aware stock movement records | Trace a lot from receipt to subsequent movement reference |
 | AC6 | Scope + Workflows (third-party bulk) | GRN create flow with `BULK_POWDER` | Receive external bulk via GRN and verify bulk stock availability |
@@ -250,7 +250,7 @@ Internal integration points:
 
 ## Risks, Assumptions, Open Questions
 
-- Risk: Current implemented GRN model is header-only (`supplier_name`, `invoice_no`, `notes`) and does not yet persist line-level item/qty/cost details required by Story 3.1.
+- Risk: Current implemented GRN model is header-only (`supplier_id`, `invoice_no`, `notes`) and does not yet persist line-level item/qty/cost details required by Story 3.1.
   Mitigation/Next step: Add migration and transactional repository methods for `grn_lines` before Epic 3 story implementation begins.
 - Risk: Lot tracking schema is not yet present, which blocks strict inbound traceability and recall-readiness.
   Mitigation/Next step: Prioritize lot table design and generation rules in Story 3.2 implementation kickoff.
@@ -299,3 +299,6 @@ Internal integration points:
 - Story 3.1: Add frontend/integration proof that RAW and PACKING_MATERIAL line items remain discrete and produce independent stock effects at intake.
 - Story 3.2: Implement lot-reference persistence for downstream non-inbound stock movements/adjustments and expose in traceability queries (Review blocker; AC5/Story AC3 continuity). **Resolved 2026-02-27**.
 - Story 3.2: Add integration/API tests proving lot-reference continuity across at least one downstream non-inbound movement path. **Resolved 2026-02-27**.
+- Story 3.3: Add ProcurementLotsPage tests covering "External" badge (source_type=SUPPLIER_GRN) and Unit Cost column rendering (AC2/AC3 UI gap). Ref: `frontend/src/components/forms/__tests__/ProcurementLotsPage.test.tsx`. **Resolved 2026-02-28**.
+- Story 3.3: Add `UnitPrice >= 0` validation in `GRN.Validate()` to enforce non-negative purchase prices at domain level. Ref: `internal/domain/inventory/entities.go:277`. **Resolved 2026-02-28**.
+- Story 3.3: supplier_id FK not yet linked in material_lots (supplier_name used throughout); add FK linkage when Epic 5 party-level lot lookups are required. **Resolved 2026-02-28** — migration 000013 replaces `supplier_name TEXT` with `supplier_id INTEGER FK` in both `grns` and `material_lots`; `ListMaterialLots` JOINs `parties` to resolve display name; all layers updated end-to-end.

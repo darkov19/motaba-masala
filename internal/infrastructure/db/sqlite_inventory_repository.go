@@ -1082,7 +1082,7 @@ func (r *SqliteInventoryRepository) validateGRNLineItemTx(tx *sql.Tx, itemID int
 		context.Background(),
 		`SELECT COUNT(1)
 		 FROM items
-		 WHERE id = ? AND is_active = 1 AND item_type IN ('RAW', 'PACKING_MATERIAL')`,
+		 WHERE id = ? AND is_active = 1 AND item_type IN ('RAW', 'PACKING_MATERIAL', 'BULK_POWDER')`,
 		itemID,
 	).Scan(&matches)
 	if err != nil {
@@ -1147,9 +1147,9 @@ func (r *SqliteInventoryRepository) CreateGRN(grn *domainInventory.GRN) error {
 
 	res, err := tx.ExecContext(
 		context.Background(),
-		`INSERT INTO grns (grn_number, supplier_name, invoice_no, notes, created_at, updated_at)
+		`INSERT INTO grns (grn_number, supplier_id, invoice_no, notes, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?)`,
-		grn.GRNNumber, grn.SupplierName, grn.InvoiceNo, grn.Notes, grn.CreatedAt, grn.UpdatedAt,
+		grn.GRNNumber, grn.SupplierID, grn.InvoiceNo, grn.Notes, grn.CreatedAt, grn.UpdatedAt,
 	)
 	if err != nil {
 		return err
@@ -1169,9 +1169,9 @@ func (r *SqliteInventoryRepository) CreateGRN(grn *domainInventory.GRN) error {
 
 		lineRes, err := tx.ExecContext(
 			context.Background(),
-			`INSERT INTO grn_lines (grn_id, line_no, item_id, quantity_received, created_at)
-			 VALUES (?, ?, ?, ?, ?)`,
-			grn.ID, line.LineNo, line.ItemID, line.QuantityReceived, grn.CreatedAt,
+			`INSERT INTO grn_lines (grn_id, line_no, item_id, quantity_received, unit_price, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?)`,
+			grn.ID, line.LineNo, line.ItemID, line.QuantityReceived, line.UnitPrice, grn.CreatedAt,
 		)
 		if err != nil {
 			return err
@@ -1193,9 +1193,9 @@ func (r *SqliteInventoryRepository) CreateGRN(grn *domainInventory.GRN) error {
 
 			_, lotErr = tx.ExecContext(
 				context.Background(),
-				`INSERT INTO material_lots (lot_number, grn_id, grn_line_id, grn_number, item_id, supplier_name, quantity_received, created_at)
-				 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-				lotNumber, grn.ID, line.ID, grn.GRNNumber, line.ItemID, grn.SupplierName, line.QuantityReceived, grn.CreatedAt,
+				`INSERT INTO material_lots (lot_number, grn_id, grn_line_id, grn_number, item_id, supplier_id, quantity_received, source_type, unit_cost, created_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				lotNumber, grn.ID, line.ID, grn.GRNNumber, line.ItemID, grn.SupplierID, line.QuantityReceived, "SUPPLIER_GRN", line.UnitPrice, grn.CreatedAt,
 			)
 			if lotErr == nil {
 				line.LotNumber = lotNumber
@@ -1241,7 +1241,7 @@ func (r *SqliteInventoryRepository) ListMaterialLots(filter domainInventory.Mate
 		args = append(args, *filter.ItemID)
 	}
 	if supplier := strings.TrimSpace(filter.Supplier); supplier != "" {
-		clauses = append(clauses, "LOWER(ml.supplier_name) LIKE ?")
+		clauses = append(clauses, "LOWER(p.name) LIKE ?")
 		args = append(args, "%"+strings.ToLower(supplier)+"%")
 	}
 	if lotNumber := strings.TrimSpace(filter.LotNumber); lotNumber != "" {
@@ -1253,7 +1253,7 @@ func (r *SqliteInventoryRepository) ListMaterialLots(filter domainInventory.Mate
 		args = append(args, "%"+strings.ToLower(grnNumber)+"%")
 	}
 	if search := strings.TrimSpace(filter.Search); search != "" {
-		clauses = append(clauses, "(LOWER(ml.lot_number) LIKE ? OR LOWER(ml.grn_number) LIKE ? OR LOWER(ml.supplier_name) LIKE ?)")
+		clauses = append(clauses, "(LOWER(ml.lot_number) LIKE ? OR LOWER(ml.grn_number) LIKE ? OR LOWER(p.name) LIKE ?)")
 		pattern := "%" + strings.ToLower(search) + "%"
 		args = append(args, pattern, pattern, pattern)
 	}
@@ -1261,9 +1261,10 @@ func (r *SqliteInventoryRepository) ListMaterialLots(filter domainInventory.Mate
 		clauses = append(clauses, "i.is_active = 1")
 	}
 
-	query := `SELECT ml.id, ml.lot_number, ml.grn_id, ml.grn_line_id, ml.grn_number, ml.item_id, ml.supplier_name, ml.quantity_received, ml.created_at
+	query := `SELECT ml.id, ml.lot_number, ml.grn_id, ml.grn_line_id, ml.grn_number, ml.item_id, ml.supplier_id, p.name, ml.quantity_received, ml.source_type, ml.unit_cost, ml.created_at
 		FROM material_lots ml
-		INNER JOIN items i ON i.id = ml.item_id`
+		INNER JOIN items i ON i.id = ml.item_id
+		INNER JOIN parties p ON p.id = ml.supplier_id`
 	if len(clauses) > 0 {
 		query += " WHERE " + strings.Join(clauses, " AND ")
 	}
@@ -1285,8 +1286,11 @@ func (r *SqliteInventoryRepository) ListMaterialLots(filter domainInventory.Mate
 			&lot.GRNLineID,
 			&lot.GRNNumber,
 			&lot.ItemID,
+			&lot.SupplierID,
 			&lot.SupplierName,
 			&lot.QuantityReceived,
+			&lot.SourceType,
+			&lot.UnitCost,
 			&lot.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -1384,9 +1388,9 @@ func (r *SqliteInventoryRepository) UpdateGRN(grn *domainInventory.GRN) error {
 	res, err := r.db.ExecContext(
 		context.Background(),
 		`UPDATE grns
-		 SET grn_number = ?, supplier_name = ?, invoice_no = ?, notes = ?, updated_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')
+		 SET grn_number = ?, supplier_id = ?, invoice_no = ?, notes = ?, updated_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE id = ? AND updated_at = ?`,
-		grn.GRNNumber, grn.SupplierName, grn.InvoiceNo, grn.Notes, grn.ID, grn.UpdatedAt,
+		grn.GRNNumber, grn.SupplierID, grn.InvoiceNo, grn.Notes, grn.ID, grn.UpdatedAt,
 	)
 	if err != nil {
 		return err
