@@ -1,6 +1,6 @@
 # Story 3.2B: Procurement Lots Route Enablement
 
-Status: review
+Status: done
 
 ## Story
 

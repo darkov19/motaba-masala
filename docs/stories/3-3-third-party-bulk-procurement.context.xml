@@ -1,0 +1,101 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>3</storyId>
+    <title>Third-Party Bulk Procurement</title>
+    <status>Draft</status>
+    <generatedAt>2026-02-27T20:58:14Z</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-3-third-party-bulk-procurement.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Factory Manager</asA>
+    <iWant>record the purchase of "Bulk Powder" directly from third-party suppliers</iWant>
+    <soThat>we can fulfill orders when in-house production is down, while keeping the stock categorized correctly and its source traceable.</soThat>
+    <tasks>
+      - [ ] 1. Update the GRN creation service (`/inventory/grns/create`) to fetch `ItemType` for lines and handle `BULK_POWDER` correctly.
+      - [ ] 2. Ensure `material_lots` generation correctly populates `supplier_id` and sets `unit_cost` from the GRN line price for third-party bulk items.
+      - [ ] 3. Write/update unit & integration tests simulating a GRN payload containing `BULK_POWDER` items to verify traceability links.
+      - [ ] 4. Validate that the `/procurement/grn` form allows the selection of `BULK_POWDER` items from the Item Master (remove any filters restricting exclusively to Raw Materials if they exist).
+      - [ ] 5. Ensure the Supplier dropdown is strictly validated (required) when submitting the GRN.
+      - [ ] 6. Update the Stock Ledger view to expose the Supplier Name alongside `BULK_POWDER` lots when `source_type == SUPPLIER_GRN`.
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Third-Party Purchase Entry: Similar to a Raw Material GRN, the user can create a Goods Received Note but select items categorized as `BULK_POWDER`. The system must enforce selecting a "Supplier".
+    2. Source Flagging & Traceability: When Third-Party Bulk is received, it is added to the general `Bulk Powder` inventory, but the specific lot MUST be flagged with the source `external` (Data model: `source_type = SUPPLIER_GRN`, `supplier_id` populated). The stock ledger MUST display the Supplier Name for these specific externally sourced lots.
+    3. Valuation Impact: Unlike in-house bulk where the value is derived from Raw Materials + Process Loss, the value of Third-Party Bulk is strictly the Purchase Price on the GRN (`unit_cost` on `material_lots` is directly the GRN `unit_price`).
+    4. Available for Packing: These external lots must immediately appear in the "Source Batch" dropdown when users are executing a Packing Run (Epic 5).
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/stories/3-3-third-party-bulk-procurement.md</path>
+        <title>Story 3.3: Third-Party Bulk Procurement</title>
+        <section>Acceptance Criteria</section>
+        <snippet>When Third-Party Bulk is received, it is added to the general Bulk Powder inventory but MUST be flagged with source external (source_type = SUPPLIER_GRN, supplier_id populated).</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-3.md</path>
+        <title>Epic 3 Technical Specification</title>
+        <section>Data Models</section>
+        <snippet>The material_lots table must be capable of linking to a supplier reference. Source types should distinguish between internal bulk receipts and supplier receipts.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <code-artifact>
+        <path>internal/app/inventory/service.go</path>
+        <kind>service</kind>
+        <symbol>CreateGRN</symbol>
+        <lines>N/A</lines>
+        <reason>The GRN creation service needs to fetch ItemType. If it's BULK_POWDER, set source_type to SUPPLIER_GRN and link supplier_id.</reason>
+      </code-artifact>
+      <code-artifact>
+        <path>internal/infrastructure/db/sqlite_inventory_repository.go</path>
+        <kind>repository</kind>
+        <symbol>CreateGRN</symbol>
+        <lines>1196-1205</lines>
+        <reason>Needs to correctly save the material lot with supplier_name/id and the source mapping for bulk items.</reason>
+      </code-artifact>
+      <code-artifact>
+        <path>frontend/src/components/forms/GRNForm.tsx</path>
+        <kind>component</kind>
+        <symbol>GRNForm</symbol>
+        <lines>N/A</lines>
+        <reason>Needs validation to allow BULK_POWDER selection and strictly require a Supplier selection.</reason>
+      </code-artifact>
+    </code>
+    <dependencies>
+      <dependency>Go / Wails</dependency>
+      <dependency>SQLite3</dependency>
+      <dependency>React / TypeScript</dependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Both raw materials and third-party bulk purchases utilize the same seamless GRN form. No separate screen.
+    - The form should continue to rely on rapid keyboard-first data entry (Tab-key navigation).
+    - Single canonical Item Master is queried correctly across views.
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Create GRN API</name>
+      <kind>REST API</kind>
+      <signature>POST /inventory/grns/create</signature>
+      <path>backend routing layer</path>
+    </interface>
+  </interfaces>
+  
+  <tests>
+    <standards>Use standard Go testing framework with SQLite in-memory db for repository tests. React Testing Library for frontend forms.</standards>
+    <locations>internal/app/inventory/service_test.go, internal/infrastructure/db/sqlite_inventory_repository_test.go, frontend/src/__tests__/forms/GRNForm.test.tsx</locations>
+    <ideas>
+      - Complete a GRN payload with BULK_POWDER, assert lot generation flags source_type as SUPPLIER_GRN and records supplier details.
+      - Assert that missing Supplier field correctly errors on both frontend and backend for BULK_POWDER.
+    </ideas>
+  </tests>
+</story-context>
