@@ -599,6 +599,12 @@ func run() error {
 					return "", err
 				}
 				return user.Role, nil
+			}, func(authToken string) (string, error) {
+				user, err := authService.CurrentUser(authToken)
+				if err != nil {
+					return "", err
+				}
+				return user.Username, nil
 			})
 			application.SetInventoryService(inventoryService)
 

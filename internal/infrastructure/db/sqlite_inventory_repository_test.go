@@ -1345,6 +1345,133 @@ func TestSqliteInventoryRepository_CreateGRN_BulkPowder_FinishedGoodRejected(t *
 	}
 }
 
+func TestSqliteInventoryRepository_CreateStockAdjustment_HappyPath(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	itemID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-SA-01", "Raw Cumin", "kg")
+
+	adj := &domainInventory.StockAdjustment{
+		ItemID:     itemID,
+		QtyDelta:   -10,
+		ReasonCode: "Spoilage",
+		Notes:      "found mold",
+		CreatedBy:  "test-user",
+	}
+	if err := repo.CreateStockAdjustment(adj); err != nil {
+		t.Fatalf("CreateStockAdjustment failed: %v", err)
+	}
+	if adj.ID == 0 {
+		t.Fatal("expected adj.ID to be set after insert")
+	}
+
+	var qtyDelta float64
+	var reasonCode, createdBy string
+	if err := manager.GetDB().QueryRow(
+		"SELECT qty_delta, reason_code, created_by FROM stock_adjustments WHERE id = ?",
+		adj.ID,
+	).Scan(&qtyDelta, &reasonCode, &createdBy); err != nil {
+		t.Fatalf("failed to query stock_adjustments: %v", err)
+	}
+	if qtyDelta != -10 {
+		t.Fatalf("expected qty_delta -10, got %v", qtyDelta)
+	}
+	if reasonCode != "Spoilage" {
+		t.Fatalf("expected reason_code 'Spoilage', got %q", reasonCode)
+	}
+	if createdBy != "test-user" {
+		t.Fatalf("expected created_by 'test-user', got %q", createdBy)
+	}
+}
+
+func TestSqliteInventoryRepository_CreateStockAdjustment_LotIDNullable(t *testing.T) {
+	repo, manager := setupInventoryRepo(t)
+
+	itemID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-SA-02", "Raw Pepper", "kg")
+
+	adj := &domainInventory.StockAdjustment{
+		ItemID:     itemID,
+		LotID:      nil,
+		QtyDelta:   5,
+		ReasonCode: "Counting Error",
+		CreatedBy:  "test-user",
+	}
+	if err := repo.CreateStockAdjustment(adj); err != nil {
+		t.Fatalf("CreateStockAdjustment (nil LotID) failed: %v", err)
+	}
+
+	var lotID any
+	if err := manager.GetDB().QueryRow(
+		"SELECT lot_id FROM stock_adjustments WHERE id = ?",
+		adj.ID,
+	).Scan(&lotID); err != nil {
+		t.Fatalf("failed to query lot_id: %v", err)
+	}
+	if lotID != nil {
+		t.Fatalf("expected lot_id to be NULL, got %v", lotID)
+	}
+}
+
+func TestSqliteInventoryRepository_GetItemStockBalance_SumsLotsAndAdjustments(t *testing.T) {
+	repo, _ := setupInventoryRepo(t)
+
+	itemID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-BAL-01", "Balance Test Item", "kg")
+	supplierID := createTestParty(t, repo, "Balance Test Supplier")
+
+	// Create two GRN lots: 100 + 80 = 180 total received
+	grn1 := &domainInventory.GRN{
+		GRNNumber:  "GRN-BAL-001",
+		SupplierID: supplierID,
+		Lines:      []domainInventory.GRNLine{{LineNo: 1, ItemID: itemID, QuantityReceived: 100}},
+	}
+	if err := repo.CreateGRN(grn1); err != nil {
+		t.Fatalf("CreateGRN 1 failed: %v", err)
+	}
+	grn2 := &domainInventory.GRN{
+		GRNNumber:  "GRN-BAL-002",
+		SupplierID: supplierID,
+		Lines:      []domainInventory.GRNLine{{LineNo: 1, ItemID: itemID, QuantityReceived: 80}},
+	}
+	if err := repo.CreateGRN(grn2); err != nil {
+		t.Fatalf("CreateGRN 2 failed: %v", err)
+	}
+
+	// Two adjustments: -20, -30 = -50 total
+	for _, delta := range []float64{-20, -30} {
+		adj := &domainInventory.StockAdjustment{
+			ItemID:     itemID,
+			QtyDelta:   delta,
+			ReasonCode: "Audit Correction",
+			CreatedBy:  "test-user",
+		}
+		if err := repo.CreateStockAdjustment(adj); err != nil {
+			t.Fatalf("CreateStockAdjustment (delta=%v) failed: %v", delta, err)
+		}
+	}
+
+	balance, err := repo.GetItemStockBalance(itemID)
+	if err != nil {
+		t.Fatalf("GetItemStockBalance failed: %v", err)
+	}
+	// Expected: 180 (lots) + (-50) (adjustments) = 130
+	if balance != 130 {
+		t.Fatalf("expected balance 130, got %v", balance)
+	}
+}
+
+func TestSqliteInventoryRepository_GetItemStockBalance_NoLotsNoAdjustments(t *testing.T) {
+	repo, _ := setupInventoryRepo(t)
+
+	itemID := createTestInventoryItem(t, repo, domainInventory.ItemTypeRaw, "RAW-BAL-02", "Empty Balance Item", "kg")
+
+	balance, err := repo.GetItemStockBalance(itemID)
+	if err != nil {
+		t.Fatalf("GetItemStockBalance failed: %v", err)
+	}
+	if balance != 0 {
+		t.Fatalf("expected balance 0 for item with no lots or adjustments, got %v", balance)
+	}
+}
+
 func TestSqliteInventoryRepository_CreateGRN_UnitPricePersistedOnGRNLine(t *testing.T) {
 	repo, manager := setupInventoryRepo(t)
 

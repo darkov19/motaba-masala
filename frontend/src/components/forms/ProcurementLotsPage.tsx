@@ -2,7 +2,7 @@ import { Alert, Button, Form, Input, Select, Space, Table, Tag, Typography, mess
 import type { InputRef } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ItemMaster, MaterialLot, listItems, listMaterialLots } from "../../services/masterDataApi";
+import { ItemMaster, MaterialLot, getItemStockBalance, listItems, listMaterialLots } from "../../services/masterDataApi";
 
 type ProcurementLotsPageProps = {
     onDirtyChange: (isDirty: boolean) => void;
@@ -64,6 +64,7 @@ export function ProcurementLotsPage({ onDirtyChange }: ProcurementLotsPageProps)
     const [itemsLoading, setItemsLoading] = useState(false);
     const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
     const [error, setError] = useState<UiError | null>(null);
+    const [stockBalances, setStockBalances] = useState<Map<number, number>>(new Map());
 
     useEffect(() => {
         onDirtyChange(false);
@@ -79,6 +80,14 @@ export function ProcurementLotsPage({ onDirtyChange }: ProcurementLotsPageProps)
         const map = new Map<number, string>();
         for (const item of items) {
             map.set(item.id, item.name);
+        }
+        return map;
+    }, [items]);
+
+    const itemMinimumStock = useMemo(() => {
+        const map = new Map<number, number>();
+        for (const item of items) {
+            map.set(item.id, item.minimum_stock ?? 0);
         }
         return map;
     }, [items]);
@@ -138,6 +147,33 @@ export function ProcurementLotsPage({ onDirtyChange }: ProcurementLotsPageProps)
         void fetchLots(EMPTY_FILTERS);
     }, [fetchLots]);
 
+    useEffect(() => {
+        if (rows.length === 0) {
+            return;
+        }
+        let mounted = true;
+        const uniqueItemIds = [...new Set(rows.map(r => r.item_id))];
+        const fetchBalances = async () => {
+            const results = await Promise.allSettled(
+                uniqueItemIds.map(id => getItemStockBalance(id).then(bal => ({ id, bal }))),
+            );
+            if (!mounted) {
+                return;
+            }
+            const next = new Map<number, number>();
+            for (const result of results) {
+                if (result.status === "fulfilled") {
+                    next.set(result.value.id, result.value.bal);
+                }
+            }
+            setStockBalances(next);
+        };
+        void fetchBalances();
+        return () => {
+            mounted = false;
+        };
+    }, [rows]);
+
     const onSearch = useCallback(() => {
         void fetchLots(form.getFieldsValue());
     }, [fetchLots, form]);
@@ -167,13 +203,19 @@ export function ProcurementLotsPage({ onDirtyChange }: ProcurementLotsPageProps)
             title: "Item",
             dataIndex: "item_id",
             key: "item_id",
-            width: 220,
-            render: (value: number) => (
-                <Space size={6}>
-                    <Tag color="geekblue">#{value}</Tag>
-                    <Typography.Text>{itemLabelByID.get(value) || "Unknown item"}</Typography.Text>
-                </Space>
-            ),
+            width: 260,
+            render: (value: number) => {
+                const minStock = itemMinimumStock.get(value) ?? 0;
+                const balance = stockBalances.get(value);
+                const isLowStock = balance !== undefined && minStock > 0 && balance < minStock;
+                return (
+                    <Space size={6}>
+                        <Tag color="geekblue">#{value}</Tag>
+                        <Typography.Text>{itemLabelByID.get(value) || "Unknown item"}</Typography.Text>
+                        {isLowStock && <Tag color="orange">Low Stock</Tag>}
+                    </Space>
+                );
+            },
         },
         { title: "Quantity", dataIndex: "quantity_received", key: "quantity_received", width: 120 },
         {
@@ -196,7 +238,7 @@ export function ProcurementLotsPage({ onDirtyChange }: ProcurementLotsPageProps)
                 return parsed.toLocaleString();
             },
         },
-    ], [itemLabelByID]);
+    ], [itemLabelByID, itemMinimumStock, stockBalances]);
 
     return (
         <Space orientation="vertical" size={16} style={{ width: "100%" }}>

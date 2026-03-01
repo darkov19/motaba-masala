@@ -59,7 +59,7 @@ func runOptimisticLockScenario() error {
 	}
 
 	repo := db.NewSqliteInventoryRepository(manager.GetDB())
-	svc := appInventory.NewService(repo, nil)
+	svc := appInventory.NewService(repo, nil, nil)
 
 	item := &domainInventory.Item{
 		SKU:          "PROBE-SKU-1",
@@ -120,6 +120,8 @@ func runItemMasterPackagingScenario() error {
 			return "", fmt.Errorf("invalid probe token")
 		}
 		return domainAuth.RoleAdmin, nil
+	}, func(token string) (string, error) {
+		return "probe-admin", nil
 	})
 
 	jarBody, err := svc.CreateItemMaster(appInventory.CreateItemInput{

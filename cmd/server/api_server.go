@@ -59,6 +59,9 @@ type serverAPIApplication interface {
 	CreateUnitConversionRule(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error)
 	ListUnitConversionRules(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error)
 	ConvertQuantity(input appInventory.ConvertQuantityInput) (app.UnitConversionResult, error)
+	CreateStockAdjustment(input appInventory.CreateStockAdjustmentInput) (app.StockAdjustmentResult, error)
+	ListStockAdjustments(input appInventory.ListStockAdjustmentsInput) ([]app.StockAdjustmentResult, error)
+	GetItemStockBalance(input appInventory.GetItemStockBalanceInput) (float64, error)
 }
 
 func startServerAuthAPIServer(application serverAPIApplication) (func(), error) {
@@ -565,6 +568,66 @@ func buildServerAPIRouter(application serverAPIApplication) *http.ServeMux {
 		result, err := application.ListLotStockMovements(input)
 		if err != nil {
 			writeMappedServerError(w, "Server inventory list lot movements failed", err)
+			return
+		}
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("/inventory/reconciliation/create", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input appInventory.CreateStockAdjustmentInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.CreateStockAdjustment(input)
+		if err != nil {
+			writeMappedServerError(w, "Server inventory create stock adjustment failed", err)
+			return
+		}
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("/inventory/reconciliation/list", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input appInventory.ListStockAdjustmentsInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.ListStockAdjustments(input)
+		if err != nil {
+			writeMappedServerError(w, "Server inventory list stock adjustments failed", err)
+			return
+		}
+		writeServerJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("/inventory/reconciliation/balance", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeServerError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var input appInventory.GetItemStockBalanceInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeServerError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+
+		result, err := application.GetItemStockBalance(input)
+		if err != nil {
+			writeMappedServerError(w, "Server inventory get item stock balance failed", err)
 			return
 		}
 		writeServerJSON(w, http.StatusOK, result)

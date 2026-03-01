@@ -249,6 +249,29 @@ export type ConvertQuantityResult = {
     factor: number;
 };
 
+export const REASON_CODES = ["Spoilage", "Audit Correction", "Damage", "Counting Error", "Other"] as const;
+export type ReasonCode = (typeof REASON_CODES)[number];
+
+export type StockAdjustment = {
+    id: number;
+    item_id: number;
+    lot_id: number | null;
+    qty_delta: number;
+    reason_code: string;
+    notes: string;
+    created_by: string;
+    created_at: string;
+};
+
+export type CreateStockAdjustmentPayload = {
+    item_id: number;
+    lot_id?: number | null;
+    qty_delta: number;
+    reason_code: string;
+    notes?: string;
+    auth_token?: string;
+};
+
 type AppBinding = {
     CreateItemMaster?: (input: CreateItemPayload) => Promise<ItemMaster>;
     UpdateItemMaster?: (input: UpdateItemPayload) => Promise<ItemMaster>;
@@ -286,6 +309,9 @@ type AppBinding = {
     CreateUnitConversionRule?: (input: CreateConversionRulePayload) => Promise<ConversionRule>;
     ListUnitConversionRules?: (input: { active_only?: boolean; item_id?: number; from_unit?: string; to_unit?: string; auth_token?: string }) => Promise<ConversionRule[]>;
     ConvertQuantity?: (input: ConvertQuantityPayload) => Promise<ConvertQuantityResult>;
+    CreateStockAdjustment?: (input: CreateStockAdjustmentPayload) => Promise<StockAdjustment>;
+    ListStockAdjustments?: (input: { item_id: number; auth_token?: string }) => Promise<StockAdjustment[]>;
+    GetItemStockBalance?: (input: { item_id: number; auth_token?: string }) => Promise<number>;
 };
 
 function getBinding(): AppBinding {
@@ -615,6 +641,51 @@ export async function convertQuantity(payload: ConvertQuantityPayload): Promise<
         return await fn({
             auth_token: resolveAuthToken(),
             ...payload,
+        });
+    } catch (error) {
+        throw mapServiceError(error);
+    }
+}
+
+export async function createStockAdjustment(payload: CreateStockAdjustmentPayload): Promise<StockAdjustment> {
+    const fn = getBinding().CreateStockAdjustment;
+    if (typeof fn !== "function") {
+        throw new Error("CreateStockAdjustment binding is unavailable");
+    }
+    try {
+        return await fn({
+            auth_token: resolveAuthToken(),
+            ...payload,
+        });
+    } catch (error) {
+        throw mapServiceError(error);
+    }
+}
+
+export async function listStockAdjustments(itemId: number): Promise<StockAdjustment[]> {
+    const fn = getBinding().ListStockAdjustments;
+    if (typeof fn !== "function") {
+        return [];
+    }
+    try {
+        return await fn({
+            item_id: itemId,
+            auth_token: resolveAuthToken(),
+        });
+    } catch (error) {
+        throw mapServiceError(error);
+    }
+}
+
+export async function getItemStockBalance(itemId: number): Promise<number> {
+    const fn = getBinding().GetItemStockBalance;
+    if (typeof fn !== "function") {
+        return 0;
+    }
+    try {
+        return await fn({
+            item_id: itemId,
+            auth_token: resolveAuthToken(),
         });
     } catch (error) {
         throw mapServiceError(error);

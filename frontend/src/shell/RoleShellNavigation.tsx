@@ -44,6 +44,7 @@ export function RoleShellNavigation({ role, activeRouteId, onNavigate, onLogout 
         "masters.parties": "SC",
         "procurement.grn": "GR",
         "procurement.lots": "LT",
+        "procurement.reconciliation": "SR",
         "production.batches": "BT",
         "production.execution": "EX",
         "packing.runs": "PR",

@@ -1,0 +1,372 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>4</storyId>
+    <title>Stock Reconciliation &amp; Audit</title>
+    <status>drafted</status>
+    <generatedAt>2026-02-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-4-stock-reconciliation-audit.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Store Keeper (Operator or Admin)</asA>
+    <iWant>manually adjust stock levels based on physical counts</iWant>
+    <soThat>the system matches reality by recording correcting transactions with mandatory reason codes and an immutable audit trail</soThat>
+    <tasks>
+      Task 1: DB migration 000014 — create stock_adjustments table
+        1.1 internal/infrastructure/db/migrations/000014_stock_adjustments.up.sql
+        1.2 internal/infrastructure/db/migrations/000014_stock_adjustments.down.sql
+      Task 2: Domain entity StockAdjustment in entities.go
+        2.1 StockAdjustment struct
+        2.2 ValidReasonCodes slice constant
+        2.3 ErrStockAdjReasonCodeRequired, ErrStockAdjQtyDeltaZero sentinel errors
+        2.4 (a *StockAdjustment) Validate() error
+      Task 3: Repository — extend interface + SQLite implementation
+        3.1 CreateStockAdjustment(adj *StockAdjustment) error → repository.go
+        3.2 ListStockAdjustments(itemID int64) ([]StockAdjustment, error) → repository.go
+        3.3 GetItemStockBalance(itemID int64) (float64, error) → repository.go
+        3.4 Implement all three in sqlite_inventory_repository.go
+        3.5 Repository integration tests
+      Task 4: Service layer CreateStockAdjustment
+        4.1 CreateStockAdjustmentInput struct
+        4.2 ListStockAdjustmentsInput, GetItemStockBalanceInput structs
+        4.3 (s *Service) CreateStockAdjustment(input) following CreateGRNRecord pattern
+        4.4 (s *Service) ListStockAdjustments(input)
+        4.5 (s *Service) GetItemStockBalance(input)
+        4.6 Service unit tests
+      Task 5: API endpoint + Wails bindings
+        5.1 POST /inventory/reconciliation/create in cmd/server/api_server.go
+        5.2 POST /inventory/reconciliation/list (optional)
+        5.3 Wails binding in internal/app/app.go
+      Task 6: Navigation contract update — procurement.reconciliation route
+      Task 7: Frontend types in masterDataApi.ts
+        7.1 StockAdjustment type, CreateStockAdjustmentPayload
+        7.2 createStockAdjustment, listStockAdjustments, getItemStockBalance wrappers
+      Task 8: StockReconciliationPage.tsx
+        8.1 Form with item Select, lot Select (filtered by item), qty_delta InputNumber, reason_code Select, notes TextArea
+        8.2 Submit → createStockAdjustment → notification
+        8.3 Register /procurement/reconciliation route
+        8.4 Add menu item in Procurement sidebar
+      Task 9: Reorder alert indicator on ProcurementLotsPage
+        9.1 Call getItemStockBalance; show "Low Stock" Tag when balance &lt; minimum_stock
+      Task 10: Frontend tests
+        10.1 StockReconciliationPage.test.tsx — happy path, missing reason_code, qty_delta=0
+        10.2 ProcurementLotsPage.test.tsx — low stock tag renders when below threshold
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    AC1: User can submit a stock adjustment: item (any active item), qty_delta (+/-), mandatory reason_code (predefined), optional notes.
+    AC2: User can optionally target a specific material_lot (lot_id nullable FK to material_lots.id).
+    AC3: System inserts new stock_adjustments record (id, item_id, lot_id, qty_delta, reason_code, notes, created_by, created_at). No original transaction is mutated or deleted.
+    AC4: created_by (authenticated user identity) and created_at timestamp recorded automatically from auth context.
+    AC5: reason_code mandatory; predefined values: "Spoilage", "Audit Correction", "Damage", "Counting Error", "Other". Missing reason_code → validation error (400 / Wails error).
+    AC6: qty_delta must be non-zero. qty_delta=0 → validation error.
+    AC7: GetItemStockBalance(itemID) returns SUM(material_lots.received_qty) + SUM(stock_adjustments.qty_delta) for that item.
+    AC8: Procurement Lots page shows "Low Stock" badge/tag when effective stock &lt; items.minimum_stock.
+    AC9: CreateStockAdjustment requires write access (requireWriteAccess); operator minimum role; blocked in read-only/grace license mode.
+    AC10: New route procurement.reconciliation (/procurement/reconciliation) added to navigation contract and React Router; accessible Admin + Operator.
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-3.md</path>
+        <title>Epic 3 Technical Specification</title>
+        <section>Data Models and Contracts — stock_adjustments</section>
+        <snippet>stock_adjustments planned schema: id (PK), item_id (FK items), lot_id (FK material_lots, nullable), qty_delta (REAL; positive/negative correction), reason_code (TEXT, required), notes (TEXT, optional), created_by (user reference), created_at (DATETIME). Reconciliation must create correcting entries rather than mutating/deleting original transactions.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-3.md</path>
+        <title>Epic 3 Technical Specification</title>
+        <section>APIs and Interfaces</section>
+        <snippet>POST /inventory/reconciliation/create → create stock adjustment with mandatory reason code. HTTP 400 for validation failures (reason_code missing, qty_delta=0), 401 missing token, 403 forbidden role or read-only mode.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-3.md</path>
+        <title>Epic 3 Technical Specification</title>
+        <section>Acceptance Criteria AC8, AC9, AC10</section>
+        <snippet>AC8: supports reconciliation entries via correcting (+/-) transactions, not destructive edits. AC9: mandatory reason_code, audit trail record. AC10: procurement screens expose stock-level visibility for reorder awareness (minimum_stock).</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>FR-004 Stock Reconciliation</section>
+        <snippet>FR-004: Feature to record physical stock counts and adjust system stock with reason codes (e.g., "Audit Found", "Spoilage"). Audit Trail: Immutable logs for all stock adjustments (Who edited stock and when).</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>FR-003 Re-order Alerts</section>
+        <snippet>FR-003: Visual indicators when stock dips below defined minimums. Items table has minimum_stock REAL DEFAULT 0 column.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epics Breakdown</title>
+        <section>Story 3.4 Stock Reconciliation &amp; Audit</section>
+        <snippet>Given physical count "50 KG" but system says "52 KG", when I enter a Stock Reconciliation, system adjusts stock to 50 KG and creates a "Stock Adjustment" transaction with mandatory Reason Code. Technical Notes: No deletion of transactions. Make a correcting entry (+/-).</snippet>
+      </doc>
+      <doc>
+        <path>docs/navigation-rbac-contract.md</path>
+        <title>Navigation &amp; RBAC Contract</title>
+        <section>Route Table</section>
+        <snippet>Existing procurement routes: procurement.grn → /procurement/grn (Admin + Operator), procurement.lots → /procurement/lots (Admin + Operator). New route procurement.reconciliation → /procurement/reconciliation must follow the same pattern.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>Repository &amp; Migrations Pattern</section>
+        <snippet>Repository: Define interfaces for data access to allow testing. Migrations: SQL migration files (.sql) embedded into Go binary via `embed`. On startup, app checks SQLite DB version and applies pending migrations automatically (golang-migrate v4.18.2).</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>internal/domain/inventory/entities.go</path>
+        <kind>domain entity</kind>
+        <symbol>GRN, GRNLine, MaterialLot, StockLedgerMovement, GRN.Validate()</symbol>
+        <lines>1-286</lines>
+        <reason>Pattern reference for new StockAdjustment entity: struct definition, sentinel errors (ErrGRNLineUnitPrice etc.), Validate() method enforcing non-negative/non-empty rules. Follow same guard patterns for qty_delta=0 and reason_code empty.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/domain/inventory/entities.go</path>
+        <kind>domain entity</kind>
+        <symbol>Item.MinimumStock</symbol>
+        <lines>62</lines>
+        <reason>Item.MinimumStock float64 field already exists. GetItemStockBalance result compared against this field for reorder alert.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/domain/inventory/repository.go</path>
+        <kind>interface</kind>
+        <symbol>Repository interface</symbol>
+        <lines>27-55</lines>
+        <reason>Extension point: add CreateStockAdjustment, ListStockAdjustments, GetItemStockBalance to this interface. All existing fake repo implementations in service_test.go must add stub methods for the new interface methods.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/app/inventory/service.go</path>
+        <kind>service</kind>
+        <symbol>CreateGRNRecord, requireWriteAccess, requireReadAccess, mapValidationError</symbol>
+        <lines>267-286, 288-467, 797-823</lines>
+        <reason>Pattern to replicate for CreateStockAdjustment: requireWriteAccess → build entity → Validate() → mapValidationError → repo.CreateStockAdjustment. Use same ServiceError / FieldError shape for field-level validation errors.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/app/inventory/service_test.go</path>
+        <kind>test</kind>
+        <symbol>fakeInventoryRepo</symbol>
+        <lines>15-37</lines>
+        <reason>fakeInventoryRepo struct must be extended with CreateStockAdjustment, ListStockAdjustments, GetItemStockBalance stub methods. Also add lastCreatedStockAdj *domainInventory.StockAdjustment field to capture written entity for assertions.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/infrastructure/db/sqlite_inventory_repository.go</path>
+        <kind>repository</kind>
+        <symbol>CreateGRN (transactional INSERT pattern)</symbol>
+        <lines>1170-1233</lines>
+        <reason>Reference for INSERT pattern using ExecContext. CreateStockAdjustment will use a simpler single-table INSERT (no transaction needed unless also writing to stock_ledger). Follow the ExecContext + LastInsertId pattern to populate entity.ID after insert.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/infrastructure/db/sqlite_inventory_repository.go</path>
+        <kind>repository</kind>
+        <symbol>ListMaterialLots (SELECT with JOIN and filter)</symbol>
+        <lines>1235-1290</lines>
+        <reason>Pattern for ListStockAdjustments: build clauses slice, append WHERE conditions, QueryContext with Scan. Also reference for GetItemStockBalance using SQL SUM aggregation with LEFT JOIN.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/infrastructure/db/migrations/000013_supplier_id_fk.up.sql</path>
+        <kind>migration</kind>
+        <symbol>migration pattern</symbol>
+        <lines>1-20</lines>
+        <reason>Last applied migration is 000013. Next migration MUST be 000014_stock_adjustments. Follow same file naming convention.</reason>
+      </artifact>
+      <artifact>
+        <path>internal/app/app.go</path>
+        <kind>wails binding</kind>
+        <symbol>App.CreateGRN, App.ListMaterialLots, App.ListItems</symbol>
+        <lines>822-840, 1129-1155, 1225-1250</lines>
+        <reason>Pattern for new Wails bindings: check isServer, postToServerAPI for client mode, else call inventoryService directly. Follow GRNResult / MaterialLotResult DTO pattern for StockAdjustmentResult.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/services/masterDataApi.ts</path>
+        <kind>service</kind>
+        <symbol>MaterialLot, CreateGRNPayload, listMaterialLots, createGRN</symbol>
+        <lines>1-80</lines>
+        <reason>Add StockAdjustment type, CreateStockAdjustmentPayload, and Wails binding wrappers. Follow existing import patterns from wailsjs and authApi.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/components/forms/ProcurementLotsPage.tsx</path>
+        <kind>component</kind>
+        <symbol>ProcurementLotsPage</symbol>
+        <lines>1-60</lines>
+        <reason>Extend this component to call getItemStockBalance per item and display "Low Stock" Tag when balance &lt; item.minimum_stock. ItemMaster type already has minimum_stock field. Do not break existing source_type "External" badge or Unit Cost column.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/components/forms/GRNForm.tsx</path>
+        <kind>component</kind>
+        <symbol>GRNForm</symbol>
+        <lines>1-50</lines>
+        <reason>Reference for keyboard-first Ant Design Form pattern with Select + InputNumber. StockReconciliationPage should follow the same field layout and Tab-key navigation approach.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/components/forms/__tests__/ProcurementLotsPage.test.tsx</path>
+        <kind>test</kind>
+        <symbol>ProcurementLotsPage tests</symbol>
+        <lines>1-163</lines>
+        <reason>Extend with test: mock getItemStockBalance returning value below minimum_stock; assert "Low Stock" Tag renders in the table. Maintain existing tests for "External" badge and Unit Cost column.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <go>
+        <module>masala_inventory_managment</module>
+        <goVersion>1.26</goVersion>
+        <packages>
+          <package>github.com/mattn/go-sqlite3 v1.14.34 — SQLite driver for all DB operations</package>
+          <package>github.com/golang-migrate/migrate/v4 v4.18.2 — embedded migration runner (migrations auto-apply on startup)</package>
+          <package>github.com/golang-jwt/jwt/v5 v5.3.1 — JWT token validation for RBAC</package>
+          <package>github.com/wailsapp/wails/v2 v2.11.0 — desktop IPC binding layer</package>
+          <package>github.com/google/uuid v1.6.0 — UUID generation (used by lot number generation)</package>
+        </packages>
+      </go>
+      <frontend>
+        <runtime>React 19.0.0 + Vite 6.1.0 + TypeScript 5.7.3</runtime>
+        <packages>
+          <package>antd ^6.2.1 — Form, Select, InputNumber, Table, Tag, message, Typography components</package>
+          <package>@ant-design/icons ^5.6.1 — icon set (WarningOutlined for low stock badge)</package>
+          <package>@tanstack/react-query ^5.66.0 — async data fetching/caching (useQuery for lots)</package>
+          <package>react-router-dom ^6.30.3 — route registration (/procurement/reconciliation)</package>
+          <package>axios ^1.7.9 — HTTP transport for server API calls</package>
+          <package>vitest ^4.0.18 — test runner</package>
+          <package>@testing-library/react ^16.3.0 — component test utilities</package>
+          <package>@testing-library/jest-dom ^6.9.1 — DOM matchers (toBeInTheDocument, toHaveTextContent)</package>
+        </packages>
+      </frontend>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>APPEND-ONLY INVARIANT: Repository must NOT expose UpdateStockAdjustment or DeleteStockAdjustment. Only CreateStockAdjustment and read methods allowed. This is enforced architecturally — do not add mutating methods.</constraint>
+    <constraint>MIGRATION SEQUENCE: Last applied migration is 000013_supplier_id_fk. Next file MUST be 000014_stock_adjustments.{up,down}.sql. golang-migrate applies migrations in numeric order; gaps or out-of-order files will cause startup failure.</constraint>
+    <constraint>REPOSITORY INTERFACE EXTENSION: All three new methods (CreateStockAdjustment, ListStockAdjustments, GetItemStockBalance) must be added to domain/inventory/repository.go interface. The fakeInventoryRepo in service_test.go must add stub implementations for all three to satisfy the interface.</constraint>
+    <constraint>RBAC PATTERN: Use requireWriteAccess(input.AuthToken) at the top of CreateStockAdjustment — same as CreateGRNRecord. Use requireReadAccess for list/balance queries. Never bypass appLicenseMode.RequireWriteAccess().</constraint>
+    <constraint>VALIDATION ERRORS: Use mapValidationError(err) to convert domain sentinel errors to ServiceError{Code: "validation_failed", Fields: [...]}.  Add new cases for ErrStockAdjReasonCodeRequired and ErrStockAdjQtyDeltaZero to the mapValidationError switch.</constraint>
+    <constraint>REASON CODE LIST: Hard-code in entities.go (var ValidReasonCodes = []string{...}) and mirror in frontend constants. Do NOT store in a DB table — no scope creep.</constraint>
+    <constraint>STOCK BALANCE FORMULA (Epic 3 scope): SUM(material_lots.received_qty WHERE item_id=?) + SUM(stock_adjustments.qty_delta WHERE item_id=?). This is intentionally inbound-only for Epic 3. Epic 4 will add consumption deductions via separate story.</constraint>
+    <constraint>CREATED_BY FIELD: Extract username/identity string from auth token JWT claims. The same auth infrastructure used by requireWriteAccess provides the actor identity. created_by is TEXT NOT NULL in the schema.</constraint>
+    <constraint>ROUTE REGISTRATION: Add procurement.reconciliation to docs/navigation-rbac-contract.md AND register the React route in the same location as procurement.grn and procurement.lots in the router config.</constraint>
+    <constraint>DO NOT BREAK EXISTING: ProcurementLotsPage.tsx currently has "External" source badge and Unit Cost column (added in Story 3.3). The Low Stock badge (Task 9) must be additive only — do not modify or remove existing columns/badges.</constraint>
+    <constraint>TESTING: Go standard library testing package only (no testify). Frontend: Vitest + @testing-library/react. Test file locations: Go tests alongside source (service_test.go, sqlite_inventory_repository_test.go), frontend tests in __tests__/ directories.</constraint>
+    <constraint>WAILS BINDING PATTERN: New App methods must check a.isServer — if not server and inventoryService is nil, use postToServerAPI("/inventory/reconciliation/create", input, &amp;result). If isServer or inventoryService set, call service directly. Follow App.CreateGRN pattern exactly.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Repository.CreateStockAdjustment</name>
+      <kind>Go interface method</kind>
+      <signature>CreateStockAdjustment(adj *domainInventory.StockAdjustment) error</signature>
+      <path>internal/domain/inventory/repository.go</path>
+    </interface>
+    <interface>
+      <name>Repository.ListStockAdjustments</name>
+      <kind>Go interface method</kind>
+      <signature>ListStockAdjustments(itemID int64) ([]domainInventory.StockAdjustment, error)</signature>
+      <path>internal/domain/inventory/repository.go</path>
+    </interface>
+    <interface>
+      <name>Repository.GetItemStockBalance</name>
+      <kind>Go interface method</kind>
+      <signature>GetItemStockBalance(itemID int64) (float64, error)</signature>
+      <path>internal/domain/inventory/repository.go</path>
+    </interface>
+    <interface>
+      <name>Service.CreateStockAdjustment</name>
+      <kind>Go service method</kind>
+      <signature>func (s *Service) CreateStockAdjustment(input CreateStockAdjustmentInput) (*domainInventory.StockAdjustment, error)</signature>
+      <path>internal/app/inventory/service.go</path>
+    </interface>
+    <interface>
+      <name>Service.GetItemStockBalance</name>
+      <kind>Go service method</kind>
+      <signature>func (s *Service) GetItemStockBalance(input GetItemStockBalanceInput) (float64, error)</signature>
+      <path>internal/app/inventory/service.go</path>
+    </interface>
+    <interface>
+      <name>POST /inventory/reconciliation/create</name>
+      <kind>HTTP endpoint</kind>
+      <signature>POST /inventory/reconciliation/create → body: CreateStockAdjustmentInput JSON → response: StockAdjustmentResult JSON | 400/401/403</signature>
+      <path>cmd/server/api_server.go</path>
+    </interface>
+    <interface>
+      <name>StockAdjustment domain entity</name>
+      <kind>Go struct</kind>
+      <signature>type StockAdjustment struct { ID int64; ItemID int64; LotID *int64; QtyDelta float64; ReasonCode string; Notes string; CreatedBy string; CreatedAt time.Time }</signature>
+      <path>internal/domain/inventory/entities.go</path>
+    </interface>
+    <interface>
+      <name>StockAdjustment.Validate()</name>
+      <kind>Go method</kind>
+      <signature>func (a *StockAdjustment) Validate() error — returns ErrStockAdjReasonCodeRequired if ReasonCode empty or not in ValidReasonCodes; returns ErrStockAdjQtyDeltaZero if QtyDelta == 0</signature>
+      <path>internal/domain/inventory/entities.go</path>
+    </interface>
+    <interface>
+      <name>CreateStockAdjustmentInput</name>
+      <kind>Go service input struct</kind>
+      <signature>type CreateStockAdjustmentInput struct { AuthToken string; ItemID int64; LotID *int64; QtyDelta float64; ReasonCode string; Notes string }</signature>
+      <path>internal/app/inventory/service.go</path>
+    </interface>
+    <interface>
+      <name>GetItemStockBalanceInput</name>
+      <kind>Go service input struct</kind>
+      <signature>type GetItemStockBalanceInput struct { AuthToken string; ItemID int64 }</signature>
+      <path>internal/app/inventory/service.go</path>
+    </interface>
+    <interface>
+      <name>stock_adjustments SQL table</name>
+      <kind>SQL DDL</kind>
+      <signature>CREATE TABLE stock_adjustments (id INTEGER PRIMARY KEY AUTOINCREMENT, item_id INTEGER NOT NULL REFERENCES items(id), lot_id INTEGER REFERENCES material_lots(id), qty_delta REAL NOT NULL, reason_code TEXT NOT NULL, notes TEXT, created_by TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)</signature>
+      <path>internal/infrastructure/db/migrations/000014_stock_adjustments.up.sql</path>
+    </interface>
+    <interface>
+      <name>GetItemStockBalance SQL query</name>
+      <kind>SQL query</kind>
+      <signature>SELECT COALESCE(SUM(ml.received_qty), 0) + COALESCE(SUM(sa.qty_delta), 0) FROM items i LEFT JOIN material_lots ml ON ml.item_id = i.id LEFT JOIN stock_adjustments sa ON sa.item_id = i.id WHERE i.id = ?</signature>
+      <path>internal/infrastructure/db/sqlite_inventory_repository.go</path>
+    </interface>
+    <interface>
+      <name>Frontend StockAdjustment type</name>
+      <kind>TypeScript type</kind>
+      <signature>export type StockAdjustment = { id: number; item_id: number; lot_id: number | null; qty_delta: number; reason_code: string; notes: string; created_by: string; created_at: string }</signature>
+      <path>frontend/src/services/masterDataApi.ts</path>
+    </interface>
+    <interface>
+      <name>Frontend CreateStockAdjustmentPayload</name>
+      <kind>TypeScript type</kind>
+      <signature>export type CreateStockAdjustmentPayload = { item_id: number; lot_id?: number | null; qty_delta: number; reason_code: string; notes?: string; auth_token?: string }</signature>
+      <path>frontend/src/services/masterDataApi.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Go tests use the standard library testing package (no testify). Service tests use a fakeInventoryRepo struct that satisfies the Repository interface — add stub implementations for all three new interface methods (CreateStockAdjustment, ListStockAdjustments, GetItemStockBalance). Repository integration tests use a real in-memory or file SQLite DB with migrations applied. Frontend tests use Vitest + @testing-library/react + @testing-library/jest-dom. Mock Wails bindings (wailsjs/) with vi.mock() in each test file. All tests must pass before marking story done.</standards>
+    <locations>
+      internal/app/inventory/service_test.go — service unit tests
+      internal/infrastructure/db/sqlite_inventory_repository_test.go — repository integration tests
+      frontend/src/components/forms/__tests__/StockReconciliationPage.test.tsx — new component tests
+      frontend/src/components/forms/__tests__/ProcurementLotsPage.test.tsx — extend existing tests with low stock badge
+    </locations>
+    <ideas>
+      AC1/AC5 — TestService_CreateStockAdjustment_HappyPath: valid input with reason_code "Spoilage" → no error, repo.lastCreatedStockAdj non-nil, ReasonCode matches.
+      AC5 — TestService_CreateStockAdjustment_MissingReasonCode: empty reason_code → ServiceError{Code: "validation_failed"}, Fields[0].Field == "reason_code".
+      AC6 — TestService_CreateStockAdjustment_ZeroQtyDelta: qty_delta=0 → ServiceError{Code: "validation_failed"}, Fields[0].Field == "qty_delta".
+      AC9 — TestService_CreateStockAdjustment_ReadOnlyMode: set read-only license mode → error returned (appLicenseMode.RequireWriteAccess blocks).
+      AC9 — TestService_CreateStockAdjustment_ForbiddenRole: use role that fails requireWriteAccess → error returned.
+      AC3 (repo) — TestRepo_CreateStockAdjustment_Persists: insert adjustment → SELECT from DB → qty_delta, reason_code, created_by all match.
+      AC2 (repo) — TestRepo_CreateStockAdjustment_LotIDNullable: insert with LotID=nil → no FK error, lot_id column IS NULL.
+      AC7 (repo) — TestRepo_GetItemStockBalance_SumsLotsAndAdjustments: insert lot (qty=100) + adjustment (delta=-20) → balance=80.
+      AC7 (repo) — TestRepo_GetItemStockBalance_NoLotsNoAdjustments: item with no lots and no adjustments → balance=0 (COALESCE handles NULL).
+      AC1 (frontend) — StockReconciliationPage renders item Select, qty_delta spinbutton, reason_code Select, notes textarea, submit button.
+      AC5 (frontend) — Submitting with empty reason_code triggers validation; createStockAdjustment Wails mock NOT called.
+      AC10 (frontend) — route /procurement/reconciliation renders StockReconciliationPage (smoke test).
+      AC8 (frontend) — ProcurementLotsPage with mocked getItemStockBalance returning value below minimum_stock shows "Low Stock" tag in row.
+    </ideas>
+  </tests>
+</story-context>

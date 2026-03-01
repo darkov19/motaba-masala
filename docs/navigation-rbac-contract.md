@@ -18,6 +18,7 @@ This document defines the canonical navigation and RBAC contract for the shared 
 | `masters.parties` | `/masters/parties` | Masters | Admin + Operator | `operator` |
 | `procurement.grn` | `/procurement/grn` | Procurement | Admin + Operator | `operator` |
 | `procurement.lots` | `/procurement/lots` | Procurement | Admin + Operator | `operator` |
+| `procurement.reconciliation` | `/procurement/reconciliation` | Procurement | Admin + Operator | `operator` |
 | `production.batches` | `/production/batches` | Production | Admin + Operator | `operator` |
 | `production.execution` | `/production/execution` | Production | Admin + Operator | `operator` |
 | `packing.runs` | `/packing/runs` | Packing | Admin + Operator | `operator` |
@@ -46,7 +47,7 @@ Route-specific UI note:
 | --- | --- | --- | --- |
 | Dashboard | `dashboard` | `dashboard.home` | `2.2B`, `2.2` |
 | Masters | `masters` | `masters.items`, `masters.recipes`, `masters.parties` | `2.2B`, `2.2`, `2.3`, `2.4` |
-| Procurement | `procurement` | `procurement.grn`, `procurement.lots` | `2.2B`, `3.1`, `3.2` |
+| Procurement | `procurement` | `procurement.grn`, `procurement.lots`, `procurement.reconciliation` | `2.2B`, `3.1`, `3.2`, `3.4` |
 | Production | `production` | `production.batches`, `production.execution` | `2.2B`, `4.1`, `4.2` |
 | Packing | `packing` | `packing.runs`, `packing.materials` | `2.2B`, `5.1`, `5.2` |
 | Sales | `sales` | `sales.orders`, `sales.dispatch` | `2.2B`, `6.1`, `6.2` |

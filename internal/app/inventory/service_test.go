@@ -13,27 +13,31 @@ import (
 )
 
 type fakeInventoryRepo struct {
-	createItemErr       error
-	createBatchErr      error
-	createGRNErr        error
-	updateItemErr       error
-	updateBatchErr      error
-	updateGRNErr        error
-	createRecipeErr     error
-	updateRecipeErr     error
-	createPartyErr      error
-	updatePartyErr      error
-	createConversionErr error
-	findConversionErr   error
-	items               []domainInventory.Item
-	profiles            []domainInventory.PackagingProfile
-	recipes             []domainInventory.Recipe
-	parties             []domainInventory.Party
-	conversionRules     []domainInventory.UnitConversionRule
-	materialLots        []domainInventory.MaterialLot
-	lotMovements        []domainInventory.StockLedgerMovement
-	lastCreatedGRN      *domainInventory.GRN
-	lastLotMovement     *domainInventory.StockLedgerMovement
+	createItemErr          error
+	createBatchErr         error
+	createGRNErr           error
+	updateItemErr          error
+	updateBatchErr         error
+	updateGRNErr           error
+	createRecipeErr        error
+	updateRecipeErr        error
+	createPartyErr         error
+	updatePartyErr         error
+	createConversionErr    error
+	findConversionErr      error
+	createStockAdjErr      error
+	items                  []domainInventory.Item
+	profiles               []domainInventory.PackagingProfile
+	recipes                []domainInventory.Recipe
+	parties                []domainInventory.Party
+	conversionRules        []domainInventory.UnitConversionRule
+	materialLots           []domainInventory.MaterialLot
+	lotMovements           []domainInventory.StockLedgerMovement
+	stockAdjustments       []domainInventory.StockAdjustment
+	lastCreatedGRN         *domainInventory.GRN
+	lastLotMovement        *domainInventory.StockLedgerMovement
+	lastCreatedStockAdj    *domainInventory.StockAdjustment
+	stockAdjBalance        float64
 }
 
 func (f *fakeInventoryRepo) CreateItem(*domainInventory.Item) error   { return f.createItemErr }
@@ -186,6 +190,34 @@ func (f *fakeInventoryRepo) ListLotStockMovements(filter domainInventory.StockLe
 	return results, nil
 }
 
+func (f *fakeInventoryRepo) CreateStockAdjustment(adj *domainInventory.StockAdjustment) error {
+	if f.createStockAdjErr != nil {
+		return f.createStockAdjErr
+	}
+	if adj != nil {
+		copy := *adj
+		copy.ID = int64(len(f.stockAdjustments) + 1)
+		f.stockAdjustments = append(f.stockAdjustments, copy)
+		f.lastCreatedStockAdj = &copy
+		adj.ID = copy.ID
+	}
+	return nil
+}
+
+func (f *fakeInventoryRepo) ListStockAdjustments(itemID int64) ([]domainInventory.StockAdjustment, error) {
+	results := make([]domainInventory.StockAdjustment, 0)
+	for _, adj := range f.stockAdjustments {
+		if adj.ItemID == itemID {
+			results = append(results, adj)
+		}
+	}
+	return results, nil
+}
+
+func (f *fakeInventoryRepo) GetItemStockBalance(itemID int64) (float64, error) {
+	return f.stockAdjBalance, nil
+}
+
 func fixedRoleResolver(role domainAuth.Role, err error) func(string) (domainAuth.Role, error) {
 	return func(_ string) (domainAuth.Role, error) {
 		return role, err
@@ -194,7 +226,7 @@ func fixedRoleResolver(role domainAuth.Role, err error) func(string) (domainAuth
 
 func TestService_UpdateItem_MapsConcurrencyError(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{updateItemErr: domainErrors.ErrConcurrencyConflict}, nil)
+	svc := NewService(&fakeInventoryRepo{updateItemErr: domainErrors.ErrConcurrencyConflict}, nil, nil)
 
 	err := svc.UpdateItem(&domainInventory.Item{ID: 1})
 	if err == nil || err.Error() != ErrRecordModified {
@@ -204,7 +236,7 @@ func TestService_UpdateItem_MapsConcurrencyError(t *testing.T) {
 
 func TestService_UpdateBatch_MapsConcurrencyError(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{updateBatchErr: domainErrors.ErrConcurrencyConflict}, nil)
+	svc := NewService(&fakeInventoryRepo{updateBatchErr: domainErrors.ErrConcurrencyConflict}, nil, nil)
 
 	err := svc.UpdateBatch(&domainInventory.Batch{ID: 1})
 	if err == nil || err.Error() != ErrRecordModified {
@@ -214,7 +246,7 @@ func TestService_UpdateBatch_MapsConcurrencyError(t *testing.T) {
 
 func TestService_UpdateGRN_MapsConcurrencyError(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{updateGRNErr: domainErrors.ErrConcurrencyConflict}, nil)
+	svc := NewService(&fakeInventoryRepo{updateGRNErr: domainErrors.ErrConcurrencyConflict}, nil, nil)
 
 	err := svc.UpdateGRN(&domainInventory.GRN{ID: 1})
 	if err == nil || err.Error() != ErrRecordModified {
@@ -225,7 +257,7 @@ func TestService_UpdateGRN_MapsConcurrencyError(t *testing.T) {
 func TestService_UpdateItem_PassesThroughNonConcurrencyErrors(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
 	expected := errors.New("db unavailable")
-	svc := NewService(&fakeInventoryRepo{updateItemErr: expected}, nil)
+	svc := NewService(&fakeInventoryRepo{updateItemErr: expected}, nil, nil)
 
 	err := svc.UpdateItem(&domainInventory.Item{ID: 1})
 	if !errors.Is(err, expected) {
@@ -240,7 +272,7 @@ func TestService_UpdateItem_BlockedInReadOnlyGracePeriod(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(func() error {
 		return appLicenseMode.ErrReadOnlyMode
 	})
-	svc := NewService(&fakeInventoryRepo{}, nil)
+	svc := NewService(&fakeInventoryRepo{}, nil, nil)
 
 	err := svc.UpdateItem(&domainInventory.Item{ID: 1})
 	if !errors.Is(err, appLicenseMode.ErrReadOnlyMode) {
@@ -255,7 +287,7 @@ func TestService_CreateBatch_BlockedInReadOnlyGracePeriod(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(func() error {
 		return appLicenseMode.ErrReadOnlyMode
 	})
-	svc := NewService(&fakeInventoryRepo{}, nil)
+	svc := NewService(&fakeInventoryRepo{}, nil, nil)
 
 	err := svc.CreateBatch(&domainInventory.Batch{ID: 1})
 	if !errors.Is(err, appLicenseMode.ErrReadOnlyMode) {
@@ -266,7 +298,7 @@ func TestService_CreateBatch_BlockedInReadOnlyGracePeriod(t *testing.T) {
 func TestService_CreateGRN_PassesThroughRepoErrors(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
 	expected := errors.New("db unavailable")
-	svc := NewService(&fakeInventoryRepo{createGRNErr: expected}, nil)
+	svc := NewService(&fakeInventoryRepo{createGRNErr: expected}, nil, nil)
 
 	err := svc.CreateGRN(&domainInventory.GRN{ID: 1})
 	if !errors.Is(err, expected) {
@@ -276,7 +308,7 @@ func TestService_CreateGRN_PassesThroughRepoErrors(t *testing.T) {
 
 func TestService_CreateGRNRecord_ValidationErrorPayload(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 
 	_, err := svc.CreateGRNRecord(CreateGRNInput{
 		GRNNumber:    "GRN-3001",
@@ -300,7 +332,7 @@ func TestService_CreateGRNRecord_ValidationErrorPayload(t *testing.T) {
 
 func TestService_CreateGRNRecord_NegativeQuantityValidationError(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 
 	_, err := svc.CreateGRNRecord(CreateGRNInput{
 		GRNNumber:    "GRN-3001",
@@ -328,7 +360,7 @@ func TestService_CreateGRNRecord_NegativeQuantityValidationError(t *testing.T) {
 func TestService_CreateGRNRecord_OperatorAllowed(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
 	repo := &fakeInventoryRepo{}
-	svc := NewService(repo, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+	svc := NewService(repo, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil), nil)
 
 	_, err := svc.CreateGRNRecord(CreateGRNInput{
 		GRNNumber:    "GRN-3001",
@@ -354,7 +386,7 @@ func TestService_CreateGRNRecord_OperatorAllowed(t *testing.T) {
 
 func TestService_CreateGRNRecord_UnauthorizedWithoutToken(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 
 	_, err := svc.CreateGRNRecord(CreateGRNInput{
 		GRNNumber:    "GRN-3001",
@@ -374,7 +406,7 @@ func TestService_CreateGRNRecord_UnauthorizedWithoutToken(t *testing.T) {
 
 func TestService_CreateGRNRecord_ForbiddenRole(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.Role("Viewer"), nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.Role("Viewer"), nil), nil)
 
 	_, err := svc.CreateGRNRecord(CreateGRNInput{
 		GRNNumber:    "GRN-3001",
@@ -400,7 +432,7 @@ func TestService_CreateGRNRecord_BlockedInReadOnlyGracePeriod(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(func() error {
 		return appLicenseMode.ErrReadOnlyMode
 	})
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 
 	_, err := svc.CreateGRNRecord(CreateGRNInput{
 		GRNNumber:    "GRN-3001",
@@ -420,7 +452,7 @@ func TestService_ListMaterialLots_OperatorAllowed(t *testing.T) {
 		materialLots: []domainInventory.MaterialLot{
 			{ID: 1, LotNumber: "LOT-20260227-001", GRNNumber: "GRN-3001"},
 		},
-	}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+	}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil), nil)
 
 	lots, err := svc.ListMaterialLots(ListMaterialLotsInput{
 		AuthToken: "operator-token",
@@ -435,7 +467,7 @@ func TestService_ListMaterialLots_OperatorAllowed(t *testing.T) {
 }
 
 func TestService_RecordLotStockMovement_OperatorAllowed(t *testing.T) {
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil), nil)
 
 	movement, err := svc.RecordLotStockMovement(RecordLotStockMovementInput{
 		LotNumber:       "LOT-20260227-001",
@@ -454,7 +486,7 @@ func TestService_RecordLotStockMovement_OperatorAllowed(t *testing.T) {
 }
 
 func TestService_RecordLotStockMovement_RejectsInboundType(t *testing.T) {
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 
 	_, err := svc.RecordLotStockMovement(RecordLotStockMovementInput{
 		LotNumber:       "LOT-20260227-001",
@@ -473,7 +505,7 @@ func TestService_RecordLotStockMovement_RejectsInboundType(t *testing.T) {
 
 func TestService_CreateItemMaster_ValidationErrorPayload(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 
 	_, err := svc.CreateItemMaster(CreateItemInput{
 		Name:      "Invalid Type",
@@ -497,7 +529,7 @@ func TestService_CreateItemMaster_ValidationErrorPayload(t *testing.T) {
 }
 
 func TestService_ListItems_ForbiddenRole(t *testing.T) {
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.Role("Viewer"), nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.Role("Viewer"), nil), nil)
 	_, err := svc.ListItems(ListItemsInput{AuthToken: "viewer-token"})
 	if err == nil {
 		t.Fatalf("expected forbidden error")
@@ -510,7 +542,7 @@ func TestService_ListItems_ForbiddenRole(t *testing.T) {
 
 func TestService_CreatePackagingProfile_RequiresComponents(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 	_, err := svc.CreatePackagingProfile(CreatePackagingProfileInput{
 		Name:      "Jar Pack",
 		PackMode:  "JAR_200G",
@@ -530,7 +562,7 @@ func TestService_CreatePackagingProfile_RequiresComponents(t *testing.T) {
 
 func TestService_CreateItemMaster_MissingTokenUnauthorized(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 	_, err := svc.CreateItemMaster(CreateItemInput{
 		Name:     "No Token",
 		ItemType: "RAW",
@@ -550,7 +582,7 @@ func TestService_CreateItemMaster_MissingTokenUnauthorized(t *testing.T) {
 
 func TestService_CreateItemMaster_ForgedActorRolePayloadIgnored(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 
 	var input CreateItemInput
 	if err := json.Unmarshal(
@@ -575,7 +607,7 @@ func TestService_CreateItemMaster_ForgedActorRolePayloadIgnored(t *testing.T) {
 
 func TestService_CreateItemMaster_OperatorDeniedByBackend(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil), nil)
 
 	_, err := svc.CreateItemMaster(CreateItemInput{
 		Name:      "Operator Attempt",
@@ -597,7 +629,7 @@ func TestService_CreateItemMaster_OperatorDeniedByBackend(t *testing.T) {
 
 func TestService_CreatePackagingProfile_OperatorDeniedByBackend(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil), nil)
 
 	_, err := svc.CreatePackagingProfile(CreatePackagingProfileInput{
 		Name:      "Operator Pack",
@@ -621,7 +653,7 @@ func TestService_CreatePackagingProfile_OperatorDeniedByBackend(t *testing.T) {
 
 func TestService_CreateUnitConversionRule_OperatorDeniedByBackend(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil), nil)
 
 	_, err := svc.CreateUnitConversionRule(CreateUnitConversionRuleInput{
 		FromUnit:       "GRAM",
@@ -645,7 +677,7 @@ func TestService_CreateUnitConversionRule_OperatorDeniedByBackend(t *testing.T) 
 
 func TestService_CreateRecipe_ValidationErrorPayload(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 
 	_, err := svc.CreateRecipe(CreateRecipeInput{
 		RecipeCode:         "RCP-1",
@@ -674,7 +706,7 @@ func TestService_CreateRecipe_ValidationErrorPayload(t *testing.T) {
 
 func TestService_CreateRecipe_OperatorDeniedByBackend(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil), nil)
 
 	_, err := svc.CreateRecipe(CreateRecipeInput{
 		RecipeCode:         "RCP-2",
@@ -700,7 +732,7 @@ func TestService_CreateRecipe_OperatorDeniedByBackend(t *testing.T) {
 
 func TestService_UpdateRecipe_MapsConcurrencyError(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{updateRecipeErr: domainErrors.ErrConcurrencyConflict}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(&fakeInventoryRepo{updateRecipeErr: domainErrors.ErrConcurrencyConflict}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 
 	_, err := svc.UpdateRecipe(UpdateRecipeInput{
 		ID:                 1,
@@ -724,7 +756,7 @@ func TestService_ListRecipes_ReadAllowedForOperator(t *testing.T) {
 		recipes: []domainInventory.Recipe{
 			{ID: 1, RecipeCode: "RCP-1", OutputItemID: 10, OutputQtyBase: 100, ExpectedWastagePct: 2},
 		},
-	}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+	}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil), nil)
 
 	result, err := svc.ListRecipes(ListRecipesInput{AuthToken: "operator-token", ActiveOnly: true})
 	if err != nil {
@@ -737,7 +769,7 @@ func TestService_ListRecipes_ReadAllowedForOperator(t *testing.T) {
 
 func TestService_CreateParty_ValidationErrorPayload(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 
 	_, err := svc.CreateParty(CreatePartyInput{
 		PartyType: "SUPPLIER",
@@ -761,7 +793,7 @@ func TestService_CreateParty_ValidationErrorPayload(t *testing.T) {
 
 func TestService_CreateParty_OperatorDeniedByBackend(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil), nil)
 
 	_, err := svc.CreateParty(CreatePartyInput{
 		PartyType: "SUPPLIER",
@@ -786,7 +818,7 @@ func TestService_ListParties_ReadAllowedForOperator(t *testing.T) {
 		parties: []domainInventory.Party{
 			{ID: 1, PartyType: domainInventory.PartyTypeSupplier, Name: "Acme Supplier", Phone: "9998887777", IsActive: true},
 		},
-	}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+	}, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil), nil)
 
 	result, err := svc.ListParties(ListPartiesInput{AuthToken: "operator-token", ActiveOnly: true})
 	if err != nil {
@@ -799,7 +831,7 @@ func TestService_ListParties_ReadAllowedForOperator(t *testing.T) {
 
 func TestService_UpdateParty_MapsConcurrencyError(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{updatePartyErr: domainErrors.ErrConcurrencyConflict}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(&fakeInventoryRepo{updatePartyErr: domainErrors.ErrConcurrencyConflict}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 
 	_, err := svc.UpdateParty(UpdatePartyInput{
 		ID:        1,
@@ -816,7 +848,7 @@ func TestService_UpdateParty_MapsConcurrencyError(t *testing.T) {
 
 func TestService_CreateUnitConversionRule_ForgedActorRolePayloadIgnored(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 
 	var input CreateUnitConversionRuleInput
 	if err := json.Unmarshal(
@@ -852,7 +884,7 @@ func TestService_ConvertQuantity_UsesConfiguredRule(t *testing.T) {
 			},
 		},
 	}
-	svc := NewService(repo, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+	svc := NewService(repo, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil), nil)
 
 	result, err := svc.ConvertQuantity(ConvertQuantityInput{
 		Quantity:   500,
@@ -872,7 +904,7 @@ func TestService_ConvertQuantity_UsesConfiguredRule(t *testing.T) {
 }
 
 func TestService_ConvertQuantity_MissingRuleReturnsValidationError(t *testing.T) {
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 
 	_, err := svc.ConvertQuantity(ConvertQuantityInput{
 		Quantity:   100,
@@ -897,7 +929,7 @@ func TestService_ConvertQuantity_MissingRuleReturnsValidationError(t *testing.T)
 func TestService_CreateGRNRecord_BulkPowder_AcceptedByService(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
 	repo := &fakeInventoryRepo{}
-	svc := NewService(repo, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil))
+	svc := NewService(repo, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil), nil)
 
 	_, err := svc.CreateGRNRecord(CreateGRNInput{
 		GRNNumber:    "GRN-BP-001",
@@ -922,7 +954,7 @@ func TestService_CreateGRNRecord_BulkPowder_AcceptedByService(t *testing.T) {
 func TestService_CreateGRNRecord_BulkPowder_UnitPriceMappedToLine(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
 	repo := &fakeInventoryRepo{}
-	svc := NewService(repo, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(repo, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 
 	_, err := svc.CreateGRNRecord(CreateGRNInput{
 		GRNNumber:    "GRN-BP-002",
@@ -946,7 +978,7 @@ func TestService_CreateGRNRecord_BulkPowder_UnitPriceMappedToLine(t *testing.T) 
 
 func TestService_CreateGRNRecord_BulkPowder_SupplierRequiredValidation(t *testing.T) {
 	appLicenseMode.SetWriteEnforcer(nil)
-	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil))
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
 
 	_, err := svc.CreateGRNRecord(CreateGRNInput{
 		GRNNumber:    "GRN-BP-003",
@@ -965,5 +997,116 @@ func TestService_CreateGRNRecord_BulkPowder_SupplierRequiredValidation(t *testin
 	}
 	if len(typed.Fields) == 0 || typed.Fields[0].Field != "supplier_id" {
 		t.Fatalf("expected supplier_id field error, got %+v", typed.Fields)
+	}
+}
+
+// --- Story 3.4: Stock Reconciliation & Audit ---
+
+func TestService_CreateStockAdjustment_HappyPath(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	repo := &fakeInventoryRepo{}
+	svc := NewService(repo, fixedRoleResolver(domainAuth.RoleDataEntryOperator, nil), func(string) (string, error) {
+		return "operator-user", nil
+	})
+
+	adj, err := svc.CreateStockAdjustment(CreateStockAdjustmentInput{
+		ItemID:     10,
+		QtyDelta:   -2.5,
+		ReasonCode: "Spoilage",
+		Notes:      "Found during shelf check",
+		AuthToken:  "operator-token",
+	})
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if adj == nil || adj.ID == 0 {
+		t.Fatalf("expected adj with ID set, got %+v", adj)
+	}
+	if adj.ReasonCode != "Spoilage" {
+		t.Fatalf("expected ReasonCode Spoilage, got %s", adj.ReasonCode)
+	}
+	if adj.CreatedBy != "operator-user" {
+		t.Fatalf("expected CreatedBy operator-user, got %s", adj.CreatedBy)
+	}
+	if repo.lastCreatedStockAdj == nil {
+		t.Fatal("expected lastCreatedStockAdj to be set")
+	}
+}
+
+func TestService_CreateStockAdjustment_MissingReasonCode(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
+
+	_, err := svc.CreateStockAdjustment(CreateStockAdjustmentInput{
+		ItemID:    10,
+		QtyDelta:  5,
+		AuthToken: "admin-token",
+	})
+	if err == nil {
+		t.Fatal("expected validation error for missing reason_code")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok || typed.Code != "validation_failed" {
+		t.Fatalf("expected validation_failed ServiceError, got %v", err)
+	}
+	if len(typed.Fields) == 0 || typed.Fields[0].Field != "reason_code" {
+		t.Fatalf("expected reason_code field error, got %+v", typed.Fields)
+	}
+}
+
+func TestService_CreateStockAdjustment_ZeroQtyDelta(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
+
+	_, err := svc.CreateStockAdjustment(CreateStockAdjustmentInput{
+		ItemID:     10,
+		QtyDelta:   0,
+		ReasonCode: "Spoilage",
+		AuthToken:  "admin-token",
+	})
+	if err == nil {
+		t.Fatal("expected validation error for zero qty_delta")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok || typed.Code != "validation_failed" {
+		t.Fatalf("expected validation_failed ServiceError, got %v", err)
+	}
+	if len(typed.Fields) == 0 || typed.Fields[0].Field != "qty_delta" {
+		t.Fatalf("expected qty_delta field error, got %+v", typed.Fields)
+	}
+}
+
+func TestService_CreateStockAdjustment_ReadOnlyMode(t *testing.T) {
+	t.Cleanup(func() { appLicenseMode.SetWriteEnforcer(nil) })
+	appLicenseMode.SetWriteEnforcer(func() error { return appLicenseMode.ErrReadOnlyMode })
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.RoleAdmin, nil), nil)
+
+	_, err := svc.CreateStockAdjustment(CreateStockAdjustmentInput{
+		ItemID:     10,
+		QtyDelta:   -1,
+		ReasonCode: "Damage",
+		AuthToken:  "admin-token",
+	})
+	if !errors.Is(err, appLicenseMode.ErrReadOnlyMode) {
+		t.Fatalf("expected ErrReadOnlyMode, got %v", err)
+	}
+}
+
+func TestService_CreateStockAdjustment_ForbiddenRole(t *testing.T) {
+	appLicenseMode.SetWriteEnforcer(nil)
+	svc := NewService(&fakeInventoryRepo{}, fixedRoleResolver(domainAuth.Role("Viewer"), nil), nil)
+
+	_, err := svc.CreateStockAdjustment(CreateStockAdjustmentInput{
+		ItemID:     10,
+		QtyDelta:   -1,
+		ReasonCode: "Damage",
+		AuthToken:  "viewer-token",
+	})
+	if err == nil {
+		t.Fatal("expected forbidden error")
+	}
+	typed, ok := err.(*ServiceError)
+	if !ok || typed.Code != "forbidden" {
+		t.Fatalf("expected forbidden ServiceError, got %v", err)
 	}
 }

@@ -40,6 +40,9 @@ type stubServerAPIApplication struct {
 	createConversionRuleFn   func(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error)
 	listConversionRulesFn    func(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error)
 	convertQuantityFn        func(input appInventory.ConvertQuantityInput) (app.UnitConversionResult, error)
+	createStockAdjFn         func(input appInventory.CreateStockAdjustmentInput) (app.StockAdjustmentResult, error)
+	listStockAdjFn           func(input appInventory.ListStockAdjustmentsInput) ([]app.StockAdjustmentResult, error)
+	getStockBalanceFn        func(input appInventory.GetItemStockBalanceInput) (float64, error)
 }
 
 func (s stubServerAPIApplication) Login(username, password string) (app.AuthTokenResult, error) {
@@ -103,6 +106,146 @@ func (s stubServerAPIApplication) CreateItemMaster(input appInventory.CreateItem
 		return s.createItemMasterFn(input)
 	}
 	return app.ItemMasterResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) UpdateItemMaster(input appInventory.UpdateItemInput) (app.ItemMasterResult, error) {
+	if s.updateItemMasterFn != nil {
+		return s.updateItemMasterFn(input)
+	}
+	return app.ItemMasterResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) ListItems(input appInventory.ListItemsInput) ([]app.ItemMasterResult, error) {
+	if s.listItemsFn != nil {
+		return s.listItemsFn(input)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) CreatePackagingProfile(input appInventory.CreatePackagingProfileInput) (app.PackagingProfileResult, error) {
+	if s.createPackagingProfileFn != nil {
+		return s.createPackagingProfileFn(input)
+	}
+	return app.PackagingProfileResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) ListPackagingProfiles(input appInventory.ListPackagingProfilesInput) ([]app.PackagingProfileResult, error) {
+	if s.listPackagingProfilesFn != nil {
+		return s.listPackagingProfilesFn(input)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) CreateRecipe(input appInventory.CreateRecipeInput) (app.RecipeResult, error) {
+	if s.createRecipeFn != nil {
+		return s.createRecipeFn(input)
+	}
+	return app.RecipeResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) UpdateRecipe(input appInventory.UpdateRecipeInput) (app.RecipeResult, error) {
+	if s.updateRecipeFn != nil {
+		return s.updateRecipeFn(input)
+	}
+	return app.RecipeResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) ListRecipes(input appInventory.ListRecipesInput) ([]app.RecipeResult, error) {
+	if s.listRecipesFn != nil {
+		return s.listRecipesFn(input)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) CreateParty(input appInventory.CreatePartyInput) (app.PartyResult, error) {
+	if s.createPartyFn != nil {
+		return s.createPartyFn(input)
+	}
+	return app.PartyResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) UpdateParty(input appInventory.UpdatePartyInput) (app.PartyResult, error) {
+	if s.updatePartyFn != nil {
+		return s.updatePartyFn(input)
+	}
+	return app.PartyResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) ListParties(input appInventory.ListPartiesInput) ([]app.PartyResult, error) {
+	if s.listPartiesFn != nil {
+		return s.listPartiesFn(input)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) ListMaterialLots(input appInventory.ListMaterialLotsInput) ([]app.MaterialLotResult, error) {
+	if s.listMaterialLotsFn != nil {
+		return s.listMaterialLotsFn(input)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) RecordLotStockMovement(input appInventory.RecordLotStockMovementInput) (app.LotStockMovementResult, error) {
+	if s.recordLotMovementFn != nil {
+		return s.recordLotMovementFn(input)
+	}
+	return app.LotStockMovementResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) ListLotStockMovements(input appInventory.ListLotStockMovementsInput) ([]app.LotStockMovementResult, error) {
+	if s.listLotMovementsFn != nil {
+		return s.listLotMovementsFn(input)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) CreateGRN(input appInventory.CreateGRNInput) (app.GRNResult, error) {
+	if s.createGRNFn != nil {
+		return s.createGRNFn(input)
+	}
+	return app.GRNResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) CreateUnitConversionRule(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error) {
+	if s.createConversionRuleFn != nil {
+		return s.createConversionRuleFn(input)
+	}
+	return app.UnitConversionRuleResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) ListUnitConversionRules(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error) {
+	if s.listConversionRulesFn != nil {
+		return s.listConversionRulesFn(input)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) ConvertQuantity(input appInventory.ConvertQuantityInput) (app.UnitConversionResult, error) {
+	if s.convertQuantityFn != nil {
+		return s.convertQuantityFn(input)
+	}
+	return app.UnitConversionResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) CreateStockAdjustment(input appInventory.CreateStockAdjustmentInput) (app.StockAdjustmentResult, error) {
+	if s.createStockAdjFn != nil {
+		return s.createStockAdjFn(input)
+	}
+	return app.StockAdjustmentResult{}, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) ListStockAdjustments(input appInventory.ListStockAdjustmentsInput) ([]app.StockAdjustmentResult, error) {
+	if s.listStockAdjFn != nil {
+		return s.listStockAdjFn(input)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (s stubServerAPIApplication) GetItemStockBalance(input appInventory.GetItemStockBalanceInput) (float64, error) {
+	if s.getStockBalanceFn != nil {
+		return s.getStockBalanceFn(input)
+	}
+	return 0, errors.New("not implemented")
 }
 
 func TestServerAPI_ListUsersSuccess(t *testing.T) {
@@ -176,125 +319,6 @@ func TestServerAPI_SetUserActiveSelfGuardReturnsConflict(t *testing.T) {
 		"is_active":  false,
 	})
 	assertErrorStatusAndMessage(t, rec, http.StatusConflict, "cannot disable your own account")
-}
-
-func (s stubServerAPIApplication) UpdateItemMaster(input appInventory.UpdateItemInput) (app.ItemMasterResult, error) {
-	if s.updateItemMasterFn != nil {
-		return s.updateItemMasterFn(input)
-	}
-	return app.ItemMasterResult{}, errors.New("not implemented")
-}
-
-func (s stubServerAPIApplication) ListItems(input appInventory.ListItemsInput) ([]app.ItemMasterResult, error) {
-	if s.listItemsFn != nil {
-		return s.listItemsFn(input)
-	}
-	return nil, errors.New("not implemented")
-}
-
-func (s stubServerAPIApplication) CreatePackagingProfile(input appInventory.CreatePackagingProfileInput) (app.PackagingProfileResult, error) {
-	if s.createPackagingProfileFn != nil {
-		return s.createPackagingProfileFn(input)
-	}
-	return app.PackagingProfileResult{}, errors.New("not implemented")
-}
-
-func (s stubServerAPIApplication) ListPackagingProfiles(input appInventory.ListPackagingProfilesInput) ([]app.PackagingProfileResult, error) {
-	if s.listPackagingProfilesFn != nil {
-		return s.listPackagingProfilesFn(input)
-	}
-	return nil, errors.New("not implemented")
-}
-
-func (s stubServerAPIApplication) CreateRecipe(input appInventory.CreateRecipeInput) (app.RecipeResult, error) {
-	if s.createRecipeFn != nil {
-		return s.createRecipeFn(input)
-	}
-	return app.RecipeResult{}, errors.New("not implemented")
-}
-
-func (s stubServerAPIApplication) UpdateRecipe(input appInventory.UpdateRecipeInput) (app.RecipeResult, error) {
-	if s.updateRecipeFn != nil {
-		return s.updateRecipeFn(input)
-	}
-	return app.RecipeResult{}, errors.New("not implemented")
-}
-
-func (s stubServerAPIApplication) ListRecipes(input appInventory.ListRecipesInput) ([]app.RecipeResult, error) {
-	if s.listRecipesFn != nil {
-		return s.listRecipesFn(input)
-	}
-	return nil, errors.New("not implemented")
-}
-
-func (s stubServerAPIApplication) CreateParty(input appInventory.CreatePartyInput) (app.PartyResult, error) {
-	if s.createPartyFn != nil {
-		return s.createPartyFn(input)
-	}
-	return app.PartyResult{}, errors.New("not implemented")
-}
-
-func (s stubServerAPIApplication) UpdateParty(input appInventory.UpdatePartyInput) (app.PartyResult, error) {
-	if s.updatePartyFn != nil {
-		return s.updatePartyFn(input)
-	}
-	return app.PartyResult{}, errors.New("not implemented")
-}
-
-func (s stubServerAPIApplication) ListParties(input appInventory.ListPartiesInput) ([]app.PartyResult, error) {
-	if s.listPartiesFn != nil {
-		return s.listPartiesFn(input)
-	}
-	return nil, errors.New("not implemented")
-}
-
-func (s stubServerAPIApplication) CreateGRN(input appInventory.CreateGRNInput) (app.GRNResult, error) {
-	if s.createGRNFn != nil {
-		return s.createGRNFn(input)
-	}
-	return app.GRNResult{}, errors.New("not implemented")
-}
-
-func (s stubServerAPIApplication) ListMaterialLots(input appInventory.ListMaterialLotsInput) ([]app.MaterialLotResult, error) {
-	if s.listMaterialLotsFn != nil {
-		return s.listMaterialLotsFn(input)
-	}
-	return nil, errors.New("not implemented")
-}
-
-func (s stubServerAPIApplication) RecordLotStockMovement(input appInventory.RecordLotStockMovementInput) (app.LotStockMovementResult, error) {
-	if s.recordLotMovementFn != nil {
-		return s.recordLotMovementFn(input)
-	}
-	return app.LotStockMovementResult{}, errors.New("not implemented")
-}
-
-func (s stubServerAPIApplication) ListLotStockMovements(input appInventory.ListLotStockMovementsInput) ([]app.LotStockMovementResult, error) {
-	if s.listLotMovementsFn != nil {
-		return s.listLotMovementsFn(input)
-	}
-	return nil, errors.New("not implemented")
-}
-
-func (s stubServerAPIApplication) CreateUnitConversionRule(input appInventory.CreateUnitConversionRuleInput) (app.UnitConversionRuleResult, error) {
-	if s.createConversionRuleFn != nil {
-		return s.createConversionRuleFn(input)
-	}
-	return app.UnitConversionRuleResult{}, errors.New("not implemented")
-}
-
-func (s stubServerAPIApplication) ListUnitConversionRules(input appInventory.ListUnitConversionRulesInput) ([]app.UnitConversionRuleResult, error) {
-	if s.listConversionRulesFn != nil {
-		return s.listConversionRulesFn(input)
-	}
-	return nil, errors.New("not implemented")
-}
-
-func (s stubServerAPIApplication) ConvertQuantity(input appInventory.ConvertQuantityInput) (app.UnitConversionResult, error) {
-	if s.convertQuantityFn != nil {
-		return s.convertQuantityFn(input)
-	}
-	return app.UnitConversionResult{}, errors.New("not implemented")
 }
 
 func TestServerAPI_LoginSuccess(t *testing.T) {
@@ -1232,6 +1256,107 @@ func TestServerAPI_ConvertQuantitySuccess(t *testing.T) {
 	}
 	if payload.QtyConverted != 0.5 || payload.SourceUnit != "GRAM" || payload.TargetUnit != "KG" {
 		t.Fatalf("unexpected response payload: %#v", payload)
+	}
+}
+
+func TestServerAPI_CreateStockAdjustmentSuccess(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		createStockAdjFn: func(input appInventory.CreateStockAdjustmentInput) (app.StockAdjustmentResult, error) {
+			if input.AuthToken != "operator-token" || input.ItemID != 11 || input.QtyDelta != -5 || input.ReasonCode != "Spoilage" {
+				t.Fatalf("unexpected create stock adjustment input: %+v", input)
+			}
+			return app.StockAdjustmentResult{
+				ID:         1,
+				ItemID:     11,
+				QtyDelta:   -5,
+				ReasonCode: "Spoilage",
+				CreatedBy:  "operator",
+			}, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/reconciliation/create", map[string]interface{}{
+		"auth_token":  "operator-token",
+		"item_id":     11,
+		"qty_delta":   -5,
+		"reason_code": "Spoilage",
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var payload app.StockAdjustmentResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.ID != 1 || payload.ReasonCode != "Spoilage" {
+		t.Fatalf("unexpected response payload: %#v", payload)
+	}
+}
+
+func TestServerAPI_CreateStockAdjustmentValidationError(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		createStockAdjFn: func(input appInventory.CreateStockAdjustmentInput) (app.StockAdjustmentResult, error) {
+			return app.StockAdjustmentResult{}, &appInventory.ServiceError{
+				Code:    "validation_failed",
+				Message: "stock adjustment validation failed",
+				Fields:  []appInventory.FieldError{{Field: "reason_code", Message: "reason_code is required"}},
+			}
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/reconciliation/create", map[string]interface{}{
+		"auth_token": "operator-token",
+		"item_id":    11,
+		"qty_delta":  -5,
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusBadRequest, "stock adjustment validation failed")
+}
+
+func TestServerAPI_CreateStockAdjustmentForbidden(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		createStockAdjFn: func(input appInventory.CreateStockAdjustmentInput) (app.StockAdjustmentResult, error) {
+			return app.StockAdjustmentResult{}, &appInventory.ServiceError{
+				Code:    "forbidden",
+				Message: "forbidden: insufficient role",
+			}
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/reconciliation/create", map[string]interface{}{
+		"auth_token": "viewer-token",
+		"item_id":    11,
+		"qty_delta":  -5,
+	})
+	assertErrorStatusAndMessage(t, rec, http.StatusForbidden, "forbidden: insufficient role")
+}
+
+func TestServerAPI_GetItemStockBalanceSuccess(t *testing.T) {
+	router := buildServerAPIRouter(stubServerAPIApplication{
+		getStockBalanceFn: func(input appInventory.GetItemStockBalanceInput) (float64, error) {
+			if input.AuthToken != "operator-token" || input.ItemID != 11 {
+				t.Fatalf("unexpected get stock balance input: %+v", input)
+			}
+			return 150.5, nil
+		},
+	})
+
+	rec := postJSON(t, router, "/inventory/reconciliation/balance", map[string]interface{}{
+		"auth_token": "operator-token",
+		"item_id":    11,
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var balance float64
+	if err := json.Unmarshal(rec.Body.Bytes(), &balance); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if balance != 150.5 {
+		t.Fatalf("expected balance 150.5, got %v", balance)
 	}
 }
 

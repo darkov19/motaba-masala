@@ -15,8 +15,9 @@ import (
 const ErrRecordModified = "Record modified by another user. Reload required."
 
 type Service struct {
-	repo         domainInventory.Repository
-	roleResolver func(authToken string) (domainAuth.Role, error)
+	repo             domainInventory.Repository
+	roleResolver     func(authToken string) (domainAuth.Role, error)
+	subjectResolver  func(authToken string) (string, error)
 }
 
 type FieldError struct {
@@ -190,6 +191,25 @@ type ListLotStockMovementsInput struct {
 	AuthToken string `json:"auth_token"`
 }
 
+type CreateStockAdjustmentInput struct {
+	ItemID     int64   `json:"item_id"`
+	LotID      *int64  `json:"lot_id,omitempty"`
+	QtyDelta   float64 `json:"qty_delta"`
+	ReasonCode string  `json:"reason_code"`
+	Notes      string  `json:"notes"`
+	AuthToken  string  `json:"auth_token"`
+}
+
+type ListStockAdjustmentsInput struct {
+	ItemID    int64  `json:"item_id"`
+	AuthToken string `json:"auth_token"`
+}
+
+type GetItemStockBalanceInput struct {
+	ItemID    int64  `json:"item_id"`
+	AuthToken string `json:"auth_token"`
+}
+
 type CreateUnitConversionRuleInput struct {
 	ItemID         *int64  `json:"item_id,omitempty"`
 	FromUnit       string  `json:"from_unit"`
@@ -217,11 +237,23 @@ type ConvertQuantityInput struct {
 	AuthToken  string  `json:"auth_token"`
 }
 
-func NewService(repo domainInventory.Repository, roleResolver func(authToken string) (domainAuth.Role, error)) *Service {
+func NewService(repo domainInventory.Repository, roleResolver func(authToken string) (domainAuth.Role, error), subjectResolver func(authToken string) (string, error)) *Service {
 	return &Service{
-		repo:         repo,
-		roleResolver: roleResolver,
+		repo:            repo,
+		roleResolver:    roleResolver,
+		subjectResolver: subjectResolver,
 	}
+}
+
+func (s *Service) resolveSubject(authToken string) string {
+	if s.subjectResolver == nil {
+		return "unknown"
+	}
+	subject, err := s.subjectResolver(authToken)
+	if err != nil || strings.TrimSpace(subject) == "" {
+		return "unknown"
+	}
+	return strings.TrimSpace(subject)
 }
 
 func (s *Service) resolveRole(authToken string) (domainAuth.Role, error) {
@@ -355,6 +387,12 @@ func mapValidationError(err error) error {
 		return &ServiceError{Code: "validation_failed", Message: "lot movement validation failed", Fields: []FieldError{{Field: "transaction_type", Message: domainInventory.ErrMovementTypeInvalid.Error()}}}
 	case errors.Is(err, domainInventory.ErrMovementQtyInvalid):
 		return &ServiceError{Code: "validation_failed", Message: "lot movement validation failed", Fields: []FieldError{{Field: "quantity", Message: domainInventory.ErrMovementQtyInvalid.Error()}}}
+	case errors.Is(err, domainInventory.ErrStockAdjReasonCodeRequired):
+		return &ServiceError{Code: "validation_failed", Message: "stock adjustment validation failed", Fields: []FieldError{{Field: "reason_code", Message: domainInventory.ErrStockAdjReasonCodeRequired.Error()}}}
+	case errors.Is(err, domainInventory.ErrStockAdjReasonCodeUnsupported):
+		return &ServiceError{Code: "validation_failed", Message: "stock adjustment validation failed", Fields: []FieldError{{Field: "reason_code", Message: domainInventory.ErrStockAdjReasonCodeUnsupported.Error()}}}
+	case errors.Is(err, domainInventory.ErrStockAdjQtyDeltaZero):
+		return &ServiceError{Code: "validation_failed", Message: "stock adjustment validation failed", Fields: []FieldError{{Field: "qty_delta", Message: domainInventory.ErrStockAdjQtyDeltaZero.Error()}}}
 	case errors.Is(err, domainInventory.ErrConversionFromUnitRequired):
 		return &ServiceError{Code: "validation_failed", Message: "conversion rule validation failed", Fields: []FieldError{{Field: "from_unit", Message: domainInventory.ErrConversionFromUnitRequired.Error()}}}
 	case errors.Is(err, domainInventory.ErrConversionToUnitRequired):
@@ -1022,4 +1060,39 @@ func (s *Service) UpdateGRN(grn *domainInventory.GRN) error {
 		return err
 	}
 	return nil
+}
+
+func (s *Service) CreateStockAdjustment(input CreateStockAdjustmentInput) (*domainInventory.StockAdjustment, error) {
+	if err := s.requireWriteAccess(input.AuthToken); err != nil {
+		return nil, err
+	}
+	adj := &domainInventory.StockAdjustment{
+		ItemID:     input.ItemID,
+		LotID:      input.LotID,
+		QtyDelta:   input.QtyDelta,
+		ReasonCode: input.ReasonCode,
+		Notes:      input.Notes,
+		CreatedBy:  s.resolveSubject(input.AuthToken),
+	}
+	if err := adj.Validate(); err != nil {
+		return nil, mapValidationError(err)
+	}
+	if err := s.repo.CreateStockAdjustment(adj); err != nil {
+		return nil, err
+	}
+	return adj, nil
+}
+
+func (s *Service) ListStockAdjustments(input ListStockAdjustmentsInput) ([]domainInventory.StockAdjustment, error) {
+	if err := s.requireReadAccess(input.AuthToken); err != nil {
+		return nil, err
+	}
+	return s.repo.ListStockAdjustments(input.ItemID)
+}
+
+func (s *Service) GetItemStockBalance(input GetItemStockBalanceInput) (float64, error) {
+	if err := s.requireReadAccess(input.AuthToken); err != nil {
+		return 0, err
+	}
+	return s.repo.GetItemStockBalance(input.ItemID)
 }

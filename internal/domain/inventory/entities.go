@@ -17,25 +17,31 @@ const (
 )
 
 var (
-	ErrItemNameRequired    = errors.New("item name is required")
-	ErrItemTypeRequired    = errors.New("item type is required")
-	ErrBaseUnitRequired    = errors.New("base unit is required")
-	ErrUnsupportedItemType = errors.New("unsupported item type")
-	ErrProfileNameRequired = errors.New("packaging profile name is required")
-	ErrPackModeRequired    = errors.New("pack mode is required")
-	ErrProfileComponents   = errors.New("at least one packaging component is required")
-	ErrComponentItemID     = errors.New("packing material item id is required")
-	ErrComponentQty        = errors.New("component qty_per_unit must be greater than zero")
-	ErrGRNNumberRequired   = errors.New("grn number is required")
-	ErrGRNSupplierRequired = errors.New("supplier id is required")
-	ErrGRNLinesRequired    = errors.New("at least one grn line is required")
-	ErrGRNLineItemID       = errors.New("grn line item id is required")
-	ErrGRNLineQuantity     = errors.New("grn line quantity must be greater than zero")
-	ErrGRNLineUnitPrice    = errors.New("grn line unit price must not be negative")
-	ErrLotNumberRequired   = errors.New("lot number is required")
-	ErrMovementTypeInvalid = errors.New("movement type must be OUT or ADJUSTMENT")
-	ErrMovementQtyInvalid  = errors.New("movement quantity must be greater than zero")
+	ErrItemNameRequired              = errors.New("item name is required")
+	ErrItemTypeRequired              = errors.New("item type is required")
+	ErrBaseUnitRequired              = errors.New("base unit is required")
+	ErrUnsupportedItemType           = errors.New("unsupported item type")
+	ErrProfileNameRequired           = errors.New("packaging profile name is required")
+	ErrPackModeRequired              = errors.New("pack mode is required")
+	ErrProfileComponents             = errors.New("at least one packaging component is required")
+	ErrComponentItemID               = errors.New("packing material item id is required")
+	ErrComponentQty                  = errors.New("component qty_per_unit must be greater than zero")
+	ErrGRNNumberRequired             = errors.New("grn number is required")
+	ErrGRNSupplierRequired           = errors.New("supplier id is required")
+	ErrGRNLinesRequired              = errors.New("at least one grn line is required")
+	ErrGRNLineItemID                 = errors.New("grn line item id is required")
+	ErrGRNLineQuantity               = errors.New("grn line quantity must be greater than zero")
+	ErrGRNLineUnitPrice              = errors.New("grn line unit price must not be negative")
+	ErrLotNumberRequired             = errors.New("lot number is required")
+	ErrMovementTypeInvalid           = errors.New("movement type must be OUT or ADJUSTMENT")
+	ErrMovementQtyInvalid            = errors.New("movement quantity must be greater than zero")
+	ErrStockAdjReasonCodeRequired    = errors.New("reason_code is required")
+	ErrStockAdjReasonCodeUnsupported = errors.New("reason_code is not a valid value")
+	ErrStockAdjQtyDeltaZero          = errors.New("qty_delta must not be zero")
 )
+
+// ValidReasonCodes is the exhaustive list of allowed reason_code values for stock adjustments.
+var ValidReasonCodes = []string{"Spoilage", "Audit Correction", "Damage", "Counting Error", "Other"}
 
 func ParseItemType(value string) ItemType {
 	return ItemType(strings.ToUpper(strings.TrimSpace(value)))
@@ -246,6 +252,43 @@ func (m *StockLedgerMovement) ValidateNonInbound() error {
 	}
 	if m.Quantity <= 0 {
 		return ErrMovementQtyInvalid
+	}
+	return nil
+}
+
+type StockAdjustment struct {
+	ID         int64     `json:"id"`
+	ItemID     int64     `json:"item_id"`
+	LotID      *int64    `json:"lot_id"`
+	QtyDelta   float64   `json:"qty_delta"`
+	ReasonCode string    `json:"reason_code"`
+	Notes      string    `json:"notes"`
+	CreatedBy  string    `json:"created_by"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+func (a *StockAdjustment) Validate() error {
+	if a == nil {
+		return errors.New("stock adjustment is nil")
+	}
+	a.ReasonCode = strings.TrimSpace(a.ReasonCode)
+	a.Notes = strings.TrimSpace(a.Notes)
+
+	if a.ReasonCode == "" {
+		return ErrStockAdjReasonCodeRequired
+	}
+	valid := false
+	for _, rc := range ValidReasonCodes {
+		if a.ReasonCode == rc {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		return ErrStockAdjReasonCodeUnsupported
+	}
+	if a.QtyDelta == 0 {
+		return ErrStockAdjQtyDeltaZero
 	}
 	return nil
 }

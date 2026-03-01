@@ -1406,3 +1406,67 @@ func (r *SqliteInventoryRepository) UpdateGRN(grn *domainInventory.GRN) error {
 
 	return r.db.QueryRowContext(context.Background(), "SELECT updated_at FROM grns WHERE id = ?", grn.ID).Scan(&grn.UpdatedAt)
 }
+
+func (r *SqliteInventoryRepository) CreateStockAdjustment(adj *domainInventory.StockAdjustment) error {
+	if adj.CreatedAt.IsZero() {
+		adj.CreatedAt = time.Now().UTC()
+	}
+
+	res, err := r.db.ExecContext(
+		context.Background(),
+		`INSERT INTO stock_adjustments (item_id, lot_id, qty_delta, reason_code, notes, created_by, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		adj.ItemID, adj.LotID, adj.QtyDelta, adj.ReasonCode, adj.Notes, adj.CreatedBy, adj.CreatedAt,
+	)
+	if err != nil {
+		return err
+	}
+	adj.ID, _ = res.LastInsertId()
+	return nil
+}
+
+func (r *SqliteInventoryRepository) ListStockAdjustments(itemID int64) ([]domainInventory.StockAdjustment, error) {
+	rows, err := r.db.QueryContext(
+		context.Background(),
+		`SELECT id, item_id, lot_id, qty_delta, reason_code, notes, created_by, created_at
+		 FROM stock_adjustments
+		 WHERE item_id = ?
+		 ORDER BY created_at DESC, id DESC`,
+		itemID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	adjustments := make([]domainInventory.StockAdjustment, 0)
+	for rows.Next() {
+		var adj domainInventory.StockAdjustment
+		if err := rows.Scan(
+			&adj.ID,
+			&adj.ItemID,
+			&adj.LotID,
+			&adj.QtyDelta,
+			&adj.ReasonCode,
+			&adj.Notes,
+			&adj.CreatedBy,
+			&adj.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		adjustments = append(adjustments, adj)
+	}
+	return adjustments, rows.Err()
+}
+
+func (r *SqliteInventoryRepository) GetItemStockBalance(itemID int64) (float64, error) {
+	var balance float64
+	err := r.db.QueryRowContext(
+		context.Background(),
+		`SELECT
+		  COALESCE((SELECT SUM(ml.quantity_received) FROM material_lots ml WHERE ml.item_id = ?), 0)
+		+ COALESCE((SELECT SUM(sa.qty_delta) FROM stock_adjustments sa WHERE sa.item_id = ?), 0)`,
+		itemID, itemID,
+	).Scan(&balance)
+	return balance, err
+}

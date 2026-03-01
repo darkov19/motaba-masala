@@ -52,4 +52,8 @@ type Repository interface {
 	RecordLotStockMovement(movement *StockLedgerMovement) error
 	ListLotStockMovements(filter StockLedgerMovementListFilter) ([]StockLedgerMovement, error)
 	UpdateGRN(grn *GRN) error
+
+	CreateStockAdjustment(adj *StockAdjustment) error
+	ListStockAdjustments(itemID int64) ([]StockAdjustment, error)
+	GetItemStockBalance(itemID int64) (float64, error)
 }

@@ -743,6 +743,17 @@ type LotStockMovementResult struct {
 	CreatedAt       string  `json:"created_at"`
 }
 
+type StockAdjustmentResult struct {
+	ID         int64   `json:"id"`
+	ItemID     int64   `json:"item_id"`
+	LotID      *int64  `json:"lot_id"`
+	QtyDelta   float64 `json:"qty_delta"`
+	ReasonCode string  `json:"reason_code"`
+	Notes      string  `json:"notes"`
+	CreatedBy  string  `json:"created_by"`
+	CreatedAt  string  `json:"created_at"`
+}
+
 type UnitConversionRuleResult struct {
 	ID             int64   `json:"id"`
 	ItemID         *int64  `json:"item_id,omitempty"`
@@ -1256,6 +1267,80 @@ func (a *App) CreateGRN(input appInventory.CreateGRNInput) (GRNResult, error) {
 		UpdatedAt:  grn.UpdatedAt.Format(time.RFC3339Nano),
 		Lines:      lines,
 	}, nil
+}
+
+func (a *App) CreateStockAdjustment(input appInventory.CreateStockAdjustmentInput) (StockAdjustmentResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result StockAdjustmentResult
+		if err := postToServerAPI("/inventory/reconciliation/create", input, &result); err != nil {
+			return StockAdjustmentResult{}, err
+		}
+		return result, nil
+	}
+	if a.inventoryService == nil {
+		return StockAdjustmentResult{}, fmt.Errorf("inventory service is not configured")
+	}
+
+	adj, err := a.inventoryService.CreateStockAdjustment(input)
+	if err != nil {
+		return StockAdjustmentResult{}, err
+	}
+	return StockAdjustmentResult{
+		ID:         adj.ID,
+		ItemID:     adj.ItemID,
+		LotID:      adj.LotID,
+		QtyDelta:   adj.QtyDelta,
+		ReasonCode: adj.ReasonCode,
+		Notes:      adj.Notes,
+		CreatedBy:  adj.CreatedBy,
+		CreatedAt:  adj.CreatedAt.Format(time.RFC3339Nano),
+	}, nil
+}
+
+func (a *App) ListStockAdjustments(input appInventory.ListStockAdjustmentsInput) ([]StockAdjustmentResult, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result []StockAdjustmentResult
+		if err := postToServerAPI("/inventory/reconciliation/list", input, &result); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+	if a.inventoryService == nil {
+		return nil, fmt.Errorf("inventory service is not configured")
+	}
+
+	adjustments, err := a.inventoryService.ListStockAdjustments(input)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]StockAdjustmentResult, 0, len(adjustments))
+	for _, adj := range adjustments {
+		result = append(result, StockAdjustmentResult{
+			ID:         adj.ID,
+			ItemID:     adj.ItemID,
+			LotID:      adj.LotID,
+			QtyDelta:   adj.QtyDelta,
+			ReasonCode: adj.ReasonCode,
+			Notes:      adj.Notes,
+			CreatedBy:  adj.CreatedBy,
+			CreatedAt:  adj.CreatedAt.Format(time.RFC3339Nano),
+		})
+	}
+	return result, nil
+}
+
+func (a *App) GetItemStockBalance(input appInventory.GetItemStockBalanceInput) (float64, error) {
+	if !a.isServer && a.inventoryService == nil {
+		var result float64
+		if err := postToServerAPI("/inventory/reconciliation/balance", input, &result); err != nil {
+			return 0, err
+		}
+		return result, nil
+	}
+	if a.inventoryService == nil {
+		return 0, fmt.Errorf("inventory service is not configured")
+	}
+	return a.inventoryService.GetItemStockBalance(input)
 }
 
 func (a *App) CreateUnitConversionRule(input appInventory.CreateUnitConversionRuleInput) (UnitConversionRuleResult, error) {

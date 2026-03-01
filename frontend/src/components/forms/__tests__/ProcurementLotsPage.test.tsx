@@ -4,16 +4,20 @@ import { ProcurementLotsPage } from "../ProcurementLotsPage";
 
 const listItemsMock = vi.fn();
 const listMaterialLotsMock = vi.fn();
+const getItemStockBalanceMock = vi.fn();
 
 vi.mock("../../../services/masterDataApi", () => ({
     listItems: (...args: unknown[]) => listItemsMock(...args),
     listMaterialLots: (...args: unknown[]) => listMaterialLotsMock(...args),
+    getItemStockBalance: (...args: unknown[]) => getItemStockBalanceMock(...args),
 }));
 
 describe("ProcurementLotsPage", () => {
     beforeEach(() => {
         listItemsMock.mockReset();
         listMaterialLotsMock.mockReset();
+        getItemStockBalanceMock.mockReset();
+        getItemStockBalanceMock.mockResolvedValue(0);
         listItemsMock.mockResolvedValue([
             {
                 id: 11,
@@ -168,5 +172,83 @@ describe("ProcurementLotsPage", () => {
 
         await waitFor(() => expect(listMaterialLotsMock).toHaveBeenCalledTimes(1));
         expect(screen.getByText("55.50")).toBeInTheDocument();
+    });
+
+    it("shows Low Stock tag when item balance is below minimum_stock", async () => {
+        listItemsMock.mockResolvedValue([
+            {
+                id: 11,
+                sku: "RAW-11",
+                name: "Red Chili",
+                item_type: "RAW",
+                base_unit: "kg",
+                item_subtype: "",
+                minimum_stock: 50,
+                is_active: true,
+                updated_at: new Date().toISOString(),
+            },
+        ]);
+        listMaterialLotsMock.mockResolvedValue([
+            {
+                id: 4,
+                lot_number: "LOT-20260228-003",
+                grn_id: 103,
+                grn_line_id: 4,
+                grn_number: "GRN-003",
+                item_id: 11,
+                supplier_name: "Test Supplier",
+                quantity_received: 10,
+                source_type: "SUPPLIER_GRN",
+                unit_cost: 0,
+                created_at: "2026-02-28T12:00:00Z",
+            },
+        ]);
+        // Stock balance (10) is below minimum_stock (50)
+        getItemStockBalanceMock.mockResolvedValue(10);
+
+        render(<ProcurementLotsPage onDirtyChange={vi.fn()} />);
+
+        await waitFor(() => expect(listMaterialLotsMock).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(getItemStockBalanceMock).toHaveBeenCalledWith(11));
+        expect(await screen.findByText("Low Stock")).toBeInTheDocument();
+    });
+
+    it("does not show Low Stock tag when balance meets minimum_stock", async () => {
+        listItemsMock.mockResolvedValue([
+            {
+                id: 11,
+                sku: "RAW-11",
+                name: "Red Chili",
+                item_type: "RAW",
+                base_unit: "kg",
+                item_subtype: "",
+                minimum_stock: 50,
+                is_active: true,
+                updated_at: new Date().toISOString(),
+            },
+        ]);
+        listMaterialLotsMock.mockResolvedValue([
+            {
+                id: 5,
+                lot_number: "LOT-20260228-004",
+                grn_id: 104,
+                grn_line_id: 5,
+                grn_number: "GRN-004",
+                item_id: 11,
+                supplier_name: "Test Supplier",
+                quantity_received: 100,
+                source_type: "SUPPLIER_GRN",
+                unit_cost: 0,
+                created_at: "2026-02-28T12:00:00Z",
+            },
+        ]);
+        // Stock balance (100) meets or exceeds minimum_stock (50)
+        getItemStockBalanceMock.mockResolvedValue(100);
+
+        render(<ProcurementLotsPage onDirtyChange={vi.fn()} />);
+
+        await waitFor(() => expect(listMaterialLotsMock).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(getItemStockBalanceMock).toHaveBeenCalledWith(11));
+        expect(screen.queryByText("Low Stock")).not.toBeInTheDocument();
     });
 });

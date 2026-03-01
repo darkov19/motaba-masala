@@ -22,6 +22,7 @@ import { PartyMasterForm } from "./components/forms/PartyMasterForm";
 import { PackagingProfileForm } from "./components/forms/PackagingProfileForm";
 import { AdminUserForm } from "./components/forms/AdminUserForm";
 import { ProcurementLotsPage } from "./components/forms/ProcurementLotsPage";
+import { StockReconciliationPage } from "./components/forms/StockReconciliationPage";
 import { useUnsavedChanges } from "./hooks/useUnsavedChanges";
 import { AppShell } from "./shell/AppShell";
 import {
@@ -241,6 +242,7 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         "party-master": false,
         grn: false,
         "procurement-lots": false,
+        "stock-reconciliation": false,
         batch: false,
         "packaging-profile": false,
         "system-users": false,
@@ -407,6 +409,7 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
             || dirtyByView["packaging-profile"]
             || dirtyByView["system-users"]
             || dirtyByView["procurement-lots"]
+            || dirtyByView["stock-reconciliation"]
             || dirtyByView.placeholder,
         [dirtyByView],
     );
@@ -444,6 +447,10 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
 
     const onProcurementLotsDirtyChange = useCallback((isDirty: boolean) => {
         setDirtyFor("procurement-lots", isDirty);
+    }, [setDirtyFor]);
+
+    const onStockReconciliationDirtyChange = useCallback((isDirty: boolean) => {
+        setDirtyFor("stock-reconciliation", isDirty);
     }, [setDirtyFor]);
 
     const onItemMasterDirtyChange = useCallback((isDirty: boolean) => {
@@ -620,6 +627,12 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                 return (
                     <ProcurementLotsPage
                         onDirtyChange={onProcurementLotsDirtyChange}
+                    />
+                );
+            case "stock-reconciliation":
+                return (
+                    <StockReconciliationPage
+                        onDirtyChange={onStockReconciliationDirtyChange}
                     />
                 );
             case "batch":

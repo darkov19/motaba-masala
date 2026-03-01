@@ -3,7 +3,7 @@ import type { AppMode } from "../context/ConnectionContext";
 export type UserRole = "admin" | "operator";
 export type ModuleKey = "dashboard" | "masters" | "procurement" | "production" | "packing" | "sales" | "reports" | "system";
 export type ActionKey = "view" | "create" | "edit" | "delete" | "approve" | "view_valuation" | "manage_system";
-export type ViewKey = "dashboard" | "grn" | "procurement-lots" | "batch" | "item-master" | "recipe-master" | "party-master" | "packaging-profile" | "system-users" | "placeholder";
+export type ViewKey = "dashboard" | "grn" | "procurement-lots" | "stock-reconciliation" | "batch" | "item-master" | "recipe-master" | "party-master" | "packaging-profile" | "system-users" | "placeholder";
 
 export type AppRoute = {
     id: string;
@@ -22,6 +22,7 @@ export const ROUTE_REGISTRY: AppRoute[] = [
     { id: "masters.parties", path: "/masters/parties", module: "masters", label: "Suppliers & Customers", minRole: "operator", viewKey: "party-master" },
     { id: "procurement.grn", path: "/procurement/grn", module: "procurement", label: "GRN", minRole: "operator", legacyPaths: ["/grn"], viewKey: "grn" },
     { id: "procurement.lots", path: "/procurement/lots", module: "procurement", label: "Lots", minRole: "operator", viewKey: "procurement-lots" },
+    { id: "procurement.reconciliation", path: "/procurement/reconciliation", module: "procurement", label: "Stock Reconciliation", minRole: "operator", viewKey: "stock-reconciliation" },
     { id: "production.batches", path: "/production/batches", module: "production", label: "Batches", minRole: "operator", legacyPaths: ["/batch"], viewKey: "batch" },
     { id: "production.execution", path: "/production/execution", module: "production", label: "Execution", minRole: "operator", viewKey: "placeholder" },
     { id: "packing.runs", path: "/packing/runs", module: "packing", label: "Packing Runs", minRole: "operator", viewKey: "placeholder" },
