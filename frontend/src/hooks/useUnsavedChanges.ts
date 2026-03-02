@@ -42,6 +42,19 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
     const quitInProgressRef = useRef(false);
     const quitDialogOpenRef = useRef(false);
 
+    const unsavedModalBaseProps = {
+        title: "Unsaved changes",
+        icon: createElement(ExclamationCircleFilled, {
+            style: { color: "#7D1111", fontSize: "24px" },
+        }),
+        centered: true,
+        okText: "Leave anyway",
+        cancelText: "Stay",
+        okButtonProps: { danger: true, size: "large" as const },
+        cancelButtonProps: { size: "large" as const },
+        width: 480,
+    };
+
     const requestQuit = () => {
         if (quitInProgressRef.current) {
             return;
@@ -78,10 +91,8 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
         }
 
         Modal.confirm({
-            title: "Unsaved changes",
+            ...unsavedModalBaseProps,
             content: message,
-            okText: "Leave anyway",
-            cancelText: "Stay",
             onOk: () => {
                 blocker.proceed();
             },
@@ -108,10 +119,8 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
 
                 quitDialogOpenRef.current = true;
                 Modal.confirm({
-                    title: "Unsaved changes",
+                    ...unsavedModalBaseProps,
                     content: message,
-                    okText: "Leave anyway",
-                    cancelText: "Stay",
                     onOk: () => {
                         requestQuit();
                     },
@@ -121,39 +130,55 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
                 });
             });
 
-            unsubscribeQuitConfirm = EventsOn("app:request-quit-confirm", () => {
-                trace("[UI][QuitFlow] app:request-quit-confirm event received");
-                if (quitInProgressRef.current || quitDialogOpenRef.current) {
-                    return;
-                }
-                quitDialogOpenRef.current = true;
-                const appLabel = appMode === "server" ? "Server" : "Client";
-                const exitLabel = appMode === "server" ? "Exit Server" : "Exit Client";
-                const runningLabel = appMode === "server" ? "Keep Running" : "Stay Open";
-                Modal.confirm({
-                    title: `Exit Masala Inventory ${appLabel}?`,
-                    content: isDirty
-                        ? "You have unsaved changes. Exiting now may lose recent edits. Do you want to exit anyway?"
-                        : appMode === "server"
-                            ? "The server will stop and connected clients may be disconnected. Do you want to exit now?"
-                            : "The client application will close. Do you want to exit now?",
-                    icon: createElement(ExclamationCircleFilled, {
-                        style: { color: "#7D1111" },
-                    }),
-                    centered: true,
-                    okText: exitLabel,
-                    cancelText: runningLabel,
-                    okButtonProps: { danger: true },
-                    onOk: () => {
-                        trace("[UI][QuitFlow] Confirm dialog accepted -> quitting");
-                        requestQuit();
-                    },
-                    onCancel: () => {
-                        quitDialogOpenRef.current = false;
-                        trace("[UI][QuitFlow] Confirm dialog cancelled -> keep running");
-                    },
-                });
-            });
+            unsubscribeQuitConfirm = EventsOn(
+                "app:request-quit-confirm",
+                () => {
+                    trace(
+                        "[UI][QuitFlow] app:request-quit-confirm event received",
+                    );
+                    if (
+                        quitInProgressRef.current ||
+                        quitDialogOpenRef.current
+                    ) {
+                        return;
+                    }
+                    quitDialogOpenRef.current = true;
+                    const appLabel = appMode === "server" ? "Server" : "Client";
+                    const exitLabel =
+                        appMode === "server" ? "Exit Server" : "Exit Client";
+                    const runningLabel =
+                        appMode === "server" ? "Keep Running" : "Stay Open";
+                    Modal.confirm({
+                        title: `Exit Masala Inventory ${appLabel}?`,
+                        content: isDirty
+                            ? "You have unsaved changes. Exiting now may lose recent edits. Do you want to exit anyway?"
+                            : appMode === "server"
+                              ? "The server will stop and connected clients may be disconnected. Do you want to exit now?"
+                              : "The client application will close. Do you want to exit now?",
+                        icon: createElement(ExclamationCircleFilled, {
+                            style: { color: "#7D1111", fontSize: "24px" },
+                        }),
+                        centered: true,
+                        width: 480,
+                        okText: exitLabel,
+                        cancelText: runningLabel,
+                        okButtonProps: { danger: true, size: "large" as const },
+                        cancelButtonProps: { size: "large" as const },
+                        onOk: () => {
+                            trace(
+                                "[UI][QuitFlow] Confirm dialog accepted -> quitting",
+                            );
+                            requestQuit();
+                        },
+                        onCancel: () => {
+                            quitDialogOpenRef.current = false;
+                            trace(
+                                "[UI][QuitFlow] Confirm dialog cancelled -> keep running",
+                            );
+                        },
+                    });
+                },
+            );
         } catch {
             // Ignore when runtime event bus is unavailable (non-Wails test/browser mode).
         }
@@ -164,7 +189,9 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
         };
     }, [appMode, isDirty, message]);
 
-    const confirmIfUnsaved = async (onConfirm: () => void): Promise<boolean> => {
+    const confirmIfUnsaved = async (
+        onConfirm: () => void,
+    ): Promise<boolean> => {
         if (!isDirty) {
             onConfirm();
             return true;
@@ -172,10 +199,8 @@ export function useUnsavedChanges(options: UseUnsavedChangesOptions) {
 
         return new Promise<boolean>(resolve => {
             Modal.confirm({
-                title: "Unsaved changes",
+                ...unsavedModalBaseProps,
                 content: message,
-                okText: "Leave anyway",
-                cancelText: "Stay",
                 onOk: () => {
                     onConfirm();
                     resolve(true);

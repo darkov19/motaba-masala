@@ -1,5 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Layout, Typography, Card, Space, Alert, Button, Form, Input, Spin, message } from "antd";
+import {
+    Layout,
+    Typography,
+    Card,
+    Space,
+    Alert,
+    Button,
+    Form,
+    Input,
+    Spin,
+    message,
+    Statistic,
+    Skeleton,
+} from "antd";
 import { useBlocker, useLocation, useNavigate } from "react-router-dom";
 import {
     EventsEmit,
@@ -95,7 +108,10 @@ type WindowWithAppBindings = Window & {
                 GetAutomationStatus?: () => Promise<AutomationStatus>;
                 RetryLockoutValidation?: () => Promise<LockoutRetryResult>;
                 GetSessionRole?: (authToken: string) => Promise<string>;
-                Login?: (username: string, password: string) => Promise<{ token: string; expires_at: number }>;
+                Login?: (
+                    username: string,
+                    password: string,
+                ) => Promise<{ token: string; expires_at: number }>;
             };
         };
     };
@@ -135,7 +151,9 @@ function WindowControls() {
     }, [syncMaximisedState]);
 
     const onMinimize = () => {
-        trace("[UI][WindowControls] Minimize clicked -> emit app:request-minimize");
+        trace(
+            "[UI][WindowControls] Minimize clicked -> emit app:request-minimize",
+        );
         try {
             EventsEmit("app:request-minimize");
         } catch {
@@ -145,7 +163,9 @@ function WindowControls() {
 
     const onHideToTray = () => {
         if (appMode === "server") {
-            trace("[UI][WindowControls] Close clicked -> emit app:request-hide-to-tray");
+            trace(
+                "[UI][WindowControls] Close clicked -> emit app:request-hide-to-tray",
+            );
             try {
                 EventsEmit("app:request-hide-to-tray");
             } catch {
@@ -154,7 +174,9 @@ function WindowControls() {
             return;
         }
 
-        trace("[UI][WindowControls] Close clicked -> emit app:request-quit-confirm");
+        trace(
+            "[UI][WindowControls] Close clicked -> emit app:request-quit-confirm",
+        );
         try {
             EventsEmit("app:request-quit-confirm");
         } catch {
@@ -176,8 +198,16 @@ function WindowControls() {
 
     return (
         <div className="window-controls">
-            <Button className="window-controls__btn" onClick={onMinimize} type="text" aria-label="Minimize">
-                <span className="window-controls__icon window-controls__icon--minimise" aria-hidden="true" />
+            <Button
+                className="window-controls__btn"
+                onClick={onMinimize}
+                type="text"
+                aria-label="Minimize"
+            >
+                <span
+                    className="window-controls__icon window-controls__icon--minimise"
+                    aria-hidden="true"
+                />
             </Button>
             <Button
                 className="window-controls__btn"
@@ -187,13 +217,23 @@ function WindowControls() {
             >
                 <span
                     className={`window-controls__icon ${
-                        isMaximised ? "window-controls__icon--restore" : "window-controls__icon--maximise"
+                        isMaximised
+                            ? "window-controls__icon--restore"
+                            : "window-controls__icon--maximise"
                     }`}
                     aria-hidden="true"
                 />
             </Button>
-            <Button className="window-controls__btn window-controls__btn--close" onClick={onHideToTray} type="text" aria-label="Hide to tray">
-                <span className="window-controls__icon window-controls__icon--close" aria-hidden="true" />
+            <Button
+                className="window-controls__btn window-controls__btn--close"
+                onClick={onHideToTray}
+                type="text"
+                aria-label="Hide to tray"
+            >
+                <span
+                    className="window-controls__icon window-controls__icon--close"
+                    aria-hidden="true"
+                />
             </Button>
         </div>
     );
@@ -201,7 +241,10 @@ function WindowControls() {
 
 function WindowTitleBar() {
     const { appMode } = useConnection();
-    const appTitle = appMode === "server" ? "Motaba Inventory Server" : "Motaba Inventory Client";
+    const appTitle =
+        appMode === "server"
+            ? "Motaba Inventory Server"
+            : "Motaba Inventory Client";
     return (
         <div className="window-titlebar" data-testid="app-shell-fixed-titlebar">
             <div className="window-titlebar__brand">
@@ -223,17 +266,27 @@ type LoginFormValues = {
     password: string;
 };
 
-function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWorkspaceProps) {
+function ResilienceWorkspace({
+    licenseStatus,
+    automationStatus,
+}: ResilienceWorkspaceProps) {
     const { appMode, isConnected, isChecking, retryNow } = useConnection();
     const navigate = useNavigate();
     const location = useLocation();
-    const [trustedSessionRole, setTrustedSessionRole] = useState<string | null>(null);
+    const [trustedSessionRole, setTrustedSessionRole] = useState<string | null>(
+        null,
+    );
     const [authLoading, setAuthLoading] = useState(true);
     const [authRequired, setAuthRequired] = useState(false);
     const [authMessage, setAuthMessage] = useState<string | null>(null);
     const [authSubmitting, setAuthSubmitting] = useState(false);
-    const role = useMemo<UserRole>(() => resolveUserRole(appMode, trustedSessionRole), [appMode, trustedSessionRole]);
-    const [unauthorizedMessage, setUnauthorizedMessage] = useState<string | null>(null);
+    const role = useMemo<UserRole>(
+        () => resolveUserRole(appMode, trustedSessionRole),
+        [appMode, trustedSessionRole],
+    );
+    const [unauthorizedMessage, setUnauthorizedMessage] = useState<
+        string | null
+    >(null);
     const [dirtyByView, setDirtyByView] = useState<Record<ViewKey, boolean>>({
         dashboard: false,
         placeholder: false,
@@ -247,13 +300,17 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         "packaging-profile": false,
         "system-users": false,
     });
-    const activeRoute = resolveRouteByPath(location.pathname) ?? getDefaultRouteForRole(role);
+    const activeRoute =
+        resolveRouteByPath(location.pathname) ?? getDefaultRouteForRole(role);
     const activeView = activeRoute.viewKey;
-    const writeDisabled = licenseStatus.status === "grace-period" || licenseStatus.status === "expired";
-    const suppressReconnectionOverlay = automationStatus?.enabled
-        && (automationStatus.current_check === "AC1"
-            || automationStatus.current_check === "AC2"
-            || automationStatus.current_check === "AC5");
+    const writeDisabled =
+        licenseStatus.status === "grace-period" ||
+        licenseStatus.status === "expired";
+    const suppressReconnectionOverlay =
+        automationStatus?.enabled &&
+        (automationStatus.current_check === "AC1" ||
+            automationStatus.current_check === "AC2" ||
+            automationStatus.current_check === "AC5");
     const activeViewDirty = dirtyByView[activeView];
 
     useEffect(() => {
@@ -270,7 +327,7 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                 return;
             }
             const expiry = resolveAuthExpiry();
-            if (expiry && Date.now() >= expiry*1000) {
+            if (expiry && Date.now() >= expiry * 1000) {
                 clearAuthSession();
                 if (mounted) {
                     setTrustedSessionRole(null);
@@ -313,71 +370,102 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         };
     }, [appMode]);
 
-    const forceLoginState = useCallback((reason: string) => {
-        clearAuthSession();
-        setTrustedSessionRole(null);
-        setAuthRequired(true);
-        setAuthLoading(false);
-        setAuthSubmitting(false);
-        setUnauthorizedMessage(null);
-        setAuthMessage(reason);
-        navigate("/dashboard", { replace: true });
-    }, [navigate]);
-
-    const handleLogin = useCallback(async (values: LoginFormValues) => {
-        const username = values.username.trim();
-        if (!username || !values.password) {
-            setAuthMessage("Username and password are required.");
-            return;
-        }
-        if (appMode === "client" && !isConnected) {
-            setAuthMessage("Cannot reach server. Start the Server app and try again.");
-            return;
-        }
-
-        setAuthSubmitting(true);
-        setAuthMessage(null);
-        try {
-            const tokenResult = await login(username, values.password);
-            if (!tokenResult?.token) {
-                throw new Error("Login did not return a session token.");
-            }
-            const trustedRole = await getSessionRole(tokenResult.token);
-            saveAuthSession(tokenResult.token, username, tokenResult.expires_at);
-            setTrustedSessionRole(trustedRole || null);
-            setUnauthorizedMessage(null);
-            setAuthRequired(false);
-            setAuthLoading(false);
-            navigate(getDefaultRouteForRole(resolveUserRole(appMode, trustedRole)).path, { replace: true });
-        } catch (error) {
-            const rawMessage = extractErrorMessage(error);
-            const normalized = rawMessage.toLowerCase();
-            const isNetworkFailure = normalized.includes("server request failed")
-                || normalized.includes("dial tcp")
-                || normalized.includes("connectex")
-                || normalized.includes("connection refused")
-                || normalized.includes("actively refused")
-                || normalized.includes("timeout");
-            if (appMode === "client" && (isNetworkFailure || !isConnected)) {
-                setAuthMessage("Cannot reach server. Start the Server app and verify network settings, then retry.");
-            } else {
-                setAuthMessage(rawMessage);
-            }
+    const forceLoginState = useCallback(
+        (reason: string) => {
+            clearAuthSession();
+            setTrustedSessionRole(null);
             setAuthRequired(true);
-        } finally {
+            setAuthLoading(false);
             setAuthSubmitting(false);
-        }
-    }, [appMode, isConnected, navigate]);
+            setUnauthorizedMessage(null);
+            setAuthMessage(reason);
+            navigate("/dashboard", { replace: true });
+        },
+        [navigate],
+    );
+
+    const handleLogin = useCallback(
+        async (values: LoginFormValues) => {
+            const username = values.username.trim();
+            if (!username || !values.password) {
+                setAuthMessage("Username and password are required.");
+                return;
+            }
+            if (appMode === "client" && !isConnected) {
+                setAuthMessage(
+                    "Cannot reach server. Start the Server app and try again.",
+                );
+                return;
+            }
+
+            setAuthSubmitting(true);
+            setAuthMessage(null);
+            try {
+                const tokenResult = await login(username, values.password);
+                if (!tokenResult?.token) {
+                    throw new Error("Login did not return a session token.");
+                }
+                const trustedRole = await getSessionRole(tokenResult.token);
+                saveAuthSession(
+                    tokenResult.token,
+                    username,
+                    tokenResult.expires_at,
+                );
+                setTrustedSessionRole(trustedRole || null);
+                setUnauthorizedMessage(null);
+                setAuthRequired(false);
+                setAuthLoading(false);
+                navigate(
+                    getDefaultRouteForRole(
+                        resolveUserRole(appMode, trustedRole),
+                    ).path,
+                    { replace: true },
+                );
+            } catch (error) {
+                const rawMessage = extractErrorMessage(error);
+                const normalized = rawMessage.toLowerCase();
+                const isNetworkFailure =
+                    normalized.includes("server request failed") ||
+                    normalized.includes("dial tcp") ||
+                    normalized.includes("connectex") ||
+                    normalized.includes("connection refused") ||
+                    normalized.includes("actively refused") ||
+                    normalized.includes("timeout");
+                if (
+                    appMode === "client" &&
+                    (isNetworkFailure || !isConnected)
+                ) {
+                    setAuthMessage(
+                        "Cannot reach server. Start the Server app and verify network settings, then retry.",
+                    );
+                } else {
+                    setAuthMessage(rawMessage);
+                }
+                setAuthRequired(true);
+            } finally {
+                setAuthSubmitting(false);
+            }
+        },
+        [appMode, isConnected, navigate],
+    );
 
     useEffect(() => {
         const onSessionExpired = (event: Event) => {
             const customEvent = event as CustomEvent<{ message?: string }>;
-            const messageText = customEvent.detail?.message || "Session expired. Please sign in again.";
+            const messageText =
+                customEvent.detail?.message ||
+                "Session expired. Please sign in again.";
             forceLoginState(messageText);
         };
-        window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, onSessionExpired as EventListener);
+        window.addEventListener(
+            AUTH_SESSION_EXPIRED_EVENT,
+            onSessionExpired as EventListener,
+        );
         return () => {
-            window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, onSessionExpired as EventListener);
+            window.removeEventListener(
+                AUTH_SESSION_EXPIRED_EVENT,
+                onSessionExpired as EventListener,
+            );
         };
     }, [forceLoginState]);
 
@@ -392,7 +480,9 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         }
 
         if (!canAccessRoute(role, route)) {
-            setUnauthorizedMessage(`Route ${route.id} is not available for your role.`);
+            setUnauthorizedMessage(
+                `Route ${route.id} is not available for your role.`,
+            );
             navigate(getDefaultRouteForRole(role).path, { replace: true });
             return;
         }
@@ -400,22 +490,23 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
 
     const hasUnsaved = useMemo(
         () =>
-            dirtyByView.dashboard
-            || dirtyByView.grn
-            || dirtyByView.batch
-            || dirtyByView["item-master"]
-            || dirtyByView["recipe-master"]
-            || dirtyByView["party-master"]
-            || dirtyByView["packaging-profile"]
-            || dirtyByView["system-users"]
-            || dirtyByView["procurement-lots"]
-            || dirtyByView["stock-reconciliation"]
-            || dirtyByView.placeholder,
+            dirtyByView.dashboard ||
+            dirtyByView.grn ||
+            dirtyByView.batch ||
+            dirtyByView["item-master"] ||
+            dirtyByView["recipe-master"] ||
+            dirtyByView["party-master"] ||
+            dirtyByView["packaging-profile"] ||
+            dirtyByView["system-users"] ||
+            dirtyByView["procurement-lots"] ||
+            dirtyByView["stock-reconciliation"] ||
+            dirtyByView.placeholder,
         [dirtyByView],
     );
     const blocker = useBlocker(
         ({ currentLocation, nextLocation }) =>
-            activeViewDirty && currentLocation.pathname !== nextLocation.pathname,
+            activeViewDirty &&
+            currentLocation.pathname !== nextLocation.pathname,
     );
 
     useUnsavedChanges({
@@ -437,63 +528,97 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         });
     }, []);
 
-    const onGRNDirtyChange = useCallback((isDirty: boolean) => {
-        setDirtyFor("grn", isDirty);
-    }, [setDirtyFor]);
+    const onGRNDirtyChange = useCallback(
+        (isDirty: boolean) => {
+            setDirtyFor("grn", isDirty);
+        },
+        [setDirtyFor],
+    );
 
-    const onBatchDirtyChange = useCallback((isDirty: boolean) => {
-        setDirtyFor("batch", isDirty);
-    }, [setDirtyFor]);
+    const onBatchDirtyChange = useCallback(
+        (isDirty: boolean) => {
+            setDirtyFor("batch", isDirty);
+        },
+        [setDirtyFor],
+    );
 
-    const onProcurementLotsDirtyChange = useCallback((isDirty: boolean) => {
-        setDirtyFor("procurement-lots", isDirty);
-    }, [setDirtyFor]);
+    const onProcurementLotsDirtyChange = useCallback(
+        (isDirty: boolean) => {
+            setDirtyFor("procurement-lots", isDirty);
+        },
+        [setDirtyFor],
+    );
 
-    const onStockReconciliationDirtyChange = useCallback((isDirty: boolean) => {
-        setDirtyFor("stock-reconciliation", isDirty);
-    }, [setDirtyFor]);
+    const onStockReconciliationDirtyChange = useCallback(
+        (isDirty: boolean) => {
+            setDirtyFor("stock-reconciliation", isDirty);
+        },
+        [setDirtyFor],
+    );
 
-    const onItemMasterDirtyChange = useCallback((isDirty: boolean) => {
-        setDirtyFor("item-master", isDirty);
-    }, [setDirtyFor]);
+    const onItemMasterDirtyChange = useCallback(
+        (isDirty: boolean) => {
+            setDirtyFor("item-master", isDirty);
+        },
+        [setDirtyFor],
+    );
 
-    const onRecipeMasterDirtyChange = useCallback((isDirty: boolean) => {
-        setDirtyFor("recipe-master", isDirty);
-    }, [setDirtyFor]);
+    const onRecipeMasterDirtyChange = useCallback(
+        (isDirty: boolean) => {
+            setDirtyFor("recipe-master", isDirty);
+        },
+        [setDirtyFor],
+    );
 
-    const onPartyMasterDirtyChange = useCallback((isDirty: boolean) => {
-        setDirtyFor("party-master", isDirty);
-    }, [setDirtyFor]);
+    const onPartyMasterDirtyChange = useCallback(
+        (isDirty: boolean) => {
+            setDirtyFor("party-master", isDirty);
+        },
+        [setDirtyFor],
+    );
 
-    const onPackagingProfileDirtyChange = useCallback((isDirty: boolean) => {
-        setDirtyFor("packaging-profile", isDirty);
-    }, [setDirtyFor]);
+    const onPackagingProfileDirtyChange = useCallback(
+        (isDirty: boolean) => {
+            setDirtyFor("packaging-profile", isDirty);
+        },
+        [setDirtyFor],
+    );
 
-    const guardedNavigate = useCallback((routeId: string, action: "view" | "create" = "view") => {
-        const route = getRouteById(routeId);
-        if (!route) {
-            return;
-        }
-        if (!canAccessRoute(role, route) || !canPerformAction(role, route.module, action)) {
-            setUnauthorizedMessage(`Role ${role} is not allowed to ${action} in ${route.module}.`);
-            return;
-        }
-        setUnauthorizedMessage(null);
-        navigate(route.path);
-    }, [navigate, role]);
+    const guardedNavigate = useCallback(
+        (routeId: string, action: "view" | "create" = "view") => {
+            const route = getRouteById(routeId);
+            if (!route) {
+                return;
+            }
+            if (
+                !canAccessRoute(role, route) ||
+                !canPerformAction(role, route.module, action)
+            ) {
+                setUnauthorizedMessage(
+                    `Role ${role} is not allowed to ${action} in ${route.module}.`,
+                );
+                return;
+            }
+            setUnauthorizedMessage(null);
+            navigate(route.path);
+        },
+        [navigate, role],
+    );
 
-    const isFormView = activeView === "grn"
-        || activeView === "batch"
-        || activeView === "item-master"
-        || activeView === "recipe-master"
-        || activeView === "party-master"
-        || activeView === "packaging-profile";
+    const isFormView =
+        activeView === "grn" ||
+        activeView === "batch" ||
+        activeView === "item-master" ||
+        activeView === "recipe-master" ||
+        activeView === "party-master" ||
+        activeView === "packaging-profile";
     const canCreateInMasters = canPerformAction(role, "masters", "create");
     const canCreateInPacking = canPerformAction(role, "packing", "create");
-    const isMasterSplitView = activeView === "item-master"
-        || activeView === "recipe-master"
-        || activeView === "party-master"
-        || activeView === "packaging-profile";
+    const isMasterSplitView =
+        activeView === "item-master" ||
+        activeView === "recipe-master" ||
+        activeView === "party-master" ||
+        activeView === "packaging-profile";
 
     const renderLicenseBanner = () => {
         if (licenseStatus.status === "expiring") {
@@ -502,7 +627,10 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                     banner
                     showIcon
                     type="warning"
-                    title={licenseStatus.message || `License expires in ${licenseStatus.days_remaining} days. Contact support to renew.`}
+                    title={
+                        licenseStatus.message ||
+                        `License expires in ${licenseStatus.days_remaining} days. Contact support to renew.`
+                    }
                 />
             );
         }
@@ -514,7 +642,10 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                     banner
                     showIcon
                     type="error"
-                    title={licenseStatus.message || `License Expired. Read-only mode active for ${daysLeft} more days.`}
+                    title={
+                        licenseStatus.message ||
+                        `License Expired. Read-only mode active for ${daysLeft} more days.`
+                    }
                 />
             );
         }
@@ -525,7 +656,10 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                     banner
                     showIcon
                     type="error"
-                    title={licenseStatus.message || "License expired. Application is locked. Contact support to renew."}
+                    title={
+                        licenseStatus.message ||
+                        "License expired. Application is locked. Contact support to renew."
+                    }
                 />
             );
         }
@@ -540,18 +674,34 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
 
         return (
             <Card size="small">
-                <Space orientation="vertical" size={6} style={{ width: "100%" }}>
+                <Space
+                    orientation="vertical"
+                    size={6}
+                    style={{ width: "100%" }}
+                >
                     <Text strong>Automation Status</Text>
-                    <Text>Current: {automationStatus.current_check || "Idle"}</Text>
-                    <Text type="secondary">{automationStatus.last_event || "Waiting..."}</Text>
-                    <Text type="secondary">Updated: {automationStatus.updated_at || "-"}</Text>
+                    <Text>
+                        Current: {automationStatus.current_check || "Idle"}
+                    </Text>
+                    <Text type="secondary">
+                        {automationStatus.last_event || "Waiting..."}
+                    </Text>
+                    <Text type="secondary">
+                        Updated: {automationStatus.updated_at || "-"}
+                    </Text>
                     {Object.keys(automationStatus.checks || {}).length > 0 ? (
-                        <Space orientation="vertical" size={2} style={{ width: "100%" }}>
-                            {Object.entries(automationStatus.checks).map(([check, status]) => (
-                                <Text key={check}>
-                                    {check}: {status}
-                                </Text>
-                            ))}
+                        <Space
+                            orientation="vertical"
+                            size={2}
+                            style={{ width: "100%" }}
+                        >
+                            {Object.entries(automationStatus.checks).map(
+                                ([check, status]) => (
+                                    <Text key={check}>
+                                        {check}: {status}
+                                    </Text>
+                                ),
+                            )}
                         </Space>
                     ) : null}
                 </Space>
@@ -562,25 +712,61 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
     const renderAdminDashboard = () => (
         <div className="dashboard-grid">
             <Card className="dashboard-kpi-card" size="small">
-                <Text type="secondary" className="dashboard-kpi-card__label">Stock Value Pipeline</Text>
-                <Title level={4} className="dashboard-kpi-card__value">{"Raw -> Bulk -> Finished"}</Title>
-                <Text type="secondary">Command-center valuation widgets attach here.</Text>
+                <Statistic
+                    title="Stock Value Pipeline"
+                    value="Raw -> Bulk -> Finished"
+                    loading={true}
+                />
+                <div style={{ marginTop: 16 }}>
+                    <Skeleton
+                        active
+                        paragraph={{ rows: 1, width: "100%" }}
+                        title={false}
+                    />
+                </div>
             </Card>
             <Card className="dashboard-kpi-card" size="small">
-                <Text type="secondary" className="dashboard-kpi-card__label">Critical Alerts</Text>
-                <Title level={4} className="dashboard-kpi-card__value">Priority Queue</Title>
-                <Text type="secondary">Low stock and service alerts are summarized first.</Text>
+                <Statistic
+                    title="Critical Alerts"
+                    value="Priority Queue"
+                    loading={true}
+                />
+                <div style={{ marginTop: 16 }}>
+                    <Skeleton
+                        active
+                        paragraph={{ rows: 1, width: "100%" }}
+                        title={false}
+                    />
+                </div>
             </Card>
             <Card className="dashboard-kpi-card" size="small">
-                <Text type="secondary" className="dashboard-kpi-card__label">Operations Pulse</Text>
-                <Title level={4} className="dashboard-kpi-card__value">Live Activity</Title>
-                <Text type="secondary">Recent GRN, Batch, and Dispatch activity appears here.</Text>
+                <Statistic
+                    title="Operations Pulse"
+                    value="Live Activity"
+                    loading={true}
+                />
+                <div style={{ marginTop: 16 }}>
+                    <Skeleton
+                        active
+                        paragraph={{ rows: 1, width: "100%" }}
+                        title={false}
+                    />
+                </div>
             </Card>
             <Card className="dashboard-panel" size="small" title="Admin Focus">
                 <ul className="dashboard-list">
-                    <li>Review valuation and low-stock exceptions before opening modules.</li>
-                    <li>Prioritize blocking risks first, then delegate transactional work.</li>
-                    <li>Use route menu to drill into Masters, Procurement, Production, and Reports.</li>
+                    <li>
+                        Review valuation and low-stock exceptions before opening
+                        modules.
+                    </li>
+                    <li>
+                        Prioritize blocking risks first, then delegate
+                        transactional work.
+                    </li>
+                    <li>
+                        Use route menu to drill into Masters, Procurement,
+                        Production, and Reports.
+                    </li>
                 </ul>
             </Card>
         </div>
@@ -590,23 +776,42 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         <div className="dashboard-grid">
             <Card className="dashboard-panel" size="small" title="Speed Hub">
                 <Text type="secondary">
-                    Use quick actions for rapid task entry, then continue with keyboard-first forms.
+                    Use quick actions for rapid task entry, then continue with
+                    keyboard-first forms.
                 </Text>
             </Card>
             <Card className="dashboard-kpi-card" size="small">
-                <Text type="secondary" className="dashboard-kpi-card__label">Ready Queue</Text>
-                <Title level={4} className="dashboard-kpi-card__value">GRN / Batch / Dispatch</Title>
-                <Text type="secondary">Operator flow starts from action-first entry points.</Text>
+                <Text type="secondary" className="dashboard-kpi-card__label">
+                    Ready Queue
+                </Text>
+                <Title level={4} className="dashboard-kpi-card__value">
+                    GRN / Batch / Dispatch
+                </Title>
+                <Text type="secondary">
+                    Operator flow starts from action-first entry points.
+                </Text>
             </Card>
             <Card className="dashboard-kpi-card" size="small">
-                <Text type="secondary" className="dashboard-kpi-card__label">Recent Work</Text>
-                <Title level={4} className="dashboard-kpi-card__value">Last Transactions</Title>
-                <Text type="secondary">Recent submissions are surfaced for quick verification.</Text>
+                <Text type="secondary" className="dashboard-kpi-card__label">
+                    Recent Work
+                </Text>
+                <Title level={4} className="dashboard-kpi-card__value">
+                    Last Transactions
+                </Title>
+                <Text type="secondary">
+                    Recent submissions are surfaced for quick verification.
+                </Text>
             </Card>
             <Card className="dashboard-kpi-card" size="small">
-                <Text type="secondary" className="dashboard-kpi-card__label">Form Readiness</Text>
-                <Title level={4} className="dashboard-kpi-card__value">Keyboard First</Title>
-                <Text type="secondary">Focus starts in primary fields for fast tab-entry rhythm.</Text>
+                <Text type="secondary" className="dashboard-kpi-card__label">
+                    Form Readiness
+                </Text>
+                <Title level={4} className="dashboard-kpi-card__value">
+                    Keyboard First
+                </Title>
+                <Text type="secondary">
+                    Focus starts in primary fields for fast tab-entry rhythm.
+                </Text>
             </Card>
         </div>
     );
@@ -614,7 +819,9 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
     const renderWorkspaceContent = () => {
         switch (activeView) {
             case "dashboard":
-                return role === "admin" ? renderAdminDashboard() : renderOperatorDashboard();
+                return role === "admin"
+                    ? renderAdminDashboard()
+                    : renderOperatorDashboard();
             case "grn":
                 return (
                     <GRNForm
@@ -689,49 +896,81 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
         }
     };
 
-    const workspaceTitle = activeView === "dashboard"
-        ? role === "admin"
-            ? "Admin Command Center"
-            : "Operator Speed Hub"
-        : activeRoute.label;
-    const workspaceSubtitle = activeView === "dashboard"
-        ? role === "admin"
-            ? "Decision-oriented overview with role-safe navigation and operational visibility."
-            : "Task-focused landing with quick operational entry points."
-        : "Role-aware shell navigation with backend-authoritative access controls.";
+    const workspaceTitle =
+        activeView === "dashboard"
+            ? role === "admin"
+                ? "Admin Command Center"
+                : "Operator Speed Hub"
+            : activeRoute.label;
+    const workspaceSubtitle =
+        activeView === "dashboard"
+            ? role === "admin"
+                ? "Decision-oriented overview with role-safe navigation and operational visibility."
+                : "Task-focused landing with quick operational entry points."
+            : "Role-aware shell navigation with backend-authoritative access controls.";
 
     const activeRouteId = activeRoute.id;
-    const contentDensity: "dashboard" | "form" | "default" | "master" = activeView === "dashboard"
-        ? "dashboard"
-        : isMasterSplitView
-            ? "master"
-            : isFormView
-            ? "form"
-            : "default";
+    const contentDensity: "dashboard" | "form" | "default" | "master" =
+        activeView === "dashboard"
+            ? "dashboard"
+            : isMasterSplitView
+              ? "master"
+              : isFormView
+                ? "form"
+                : "default";
 
     const handleLogout = useCallback(() => {
         forceLoginState("You have been logged out.");
     }, [forceLoginState]);
 
-    const authSurfaceTitle = appMode === "server" ? "Motaba Inventory Server" : "Motaba Inventory Client";
+    const authSurfaceTitle =
+        appMode === "server"
+            ? "Motaba Inventory Server"
+            : "Motaba Inventory Client";
 
     if (authLoading) {
         return (
-            <Layout className="app-shell auth-shell" style={{ minHeight: "100vh" }}>
+            <Layout
+                className="app-shell auth-shell"
+                style={{ minHeight: "100vh" }}
+            >
                 <WindowTitleBar />
                 <Content className="auth-gate">
                     <Card className="auth-gate__card" variant="borderless">
-                        <Space orientation="vertical" align="center" size={16} style={{ width: "100%" }}>
+                        <Space
+                            orientation="vertical"
+                            align="center"
+                            size={16}
+                            style={{ width: "100%" }}
+                        >
                             <div className="auth-gate__brand">
-                                <img src={logo} className="auth-gate__brand-logo" alt="Motaba logo" />
+                                <img
+                                    src={logo}
+                                    className="auth-gate__brand-logo"
+                                    alt="Motaba logo"
+                                />
                                 <div className="auth-gate__brand-copy">
-                                    <Text className="auth-gate__brand-kicker">Motaba</Text>
-                                    <Title level={4} className="auth-gate__brand-title">{authSurfaceTitle}</Title>
+                                    <Text className="auth-gate__brand-kicker">
+                                        Motaba
+                                    </Text>
+                                    <Title
+                                        level={4}
+                                        className="auth-gate__brand-title"
+                                    >
+                                        {authSurfaceTitle}
+                                    </Title>
                                 </div>
                             </div>
-                            <Space orientation="vertical" align="center" size={12} style={{ width: "100%" }}>
+                            <Space
+                                orientation="vertical"
+                                align="center"
+                                size={12}
+                                style={{ width: "100%" }}
+                            >
                                 <Spin />
-                                <Text type="secondary">Checking session...</Text>
+                                <Text type="secondary">
+                                    Checking session...
+                                </Text>
                             </Space>
                         </Space>
                     </Card>
@@ -742,21 +981,45 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
 
     if (authRequired) {
         return (
-            <Layout className="app-shell auth-shell" style={{ minHeight: "100vh" }}>
+            <Layout
+                className="app-shell auth-shell"
+                style={{ minHeight: "100vh" }}
+            >
                 <WindowTitleBar />
                 <Content className="auth-gate">
                     <Card className="auth-gate__card" variant="borderless">
-                        <Space orientation="vertical" size={14} style={{ width: "100%" }}>
+                        <Space
+                            orientation="vertical"
+                            size={14}
+                            style={{ width: "100%" }}
+                        >
                             <div className="auth-gate__brand">
-                                <img src={logo} className="auth-gate__brand-logo" alt="Motaba logo" />
+                                <img
+                                    src={logo}
+                                    className="auth-gate__brand-logo"
+                                    alt="Motaba logo"
+                                />
                                 <div className="auth-gate__brand-copy">
-                                    <Text className="auth-gate__brand-kicker">Motaba</Text>
-                                    <Title level={4} className="auth-gate__brand-title">{authSurfaceTitle}</Title>
+                                    <Text className="auth-gate__brand-kicker">
+                                        Motaba
+                                    </Text>
+                                    <Title
+                                        level={4}
+                                        className="auth-gate__brand-title"
+                                    >
+                                        {authSurfaceTitle}
+                                    </Title>
                                 </div>
                             </div>
-                            <Title level={3} className="auth-gate__title">Sign In</Title>
-                            <Text type="secondary" className="auth-gate__subtitle">
-                                Enter your credentials to access Masala Inventory Management.
+                            <Title level={3} className="auth-gate__title">
+                                Sign In
+                            </Title>
+                            <Text
+                                type="secondary"
+                                className="auth-gate__subtitle"
+                            >
+                                Enter your credentials to access Masala
+                                Inventory Management.
                             </Text>
                             {appMode === "client" && !isConnected ? (
                                 <Alert
@@ -764,28 +1027,49 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                                     showIcon
                                     title="Server unavailable"
                                     description="Client cannot reach the server. Start the server and retry connection."
-                                    action={(
-                                        <Button size="small" onClick={() => void retryNow()} loading={isChecking}>
+                                    action={
+                                        <Button
+                                            size="small"
+                                            onClick={() => void retryNow()}
+                                            loading={isChecking}
+                                        >
                                             Retry
                                         </Button>
-                                    )}
+                                    }
                                 />
                             ) : null}
                             {authMessage ? (
-                                <Alert type="warning" showIcon title={authMessage} />
+                                <Alert
+                                    type="warning"
+                                    showIcon
+                                    title={authMessage}
+                                />
                             ) : null}
-                            <Form<LoginFormValues> layout="vertical" onFinish={handleLogin}>
+                            <Form<LoginFormValues>
+                                layout="vertical"
+                                onFinish={handleLogin}
+                            >
                                 <Form.Item
                                     name="username"
                                     label="Username"
-                                    rules={[{ required: true, message: "Username is required" }]}
+                                    rules={[
+                                        {
+                                            required: true,
+                                            message: "Username is required",
+                                        },
+                                    ]}
                                 >
                                     <Input autoComplete="username" />
                                 </Form.Item>
                                 <Form.Item
                                     name="password"
                                     label="Password"
-                                    rules={[{ required: true, message: "Password is required" }]}
+                                    rules={[
+                                        {
+                                            required: true,
+                                            message: "Password is required",
+                                        },
+                                    ]}
                                 >
                                     <Input.Password autoComplete="current-password" />
                                 </Form.Item>
@@ -794,7 +1078,9 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                                     htmlType="submit"
                                     block
                                     loading={authSubmitting}
-                                    disabled={appMode === "client" && !isConnected}
+                                    disabled={
+                                        appMode === "client" && !isConnected
+                                    }
                                 >
                                     Sign In
                                 </Button>
@@ -828,13 +1114,17 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
             {activeView === "dashboard" ? (
                 <div className="workspace-quick-actions">
                     <Button
-                        onClick={() => guardedNavigate("procurement.grn", "create")}
+                        onClick={() =>
+                            guardedNavigate("procurement.grn", "create")
+                        }
                         disabled={writeDisabled}
                     >
                         New GRN
                     </Button>
                     <Button
-                        onClick={() => guardedNavigate("production.batches", "create")}
+                        onClick={() =>
+                            guardedNavigate("production.batches", "create")
+                        }
                         disabled={writeDisabled}
                     >
                         New Batch
@@ -846,7 +1136,9 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
                         Item Master
                     </Button>
                     <Button
-                        onClick={() => guardedNavigate("packing.materials", "view")}
+                        onClick={() =>
+                            guardedNavigate("packing.materials", "view")
+                        }
                         disabled={!canPerformAction(role, "packing", "view")}
                     >
                         Packaging Profiles
@@ -855,7 +1147,9 @@ function ResilienceWorkspace({ licenseStatus, automationStatus }: ResilienceWork
             ) : null}
 
             {renderWorkspaceContent()}
-            <ReconnectionOverlay suppress={Boolean(suppressReconnectionOverlay)} />
+            <ReconnectionOverlay
+                suppress={Boolean(suppressReconnectionOverlay)}
+            />
         </AppShell>
     );
 }
@@ -868,14 +1162,20 @@ const defaultLicenseStatus: LicenseStatus = {
 const degradedLicenseStatus: LicenseStatus = {
     status: "grace-period",
     days_remaining: 0,
-    message: "Unable to verify license status. Read-only mode is active until verification succeeds.",
+    message:
+        "Unable to verify license status. Read-only mode is active until verification succeeds.",
 };
 
 function App() {
-    const [recoveryState, setRecoveryState] = useState<RecoveryState | null>(null);
-    const [licenseStatus, setLicenseStatus] = useState<LicenseStatus>(defaultLicenseStatus);
-    const [lockoutState, setLockoutState] = useState<LicenseLockoutState | null>(null);
-    const [automationStatus, setAutomationStatus] = useState<AutomationStatus | null>(null);
+    const [recoveryState, setRecoveryState] = useState<RecoveryState | null>(
+        null,
+    );
+    const [licenseStatus, setLicenseStatus] =
+        useState<LicenseStatus>(defaultLicenseStatus);
+    const [lockoutState, setLockoutState] =
+        useState<LicenseLockoutState | null>(null);
+    const [automationStatus, setAutomationStatus] =
+        useState<AutomationStatus | null>(null);
     const [isLoadingRecovery, setIsLoadingRecovery] = useState(true);
     const [restoringBackup, setRestoringBackup] = useState<string | null>(null);
 
@@ -883,7 +1183,8 @@ function App() {
         let mounted = true;
 
         const loadRecoveryState = async () => {
-            const binding = (window as WindowWithAppBindings).go?.app?.App?.GetRecoveryState;
+            const binding = (window as WindowWithAppBindings).go?.app?.App
+                ?.GetRecoveryState;
             if (typeof binding !== "function") {
                 if (mounted) {
                     setRecoveryState(null);
@@ -904,7 +1205,8 @@ function App() {
         };
 
         const loadLockoutState = async () => {
-            const binding = (window as WindowWithAppBindings).go?.app?.App?.GetLicenseLockoutState;
+            const binding = (window as WindowWithAppBindings).go?.app?.App
+                ?.GetLicenseLockoutState;
             if (typeof binding !== "function") {
                 if (mounted) {
                     setLockoutState(null);
@@ -925,7 +1227,8 @@ function App() {
         };
 
         const loadLicenseStatus = async () => {
-            const binding = (window as WindowWithAppBindings).go?.app?.App?.GetLicenseStatus;
+            const binding = (window as WindowWithAppBindings).go?.app?.App
+                ?.GetLicenseStatus;
             if (typeof binding !== "function") {
                 if (mounted) {
                     setLicenseStatus(defaultLicenseStatus);
@@ -946,7 +1249,11 @@ function App() {
         };
 
         const initialize = async () => {
-            await Promise.all([loadRecoveryState(), loadLockoutState(), loadLicenseStatus()]);
+            await Promise.all([
+                loadRecoveryState(),
+                loadLockoutState(),
+                loadLicenseStatus(),
+            ]);
             if (mounted) {
                 setIsLoadingRecovery(false);
             }
@@ -967,7 +1274,9 @@ function App() {
         let unsubscribe: (() => void) | undefined;
         try {
             unsubscribe = EventsOn("app:request-open-dashboard", () => {
-                console.info("[UI][TrayFlow] app:request-open-dashboard event received");
+                console.info(
+                    "[UI][TrayFlow] app:request-open-dashboard event received",
+                );
                 try {
                     WindowShow();
                     WindowUnminimise();
@@ -987,7 +1296,8 @@ function App() {
     useEffect(() => {
         let mounted = true;
         const pollAutomationStatus = async () => {
-            const binding = (window as WindowWithAppBindings).go?.app?.App?.GetAutomationStatus;
+            const binding = (window as WindowWithAppBindings).go?.app?.App
+                ?.GetAutomationStatus;
             if (typeof binding !== "function") {
                 return;
             }
@@ -1022,17 +1332,30 @@ function App() {
             return {
                 enabled: true,
                 reason: "license-expired",
-                message: licenseStatus.message || "License expired. Application is locked.",
-                hardware_id: licenseStatus.hardware_id || lockoutState?.hardware_id || "",
+                message:
+                    licenseStatus.message ||
+                    "License expired. Application is locked.",
+                hardware_id:
+                    licenseStatus.hardware_id ||
+                    lockoutState?.hardware_id ||
+                    "",
             };
         }
         return null;
-    }, [licenseStatus.hardware_id, licenseStatus.message, licenseStatus.status, lockoutState]);
+    }, [
+        licenseStatus.hardware_id,
+        licenseStatus.message,
+        licenseStatus.status,
+        lockoutState,
+    ]);
 
     const onRestoreBackup = async (backupPath: string) => {
-        const restoreBinding = (window as WindowWithAppBindings).go?.app?.App?.RestoreBackup;
+        const restoreBinding = (window as WindowWithAppBindings).go?.app?.App
+            ?.RestoreBackup;
         if (typeof restoreBinding !== "function") {
-            message.error("Restore binding is unavailable in this environment.");
+            message.error(
+                "Restore binding is unavailable in this environment.",
+            );
             return;
         }
 
@@ -1041,7 +1364,10 @@ function App() {
             await restoreBinding(backupPath);
             message.success("Backup restore started. Server will restart.");
         } catch (error) {
-            const details = error instanceof Error ? error.message : "Unknown restore error";
+            const details =
+                error instanceof Error
+                    ? error.message
+                    : "Unknown restore error";
             message.error(`Restore failed: ${details}`);
         } finally {
             setRestoringBackup(null);
@@ -1069,11 +1395,12 @@ function App() {
 
     const onCopySupportMessage = async () => {
         const machineID = effectiveLockoutState?.hardware_id || "Unavailable";
-        const issue = effectiveLockoutState?.reason === "license-expired"
-            ? "License expired (grace period ended)"
-            : effectiveLockoutState?.reason === "clock-tamper"
-                ? "Clock tampering detected"
-                : "Hardware ID mismatch";
+        const issue =
+            effectiveLockoutState?.reason === "license-expired"
+                ? "License expired (grace period ended)"
+                : effectiveLockoutState?.reason === "clock-tamper"
+                  ? "Clock tampering detected"
+                  : "Hardware ID mismatch";
         const supportMessage = [
             "Lockout Diagnostics",
             `Issue: ${issue}`,
@@ -1091,21 +1418,30 @@ function App() {
     };
 
     const onRetryLockoutValidation = async () => {
-        const retryBinding = (window as WindowWithAppBindings).go?.app?.App?.RetryLockoutValidation;
+        const retryBinding = (window as WindowWithAppBindings).go?.app?.App
+            ?.RetryLockoutValidation;
         if (typeof retryBinding !== "function") {
-            message.error("Retry validation is unavailable in this environment.");
+            message.error(
+                "Retry validation is unavailable in this environment.",
+            );
             return;
         }
 
         try {
             const result = await retryBinding();
             if (result.passed) {
-                message.success(result.message || "Validation passed. Restart app to resume.");
+                message.success(
+                    result.message ||
+                        "Validation passed. Restart app to resume.",
+                );
             } else {
                 message.warning(result.message || "Validation still failing.");
             }
         } catch (error) {
-            const details = error instanceof Error ? error.message : "Unknown validation error";
+            const details =
+                error instanceof Error
+                    ? error.message
+                    : "Unknown validation error";
             message.error(`Retry validation failed: ${details}`);
         }
     };
@@ -1119,16 +1455,18 @@ function App() {
     };
 
     if (!isLoadingRecovery && effectiveLockoutState?.enabled) {
-        const heading = effectiveLockoutState.reason === "license-expired"
-            ? "License Expired. Application is locked."
-            : effectiveLockoutState.reason === "clock-tamper"
-                ? "Clock Tampering Detected. Application is locked."
-                : "Hardware ID Mismatch. Application is locked.";
-        const guidance = effectiveLockoutState.reason === "license-expired"
-            ? "Your grace period has ended. Contact support with this Hardware ID to renew your license."
-            : effectiveLockoutState.reason === "clock-tamper"
-                ? "Set system time correctly, then use Retry Validation. After validation passes, restart the app."
-                : "Contact support with this Hardware ID to request a new license.";
+        const heading =
+            effectiveLockoutState.reason === "license-expired"
+                ? "License Expired. Application is locked."
+                : effectiveLockoutState.reason === "clock-tamper"
+                  ? "Clock Tampering Detected. Application is locked."
+                  : "Hardware ID Mismatch. Application is locked.";
+        const guidance =
+            effectiveLockoutState.reason === "license-expired"
+                ? "Your grace period has ended. Contact support with this Hardware ID to renew your license."
+                : effectiveLockoutState.reason === "clock-tamper"
+                  ? "Set system time correctly, then use Retry Validation. After validation passes, restart the app."
+                  : "Contact support with this Hardware ID to request a new license.";
 
         return (
             <ConnectionProvider>
@@ -1136,7 +1474,11 @@ function App() {
                     <WindowTitleBar />
                     <Header className="app-header">
                         <Space align="center" size={16}>
-                            <img src={logo} className="app-header__logo" alt="logo" />
+                            <img
+                                src={logo}
+                                className="app-header__logo"
+                                alt="logo"
+                            />
                             <Title level={4} className="app-header__title">
                                 Masala Inventory Management
                             </Title>
@@ -1144,32 +1486,59 @@ function App() {
                     </Header>
                     <Content className="app-content">
                         <Card className="app-card" variant="borderless">
-                            <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+                            <Space
+                                orientation="vertical"
+                                size={16}
+                                style={{ width: "100%" }}
+                            >
                                 <Title level={3} style={{ marginBottom: 0 }}>
                                     {heading}
                                 </Title>
                                 <Alert
                                     type="error"
                                     showIcon
-                                    title={effectiveLockoutState.message || heading}
+                                    title={
+                                        effectiveLockoutState.message || heading
+                                    }
                                 />
-                                <Text type="secondary">
-                                    {guidance}
-                                </Text>
+                                <Text type="secondary">{guidance}</Text>
                                 <Card size="small">
-                                    <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
+                                    <Space
+                                        wrap
+                                        style={{
+                                            width: "100%",
+                                            justifyContent: "space-between",
+                                        }}
+                                    >
                                         <Text>
-                                            <Text type="secondary">Machine ID: </Text>
-                                            <Text code>{effectiveLockoutState.hardware_id || "Unavailable"}</Text>
+                                            <Text type="secondary">
+                                                Machine ID:{" "}
+                                            </Text>
+                                            <Text code>
+                                                {effectiveLockoutState.hardware_id ||
+                                                    "Unavailable"}
+                                            </Text>
                                         </Text>
                                         <Space>
-                                            <Button onClick={() => void onRetryLockoutValidation()}>
+                                            <Button
+                                                onClick={() =>
+                                                    void onRetryLockoutValidation()
+                                                }
+                                            >
                                                 Retry Validation
                                             </Button>
-                                            <Button type="primary" onClick={() => void onCopySupportMessage()}>
+                                            <Button
+                                                type="primary"
+                                                onClick={() =>
+                                                    void onCopySupportMessage()
+                                                }
+                                            >
                                                 Copy Diagnostics
                                             </Button>
-                                            <Button danger onClick={onExitApplication}>
+                                            <Button
+                                                danger
+                                                onClick={onExitApplication}
+                                            >
                                                 Exit
                                             </Button>
                                         </Space>
@@ -1190,7 +1559,11 @@ function App() {
                     <WindowTitleBar />
                     <Header className="app-header">
                         <Space align="center" size={16}>
-                            <img src={logo} className="app-header__logo" alt="logo" />
+                            <img
+                                src={logo}
+                                className="app-header__logo"
+                                alt="logo"
+                            />
                             <Title level={4} className="app-header__title">
                                 Masala Inventory Management
                             </Title>
@@ -1198,36 +1571,72 @@ function App() {
                     </Header>
                     <Content className="app-content">
                         <Card className="app-card" variant="borderless">
-                            <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+                            <Space
+                                orientation="vertical"
+                                size={16}
+                                style={{ width: "100%" }}
+                            >
                                 <Title level={3} style={{ marginBottom: 0 }}>
                                     Database Recovery Mode
                                 </Title>
                                 <Alert
                                     type="warning"
                                     showIcon
-                                    title={recoveryState.message || "Database recovery is required before normal startup."}
+                                    title={
+                                        recoveryState.message ||
+                                        "Database recovery is required before normal startup."
+                                    }
                                 />
                                 <Text type="secondary">
-                                    Select a backup archive to restore. The server will restart automatically after restore.
+                                    Select a backup archive to restore. The
+                                    server will restart automatically after
+                                    restore.
                                 </Text>
                                 {recoveryState.backups.length === 0 ? (
-                                    <Text type="secondary">No backups found in backups/ directory.</Text>
+                                    <Text type="secondary">
+                                        No backups found in backups/ directory.
+                                    </Text>
                                 ) : (
-                                    <Space orientation="vertical" size={12} style={{ width: "100%" }}>
-                                        {recoveryState.backups.map(backupPath => (
-                                            <Card key={backupPath} size="small">
-                                                <Space align="center" style={{ width: "100%", justifyContent: "space-between" }}>
-                                                    <Text code>{backupPath}</Text>
-                                                    <Button
-                                                        type="primary"
-                                                        loading={restoringBackup === backupPath}
-                                                        onClick={() => void onRestoreBackup(backupPath)}
+                                    <Space
+                                        orientation="vertical"
+                                        size={12}
+                                        style={{ width: "100%" }}
+                                    >
+                                        {recoveryState.backups.map(
+                                            backupPath => (
+                                                <Card
+                                                    key={backupPath}
+                                                    size="small"
+                                                >
+                                                    <Space
+                                                        align="center"
+                                                        style={{
+                                                            width: "100%",
+                                                            justifyContent:
+                                                                "space-between",
+                                                        }}
                                                     >
-                                                        Restore
-                                                    </Button>
-                                                </Space>
-                                            </Card>
-                                        ))}
+                                                        <Text code>
+                                                            {backupPath}
+                                                        </Text>
+                                                        <Button
+                                                            type="primary"
+                                                            loading={
+                                                                restoringBackup ===
+                                                                backupPath
+                                                            }
+                                                            onClick={() =>
+                                                                void onRestoreBackup(
+                                                                    backupPath,
+                                                                )
+                                                            }
+                                                        >
+                                                            Restore
+                                                        </Button>
+                                                    </Space>
+                                                </Card>
+                                            ),
+                                        )}
                                     </Space>
                                 )}
                             </Space>
@@ -1240,7 +1649,10 @@ function App() {
 
     return (
         <ConnectionProvider>
-            <ResilienceWorkspace licenseStatus={licenseStatus} automationStatus={automationStatus} />
+            <ResilienceWorkspace
+                licenseStatus={licenseStatus}
+                automationStatus={automationStatus}
+            />
         </ConnectionProvider>
     );
 }

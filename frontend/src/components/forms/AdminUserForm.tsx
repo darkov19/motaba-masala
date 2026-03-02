@@ -1,6 +1,30 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { DeleteOutlined, KeyOutlined, ReloadOutlined, SearchOutlined, UserOutlined } from "@ant-design/icons";
-import { Alert, Badge, Button, Card, Form, Input, Modal, Popconfirm, Segmented, Select, Space, Switch, Table, Tag, Tooltip, Typography, message } from "antd";
+import {
+    DeleteOutlined,
+    KeyOutlined,
+    ReloadOutlined,
+    SearchOutlined,
+    UserOutlined,
+} from "@ant-design/icons";
+import {
+    Alert,
+    Badge,
+    Button,
+    Card,
+    Form,
+    Input,
+    Modal,
+    Popconfirm,
+    Segmented,
+    Select,
+    Space,
+    Switch,
+    Table,
+    Tag,
+    Tooltip,
+    Typography,
+    message,
+} from "antd";
 import {
     createUser,
     deleteUser,
@@ -47,7 +71,11 @@ function resolveCurrentUsername(): string {
         return "";
     }
     try {
-        return (window.localStorage.getItem("username") || window.localStorage.getItem("user_name") || "").trim();
+        return (
+            window.localStorage.getItem("username") ||
+            window.localStorage.getItem("user_name") ||
+            ""
+        ).trim();
     } catch {
         return "";
     }
@@ -60,13 +88,18 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
     const [isLoadingUsers, setIsLoadingUsers] = useState(false);
     const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
     const [busyUserAction, setBusyUserAction] = useState<string | null>(null);
-    const [resetTargetUser, setResetTargetUser] = useState<UserAccount | null>(null);
+    const [resetTargetUser, setResetTargetUser] = useState<UserAccount | null>(
+        null,
+    );
     const [isSubmittingReset, setIsSubmittingReset] = useState(false);
     const [userSearch, setUserSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
 
     const currentUsername = useMemo(resolveCurrentUsername, []);
-    const normalizedCurrentUsername = useMemo(() => currentUsername.toLowerCase(), [currentUsername]);
+    const normalizedCurrentUsername = useMemo(
+        () => currentUsername.toLowerCase(),
+        [currentUsername],
+    );
 
     const loadUsers = useCallback(async () => {
         setIsLoadingUsers(true);
@@ -99,7 +132,11 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
         }
     };
 
-    const runUserMutation = async (username: string, operation: () => Promise<void>, successMessage: string) => {
+    const runUserMutation = async (
+        username: string,
+        operation: () => Promise<void>,
+        successMessage: string,
+    ) => {
         setBusyUserAction(username);
         try {
             await operation();
@@ -118,8 +155,11 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
         }
         await runUserMutation(
             user.username,
-            () => setUserActive({ username: user.username, is_active: isActive }),
-            isActive ? `Enabled "${user.username}".` : `Disabled "${user.username}".`,
+            () =>
+                setUserActive({ username: user.username, is_active: isActive }),
+            isActive
+                ? `Enabled "${user.username}".`
+                : `Disabled "${user.username}".`,
         );
     };
 
@@ -153,7 +193,9 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                 username: resetTargetUser.username,
                 new_password: values.new_password,
             });
-            message.success(`Password reset for "${resetTargetUser.username}".`);
+            message.success(
+                `Password reset for "${resetTargetUser.username}".`,
+            );
             setResetTargetUser(null);
             await loadUsers();
         } catch (error) {
@@ -165,14 +207,14 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
 
     const userStats = useMemo(() => {
         const total = users.length;
-        const active = users.filter((user) => user.is_active).length;
+        const active = users.filter(user => user.is_active).length;
         const disabled = total - active;
         return { total, active, disabled };
     }, [users]);
 
     const filteredUsers = useMemo(() => {
         const query = userSearch.trim().toLowerCase();
-        return users.filter((user) => {
+        return users.filter(user => {
             if (statusFilter === "active" && !user.is_active) {
                 return false;
             }
@@ -182,7 +224,10 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
             if (!query) {
                 return true;
             }
-            return user.username.toLowerCase().includes(query) || getRoleLabel(user.role).toLowerCase().includes(query);
+            return (
+                user.username.toLowerCase().includes(query) ||
+                getRoleLabel(user.role).toLowerCase().includes(query)
+            );
         });
     }, [statusFilter, userSearch, users]);
 
@@ -206,10 +251,18 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                         label="Username"
                         rules={[
                             { required: true, message: "Username is required" },
-                            { min: 3, message: "Username must be at least 3 characters" },
+                            {
+                                min: 3,
+                                message:
+                                    "Username must be at least 3 characters",
+                            },
                         ]}
                     >
-                        <Input autoComplete="username" placeholder="e.g. inventory.operator" />
+                        <Input
+                            autoComplete="username"
+                            placeholder="e.g. inventory.operator"
+                            style={{ maxWidth: 400 }}
+                        />
                     </Form.Item>
 
                     <Form.Item
@@ -219,26 +272,41 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                             { required: true, message: "Password is required" },
                         ]}
                     >
-                        <Input.Password autoComplete="new-password" placeholder="Enter secure password" />
+                        <Input.Password
+                            autoComplete="new-password"
+                            placeholder="Enter secure password"
+                            style={{ maxWidth: 400 }}
+                        />
                     </Form.Item>
 
                     <Form.Item
                         name="role"
                         label="Role"
-                        rules={[{ required: true, message: "Role is required" }]}
+                        rules={[
+                            { required: true, message: "Role is required" },
+                        ]}
                     >
                         <Select
+                            style={{ maxWidth: 400 }}
                             options={[
-                                { label: "Data Entry Operator", value: "operator" },
+                                {
+                                    label: "Data Entry Operator",
+                                    value: "operator",
+                                },
                                 { label: "Admin", value: "admin" },
                             ]}
                         />
                     </Form.Item>
 
-                    <Space orientation="vertical" size={8} style={{ width: "100%" }}>
+                    <Space
+                        orientation="vertical"
+                        size={8}
+                        style={{ width: "100%" }}
+                    >
                         {writeDisabled ? (
                             <Text type="warning">
-                                Write actions are currently disabled due to license state.
+                                Write actions are currently disabled due to
+                                license state.
                             </Text>
                         ) : null}
                         <Button
@@ -253,15 +321,12 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                 </Form>
             </Card>
 
-            <Card
-                size="small"
-                title="Existing Users"
-            >
+            <Card size="small" title="Existing Users">
                 <div className="existing-users-toolbar">
                     <Input
                         allowClear
                         value={userSearch}
-                        onChange={(event) => setUserSearch(event.target.value)}
+                        onChange={event => setUserSearch(event.target.value)}
                         prefix={<SearchOutlined />}
                         placeholder="Search by username or role"
                         className="existing-users-toolbar__search"
@@ -271,38 +336,69 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                             value={statusFilter}
                             onChange={setStatusFilter}
                             options={[
-                                { label: `All (${userStats.total})`, value: "all" },
-                                { label: `Active (${userStats.active})`, value: "active" },
-                                { label: `Disabled (${userStats.disabled})`, value: "disabled" },
+                                {
+                                    label: `All (${userStats.total})`,
+                                    value: "all",
+                                },
+                                {
+                                    label: `Active (${userStats.active})`,
+                                    value: "active",
+                                },
+                                {
+                                    label: `Disabled (${userStats.disabled})`,
+                                    value: "disabled",
+                                },
                             ]}
                         />
-                        <Button icon={<ReloadOutlined />} onClick={() => void loadUsers()} loading={isLoadingUsers}>
+                        <Button
+                            icon={<ReloadOutlined />}
+                            onClick={() => void loadUsers()}
+                            loading={isLoadingUsers}
+                        >
                             Refresh
                         </Button>
                     </Space>
                 </div>
                 <Space size={8} wrap className="existing-users-stats">
-                    <Tag className="existing-users-stats__tag existing-users-stats__tag--total">Total: {userStats.total}</Tag>
-                    <Tag className="existing-users-stats__tag existing-users-stats__tag--active">Active: {userStats.active}</Tag>
-                    <Tag className="existing-users-stats__tag existing-users-stats__tag--disabled">Disabled: {userStats.disabled}</Tag>
+                    <Tag className="existing-users-stats__tag existing-users-stats__tag--total">
+                        Total: {userStats.total}
+                    </Tag>
+                    <Tag className="existing-users-stats__tag existing-users-stats__tag--active">
+                        Active: {userStats.active}
+                    </Tag>
+                    <Tag className="existing-users-stats__tag existing-users-stats__tag--disabled">
+                        Disabled: {userStats.disabled}
+                    </Tag>
                 </Space>
                 <Table<UserAccount>
                     className="existing-users-table"
-                    rowKey={(record) => record.username}
+                    rowKey={record => record.username}
                     loading={isLoadingUsers}
                     dataSource={filteredUsers}
                     size="middle"
                     pagination={{ pageSize: 8 }}
                     scroll={{ x: 960 }}
-                    rowClassName={(record) => (record.is_active ? "" : "existing-users-table__row--inactive")}
-                    locale={{ emptyText: users.length > 0 ? "No users match the current filters." : "No users found." }}
+                    rowClassName={record =>
+                        record.is_active
+                            ? ""
+                            : "existing-users-table__row--inactive"
+                    }
+                    locale={{
+                        emptyText:
+                            users.length > 0
+                                ? "No users match the current filters."
+                                : "No users found.",
+                    }}
                     columns={[
                         {
                             title: "User",
                             dataIndex: "username",
                             key: "username",
                             render: (_, user) => {
-                                const isSelf = normalizedCurrentUsername !== "" && normalizedCurrentUsername === user.username.toLowerCase();
+                                const isSelf =
+                                    normalizedCurrentUsername !== "" &&
+                                    normalizedCurrentUsername ===
+                                        user.username.toLowerCase();
                                 return (
                                     <div className="existing-users-usercell">
                                         <span className="existing-users-usercell__avatar">
@@ -310,11 +406,23 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                                         </span>
                                         <div className="existing-users-usercell__meta">
                                             <Space size={8} wrap>
-                                                <Text strong>{user.username}</Text>
-                                                {isSelf ? <Tag color="blue">Current Session</Tag> : null}
+                                                <Text strong>
+                                                    {user.username}
+                                                </Text>
+                                                {isSelf ? (
+                                                    <Tag color="blue">
+                                                        Current Session
+                                                    </Tag>
+                                                ) : null}
                                             </Space>
-                                            <Text type="secondary" className="existing-users-usercell__subtle">
-                                                Created {formatDateTime(user.created_at)}
+                                            <Text
+                                                type="secondary"
+                                                className="existing-users-usercell__subtle"
+                                            >
+                                                Created{" "}
+                                                {formatDateTime(
+                                                    user.created_at,
+                                                )}
                                             </Text>
                                         </div>
                                     </div>
@@ -326,7 +434,11 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                             dataIndex: "role",
                             key: "role",
                             render: (value: UserAccount["role"]) => (
-                                <Tag color={value === "Admin" ? "gold" : "default"}>
+                                <Tag
+                                    color={
+                                        value === "Admin" ? "gold" : "default"
+                                    }
+                                >
                                     {getRoleLabel(value)}
                                 </Tag>
                             ),
@@ -336,7 +448,10 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                             dataIndex: "is_active",
                             key: "is_active",
                             render: (isActive: boolean) => (
-                                <Badge status={isActive ? "success" : "error"} text={isActive ? "Active" : "Disabled"} />
+                                <Badge
+                                    status={isActive ? "success" : "error"}
+                                    text={isActive ? "Active" : "Disabled"}
+                                />
                             ),
                         },
                         {
@@ -349,11 +464,15 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                             title: "Actions",
                             key: "actions",
                             render: (_, user) => {
-                                const isSelf = normalizedCurrentUsername !== "" && normalizedCurrentUsername === user.username.toLowerCase();
+                                const isSelf =
+                                    normalizedCurrentUsername !== "" &&
+                                    normalizedCurrentUsername ===
+                                        user.username.toLowerCase();
                                 const isBusy = busyUserAction === user.username;
-                                const disableToggleReason = isSelf && user.is_active
-                                    ? "You cannot disable your currently signed-in account."
-                                    : undefined;
+                                const disableToggleReason =
+                                    isSelf && user.is_active
+                                        ? "You cannot disable your currently signed-in account."
+                                        : undefined;
                                 const disableDeleteReason = isSelf
                                     ? "You cannot delete your currently signed-in account."
                                     : undefined;
@@ -364,11 +483,20 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                                             <span>
                                                 <Switch
                                                     checked={user.is_active}
-                                                    checkedChildren="Active"
-                                                    unCheckedChildren="Disabled"
                                                     loading={isBusy}
-                                                    disabled={writeDisabled || isBusy || Boolean(disableToggleReason)}
-                                                    onChange={(checked) => void handleSetActive(user, checked)}
+                                                    disabled={
+                                                        writeDisabled ||
+                                                        isBusy ||
+                                                        Boolean(
+                                                            disableToggleReason,
+                                                        )
+                                                    }
+                                                    onChange={checked =>
+                                                        void handleSetActive(
+                                                            user,
+                                                            checked,
+                                                        )
+                                                    }
                                                 />
                                             </span>
                                         </Tooltip>
@@ -385,17 +513,33 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                                             description="This action cannot be undone."
                                             okText="Delete"
                                             cancelText="Cancel"
-                                            onConfirm={() => handleDeleteUser(user)}
-                                            disabled={writeDisabled || isBusy || isSelf}
+                                            onConfirm={() =>
+                                                handleDeleteUser(user)
+                                            }
+                                            disabled={
+                                                writeDisabled ||
+                                                isBusy ||
+                                                isSelf
+                                            }
                                         >
-                                            <Tooltip title={disableDeleteReason}>
+                                            <Tooltip
+                                                title={disableDeleteReason}
+                                            >
                                                 <span>
                                                     <Button
                                                         danger
                                                         size="small"
-                                                        icon={<DeleteOutlined />}
+                                                        icon={
+                                                            <DeleteOutlined />
+                                                        }
                                                         loading={isBusy}
-                                                        disabled={writeDisabled || isBusy || Boolean(disableDeleteReason)}
+                                                        disabled={
+                                                            writeDisabled ||
+                                                            isBusy ||
+                                                            Boolean(
+                                                                disableDeleteReason,
+                                                            )
+                                                        }
                                                     >
                                                         Delete
                                                     </Button>
@@ -411,7 +555,11 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
             </Card>
 
             <Modal
-                title={resetTargetUser ? `Reset Password: ${resetTargetUser.username}` : "Reset Password"}
+                title={
+                    resetTargetUser
+                        ? `Reset Password: ${resetTargetUser.username}`
+                        : "Reset Password"
+                }
                 open={resetTargetUser !== null}
                 onCancel={closeResetModal}
                 onOk={() => resetForm.submit()}
@@ -428,10 +576,17 @@ export function AdminUserForm({ writeDisabled }: AdminUserFormProps) {
                         name="new_password"
                         label="New Password"
                         rules={[
-                            { required: true, message: "New password is required" },
+                            {
+                                required: true,
+                                message: "New password is required",
+                            },
                         ]}
                     >
-                        <Input.Password autoComplete="new-password" placeholder="Enter a temporary password" />
+                        <Input.Password
+                            autoComplete="new-password"
+                            placeholder="Enter a temporary password"
+                            style={{ maxWidth: 400 }}
+                        />
                     </Form.Item>
                 </Form>
             </Modal>

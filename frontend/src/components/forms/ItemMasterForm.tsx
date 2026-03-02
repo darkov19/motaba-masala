@@ -1,7 +1,23 @@
-import { Alert, Button, Form, Input, InputNumber, Segmented, Space, Switch, Table, message } from "antd";
+import {
+    Alert,
+    Button,
+    Form,
+    Input,
+    InputNumber,
+    Segmented,
+    Space,
+    Switch,
+    Table,
+    message,
+} from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createItem, ItemMaster, listItems, updateItem } from "../../services/masterDataApi";
+import {
+    createItem,
+    ItemMaster,
+    listItems,
+    updateItem,
+} from "../../services/masterDataApi";
 
 type ItemMasterFormValues = {
     id?: number;
@@ -35,11 +51,16 @@ const typeTitles: Record<ItemMaster["item_type"], string> = {
     FINISHED_GOOD: "Finished Goods Master",
 };
 
-export function ItemMasterForm({ onDirtyChange, writeDisabled = false, readOnly = false }: ItemMasterFormProps) {
+export function ItemMasterForm({
+    onDirtyChange,
+    writeDisabled = false,
+    readOnly = false,
+}: ItemMasterFormProps) {
     const navigate = useNavigate();
     const [form] = Form.useForm<ItemMasterFormValues>();
     const watchedValues = Form.useWatch([], form);
-    const [activeType, setActiveType] = useState<ItemMaster["item_type"]>("RAW");
+    const [activeType, setActiveType] =
+        useState<ItemMaster["item_type"]>("RAW");
     const [items, setItems] = useState<ItemMaster[]>([]);
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -78,7 +99,9 @@ export function ItemMasterForm({ onDirtyChange, writeDisabled = false, readOnly 
             const rows = await listItems(true, activeType);
             setItems(rows);
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "Failed to load items");
+            message.error(
+                error instanceof Error ? error.message : "Failed to load items",
+            );
         } finally {
             setLoading(false);
         }
@@ -90,7 +113,11 @@ export function ItemMasterForm({ onDirtyChange, writeDisabled = false, readOnly 
 
     const resetForm = () => {
         form.resetFields();
-        form.setFieldsValue({ is_active: true, item_type: activeType, minimum_stock: 0 });
+        form.setFieldsValue({
+            is_active: true,
+            item_type: activeType,
+            minimum_stock: 0,
+        });
         setEditingId(null);
         onDirtyChange(false);
     };
@@ -127,7 +154,9 @@ export function ItemMasterForm({ onDirtyChange, writeDisabled = false, readOnly 
             resetForm();
             await refresh();
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "Failed to save item");
+            message.error(
+                error instanceof Error ? error.message : "Failed to save item",
+            );
         } finally {
             setSubmitting(false);
         }
@@ -144,14 +173,22 @@ export function ItemMasterForm({ onDirtyChange, writeDisabled = false, readOnly 
                     const nextType = value as ItemMaster["item_type"];
                     setActiveType(nextType);
                     form.resetFields();
-                    form.setFieldsValue({ is_active: true, item_type: nextType, minimum_stock: 0 });
+                    form.setFieldsValue({
+                        is_active: true,
+                        item_type: nextType,
+                        minimum_stock: 0,
+                    });
                     setEditingId(null);
                     onDirtyChange(false);
                 }}
             />
             {activeType === "PACKING_MATERIAL" ? (
                 <div className="item-master-shortcuts">
-                    <Button type="link" className="item-master-shortcuts__link" onClick={() => navigate("/packing/materials")}>
+                    <Button
+                        type="link"
+                        className="item-master-shortcuts__link"
+                        onClick={() => navigate("/packing/materials")}
+                    >
                         Open Packaging Profiles
                     </Button>
                 </div>
@@ -164,7 +201,9 @@ export function ItemMasterForm({ onDirtyChange, writeDisabled = false, readOnly 
                     description="Your role can view Item Master records, but cannot create or edit in Masters."
                 />
             ) : null}
-            <div className={`item-master-split${readOnly ? " item-master-split--readonly" : ""}`}>
+            <div
+                className={`item-master-split${readOnly ? " item-master-split--readonly" : ""}`}
+            >
                 <div className="item-master-split__table">
                     <Table<ItemMaster>
                         rowKey="id"
@@ -174,88 +213,162 @@ export function ItemMasterForm({ onDirtyChange, writeDisabled = false, readOnly 
                         columns={[
                             { title: "Name", dataIndex: "name" },
                             { title: "Base Unit", dataIndex: "base_unit" },
-                            { title: "Subtype", dataIndex: "item_subtype" },
-                            { title: "SKU", dataIndex: "sku" },
+                            {
+                                title: "Subtype",
+                                dataIndex: "item_subtype",
+                                render: (val: string) =>
+                                    val ? (
+                                        val
+                                    ) : (
+                                        <span style={{ color: "#bfbfbf" }}>
+                                            —
+                                        </span>
+                                    ),
+                            },
+                            {
+                                title: "SKU",
+                                dataIndex: "sku",
+                                render: (val: string) =>
+                                    val ? (
+                                        val
+                                    ) : (
+                                        <span style={{ color: "#bfbfbf" }}>
+                                            —
+                                        </span>
+                                    ),
+                            },
                             ...(readOnly
                                 ? []
-                                : [{
-                                    title: "Actions",
-                                    key: "actions",
-                                    render: (_: unknown, row: ItemMaster) => (
-                                        <Button
-                                            size="small"
-                                            onClick={() => {
-                                                setEditingId(row.id);
-                                                form.setFieldsValue({
-                                                    id: row.id,
-                                                    sku: row.sku,
-                                                    name: row.name,
-                                                    item_type: row.item_type,
-                                                    base_unit: row.base_unit,
-                                                    item_subtype: row.item_subtype,
-                                                    minimum_stock: row.minimum_stock,
-                                                    is_active: row.is_active,
-                                                    updated_at: row.updated_at,
-                                                });
-                                                onDirtyChange(true);
-                                            }}
-                                            disabled={writeDisabled}
-                                        >
-                                            Edit
-                                        </Button>
-                                    ),
-                                }]),
+                                : [
+                                      {
+                                          title: "Actions",
+                                          key: "actions",
+                                          render: (
+                                              _: unknown,
+                                              row: ItemMaster,
+                                          ) => (
+                                              <Button
+                                                  size="small"
+                                                  onClick={() => {
+                                                      setEditingId(row.id);
+                                                      form.setFieldsValue({
+                                                          id: row.id,
+                                                          sku: row.sku,
+                                                          name: row.name,
+                                                          item_type:
+                                                              row.item_type,
+                                                          base_unit:
+                                                              row.base_unit,
+                                                          item_subtype:
+                                                              row.item_subtype,
+                                                          minimum_stock:
+                                                              row.minimum_stock,
+                                                          is_active:
+                                                              row.is_active,
+                                                          updated_at:
+                                                              row.updated_at,
+                                                      });
+                                                      onDirtyChange(true);
+                                                  }}
+                                                  disabled={writeDisabled}
+                                              >
+                                                  Edit
+                                              </Button>
+                                          ),
+                                      },
+                                  ]),
                         ]}
                     />
                 </div>
 
                 {!readOnly ? (
                     <div className="item-master-split__form">
-                    <Form
-                        form={form}
-                        layout="vertical"
-                        onFinish={onFinish}
-                        initialValues={{ is_active: true, item_type: activeType, minimum_stock: 0 }}
-                    >
-                        <Form.Item label="Item Name" name="name" rules={[{ required: true, message: "Item name is required" }]}>
-                            <Input autoFocus placeholder="Enter item name" />
-                        </Form.Item>
-                        <Form.Item label="Item Code (SKU)" name="sku">
-                            <Input placeholder="Optional SKU/code" />
-                        </Form.Item>
-                        <Space style={{ width: "100%" }} size={12} wrap>
-                            <Form.Item hidden name="item_type">
+                        <Form
+                            form={form}
+                            layout="vertical"
+                            onFinish={onFinish}
+                            initialValues={{
+                                is_active: true,
+                                item_type: activeType,
+                                minimum_stock: 0,
+                            }}
+                        >
+                            <Form.Item
+                                label="Item Name"
+                                name="name"
+                                rules={[
+                                    {
+                                        required: true,
+                                        message: "Item name is required",
+                                    },
+                                ]}
+                            >
+                                <Input
+                                    autoFocus
+                                    placeholder="Enter item name"
+                                />
+                            </Form.Item>
+                            <Form.Item label="Item Code (SKU)" name="sku">
+                                <Input placeholder="Optional SKU/code" />
+                            </Form.Item>
+                            <Space style={{ width: "100%" }} size={12} wrap>
+                                <Form.Item hidden name="item_type">
+                                    <Input />
+                                </Form.Item>
+                                <Form.Item
+                                    style={{ minWidth: 220, flex: 1 }}
+                                    label="Base Unit"
+                                    name="base_unit"
+                                    rules={[
+                                        {
+                                            required: true,
+                                            message: "Base unit is required",
+                                        },
+                                    ]}
+                                >
+                                    <Input placeholder="kg, g, pcs, ltr..." />
+                                </Form.Item>
+                            </Space>
+                            <Space style={{ width: "100%" }} size={12} wrap>
+                                <Form.Item
+                                    style={{ minWidth: 220 }}
+                                    label="Minimum Stock"
+                                    name="minimum_stock"
+                                >
+                                    <InputNumber
+                                        min={0}
+                                        style={{ width: "100%" }}
+                                    />
+                                </Form.Item>
+                                <Form.Item
+                                    style={{ minWidth: 220 }}
+                                    label="Active"
+                                    name="is_active"
+                                    valuePropName="checked"
+                                >
+                                    <Switch />
+                                </Form.Item>
+                            </Space>
+                            <Form.Item name="updated_at" hidden>
                                 <Input />
                             </Form.Item>
-                            <Form.Item
-                                style={{ minWidth: 220, flex: 1 }}
-                                label="Base Unit"
-                                name="base_unit"
-                                rules={[{ required: true, message: "Base unit is required" }]}
-                            >
-                                <Input placeholder="kg, g, pcs, ltr..." />
-                            </Form.Item>
-                        </Space>
-                        <Space style={{ width: "100%" }} size={12} wrap>
-                            <Form.Item style={{ minWidth: 220 }} label="Minimum Stock" name="minimum_stock">
-                                <InputNumber min={0} style={{ width: "100%" }} />
-                            </Form.Item>
-                            <Form.Item style={{ minWidth: 220 }} label="Active" name="is_active" valuePropName="checked">
-                                <Switch />
-                            </Form.Item>
-                        </Space>
-                        <Form.Item name="updated_at" hidden>
-                            <Input />
-                        </Form.Item>
-                        <Space>
-                            <Button type="primary" htmlType="submit" loading={submitting} disabled={writeDisabled}>
-                                {editingId ? "Update Item" : "Create Item"}
-                            </Button>
-                            <Button onClick={resetForm} disabled={writeDisabled || submitting}>
-                                Reset
-                            </Button>
-                        </Space>
-                    </Form>
+                            <Space>
+                                <Button
+                                    type="primary"
+                                    htmlType="submit"
+                                    loading={submitting}
+                                    disabled={writeDisabled}
+                                >
+                                    {editingId ? "Update Item" : "Create Item"}
+                                </Button>
+                                <Button
+                                    onClick={resetForm}
+                                    disabled={writeDisabled || submitting}
+                                >
+                                    Reset
+                                </Button>
+                            </Space>
+                        </Form>
                     </div>
                 ) : null}
             </div>
