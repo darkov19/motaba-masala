@@ -374,6 +374,7 @@ This story is intentionally sequenced after Story 2.2D shell UX conformance hard
 
 **Technical Notes:** Recipe Header (Output Item) -> Recipe Details (Input Items + Qty).
 Navigation access and role capability assumptions must remain consistent with `docs/navigation-rbac-contract.md`.
+**Planned Extension (Epic 4 prerequisite):** Recipes will gain an `is_percentage_base` flag (migration at Epic 4 start). When enabled, component quantities represent percentages of a 100-unit base, and the Recipe Builder UI will enforce that the sum of components equals 100%. Production runs use this to auto-scale to any target output quantity.
 
 ### Story 2.4: Supplier & Customer Masters
 
@@ -390,6 +391,26 @@ Navigation access and role capability assumptions must remain consistent with `d
 
 **Technical Notes:** Standard CRUD.
 Role and module access assumptions must remain consistent with `docs/navigation-rbac-contract.md`.
+
+### Story 2.5: Packaging Profile Edit Capability
+
+**As a** Data Entry Operator,
+**I want** to edit an existing Packaging Profile after it has been created,
+**So that** I can correct component quantities or add new components without deleting and recreating the profile.
+
+**Acceptance Criteria:**
+
+- **Given** an existing Packaging Profile (e.g., "100g Glass Jar Pack")
+- **When** I click "Edit" on the profile in the list
+- **Then** the PackagingProfile Builder opens pre-populated with all existing components
+- **And** I can update the `QtyPerUnit` for any existing component
+- **And** I can add new packing material components to the profile
+- **And** I can remove a component from the profile
+- **When** I save the updated profile
+- **Then** the changes are persisted and the profile is available for future Packing Runs
+- **And** any Packing Runs already completed using the old profile version are unaffected (historical integrity)
+
+**Technical Notes:** Currently the PackagingProfileForm has no edit path — only create is supported (identified in `ui_ux_recipe_packaging_plan.md`). Implement `UpdatePackagingProfile` backend method and wire the "Edit" action in the profile list to open the Builder in edit mode. Use the `PackagingProfileBuilder.tsx` component (introduced as Epic 4 UX prerequisite) for the edit UI. See [Recipe & Packaging Profile UX Plan](./ui_ux_recipe_packaging_plan.md).
 
 ---
 
@@ -494,11 +515,43 @@ Role and module access assumptions must remain consistent with `docs/navigation-
 
 **Technical Notes:** No deletion of transactions. Make a correcting entry (+/-).
 
+### Story 3.5: Auto-Suggest GRN Number & Item SKU
+
+**As a** Data Entry Operator,
+**I want** the system to suggest the next GRN number and Item SKU when I open the relevant forms,
+**So that** I don't have to manually track sequences or risk duplicate codes.
+
+**Acceptance Criteria:**
+
+- **Given** I open the "Create GRN" form
+- **When** the form mounts
+- **Then** the GRN Number field is pre-filled with the next suggested value in the format `GRN-{YYYYMMDD}-{DailySequence}` (e.g., `GRN-20260302-001`)
+- **And** I can clear and type a custom GRN number if I prefer
+
+- **Given** I open the "Create Item" form
+- **When** the form mounts and I select an Item Type
+- **Then** the SKU field is pre-filled with the next suggested value for that type prefix:
+    - `RAW-001` (Raw Materials)
+    - `BLK-001` (Bulk Powder)
+    - `PKG-001` (Packing Material)
+    - `FIN-001` (Finished Goods)
+- **And** I can clear and type a custom SKU if I prefer
+- **And** the suggestion updates if I change the Item Type before saving
+
+- **Given** two operators open the form simultaneously
+- **When** both submit with the same suggested value
+- **Then** the DB unique constraint on SKU / GRN number rejects the duplicate
+- **And** the losing operator sees a clear error and the form offers a new suggestion
+
+**Technical Notes:** Two new read-only Wails endpoints: `SuggestNextGRN()` and `SuggestNextSKU(itemType string)`. Each runs a MAX+1 query against the relevant table filtered by date (GRN) or type prefix (SKU). Frontend calls on form mount via `useEffect`; result is injected into field state. No reservation/locking — uniqueness enforced by DB constraint at save time.
+
 ---
 
 ## Epic 4: Production & Processing (The Core)
 
 **Goal:** Digitally track the physical transformation of spices to ensure accurate valuation and loss tracking.
+
+**UX Reference:** [Batches & Execution UX Plan](./ui_ux_batch_execution_plan.md) — `ProductionRunTerminal.tsx` and `PackingRunTerminal.tsx` replace standard forms with live "Mission Control" dashboards. Recipe Builder UX ([Recipe & Packaging Plan](./ui_ux_recipe_packaging_plan.md)) applies to the % base recipe editor introduced as an Epic 4 prerequisite.
 
 ### Story 4.1: Production Batch Creation
 
@@ -510,10 +563,13 @@ Role and module access assumptions must remain consistent with `docs/navigation-
 
 - **Given** the Production Schedule
 - **When** I create a new Batch `#BATCH-1001` for "Chili Powder Bulk"
+- **And** I enter the Target Output Quantity (e.g., 500 KG)
 - **Then** the status is set to "Planned"
-- **And** I can print a "Job Card" showing the required ingredients (from Recipe)
+- **And** the system pre-calculates required ingredient quantities (scaling % recipe by target if `is_percentage_base = true`)
+- **And** I can view a "Job Card" showing ingredient requirements with live stock availability indicators (sufficient / shortage) per ingredient
+- **And** the "Start Production" action is blocked if any required ingredient is in shortage
 
-**Technical Notes:** Batch Statuses: Planned, In-Progress, Completed.
+**Technical Notes:** Batch Statuses: Planned, In-Progress, Completed. Target quantity drives the YieldCalculator scaling at batch creation time.
 
 ### Story 4.2: Recipe Execution & Material Consumption
 
@@ -525,11 +581,14 @@ Role and module access assumptions must remain consistent with `docs/navigation-
 
 - **Given** a Batch in "In-Progress"
 - **When** I open the "Issue Materials" screen
-- **Then** the system shows the _Standard_ recipe quantities (e.g., 200KG Chili Raw)
+- **Then** the system shows the _Standard_ recipe quantities scaled to the target output (e.g., for a % recipe: Target 500KG × 40% = 200KG Chili Raw)
 - **But** the "Actual Issued" column starts BLANK (must be typed to ensure verification)
-- **When** I verify and save, "Chili Raw" stock decreases by the actual amount
+- **And** the operator may adjust any ingredient quantity (Override input per line)
+- **And** the operator may add an ingredient not on the base recipe ("Add Extra Ingredient")
+- **When** I verify and save, stock decreases by the ACTUAL consumed quantities (not the theoretical recipe quantities)
+- **And** the `stock_ledger` deductions reference the specific consumed lots
 
-**Technical Notes:** Link consumption to specific Raw Material Lots (FIFO suggestion).
+**Technical Notes:** Link consumption to specific Raw Material Lots (FIFO suggestion). Backend uses `ProductionRun` payload with `ActualConsumedComponents []ConsumedComponent` struct. Ledger deductions are driven entirely by the actual list.
 
 ### Story 4.3: Bulk Output & Wastage Recording
 
@@ -571,6 +630,8 @@ Role and module access assumptions must remain consistent with `docs/navigation-
 
 **Goal:** Manage conversion of Bulk Powder into Retail SKUs with full traceability and profile-driven packing-material deduction.
 
+**UX Reference:** [Batches & Execution UX Plan](./ui_ux_batch_execution_plan.md) — `PackingRunTerminal.tsx` handles the Packing Run flow including market segment selection, profile-driven feasibility check, and atomic dispatch.
+
 ### Story 5.1: Packing Run Creation
 
 **As a** Data Entry Operator,
@@ -582,6 +643,7 @@ Role and module access assumptions must remain consistent with `docs/navigation-
 - **Given** I have 100KG "Chili Powder (Bulk)" in stock
 - **When** I start a Packing Run for "Chili Powder 50g Pouch"
 - **And** I select the Source Bulk Batch `#BATCH-1001`
+- **And** I select the Market Segment (`REGULAR` or `ONLINE`) for the output Finished Goods
 - **Then** the system validates that sufficient bulk quantity exists
 - **And** when I select a profile-based pack type (e.g., Jar Pack), the run preloads all mapped packing-material components and required per-unit quantities
 - **And** the run validation checks both bulk quantity and all mapped packing-material component availability before allowing completion
@@ -619,7 +681,8 @@ Role and module access assumptions must remain consistent with `docs/navigation-
 
 - **Given** the packing is complete
 - **When** I confirm the output Quantity (e.g., 100 Boxes of 20 Pouches each)
-- **Then** "Chili Powder 50g Pouch" Finished Goods stock increases
+- **Then** "Chili Powder 50g Pouch" Finished Goods stock increases in the selected Market Segment pool (`REGULAR` or `ONLINE`)
+- **And** the FG batch is permanently tagged with that segment for all downstream dispatch and reporting queries
 - **And** the "Cost Price" of the FG is calculated (Bulk Cost + Packing Material Cost + Overheads)
 - **And** when a packaging profile is used, FG cost includes all consumed profile components (e.g., Jar Body + Lid + Cup Sticker) based on their effective item costs
 
@@ -631,6 +694,8 @@ Role and module access assumptions must remain consistent with `docs/navigation-
 
 **Goal:** Manage the outflow of Finished Goods and revenue realization.
 
+**UX Reference:** [Sales & Dispatch UX Plan](./ui_ux_sales_dispatch_plan.md) — `DispatchTerminal.tsx` with POS-style cart, FIFO auto-allocator, and market segment filtering. Returns flow handles GOOD vs DAMAGED condition routing.
+
 ### Story 6.1: Sales Order & Dispatch Note
 
 **As a** Sales Manager,
@@ -640,8 +705,10 @@ Role and module access assumptions must remain consistent with `docs/navigation-
 **Acceptance Criteria:**
 
 - **Given** a customer order
-- **When** I select items to dispatch
-- **Then** the system shows _Current Available Stock_
+- **When** I select a Customer and a Market Segment (`REGULAR` or `ONLINE`)
+- **And** I select items to dispatch
+- **Then** the system shows _Current Available Stock_ filtered to that segment
+- **And** prevents selecting Finished Good stock from a different segment
 - **And** prevents selecting "Bulk Powder" (as per FR-012)
 - **And** reduces stock upon confirmation
 
@@ -657,7 +724,8 @@ Role and module access assumptions must remain consistent with `docs/navigation-
 
 - **Given** I am dispatching "Garam Masala 100g"
 - **When** I need 50 Boxes
-- **Then** the system automatically selects the Batch with the _earliest expiry date_
+- **Then** the system automatically selects the oldest Batch within the selected Market Segment with the _earliest expiry date_
+- **And** batches from the other segment are never suggested or allocated
 - **But** allows me to manually override if needed
 
 **Technical Notes:** Default sorting by Expiry Date ASC.
@@ -697,6 +765,10 @@ Role and module access assumptions must remain consistent with `docs/navigation-
 ## Epic 7: Reporting & Analytics
 
 **Goal:** Provide visibility into financial value and operational efficiency.
+
+**UX Reference:** [Reporting & Analytics UX Plan](./ui_ux_reporting_plan.md) and [Dashboards UX Plan](./ui_ux_dashboards_plan.md).
+
+**Schema prerequisite:** `stock_ledger` table requires `unit_cost REAL` and `total_value REAL` columns (new migration at **Epic 4 start** — Production Runs are the first writers of financial context; Epic 7 reads what Epics 4–6 wrote). GRN creation populates inbound cost; Production Run execution transfers blended cost to bulk batch ledger entries.
 
 ### Story 7.1: Real-Time Stock Ledger
 
@@ -742,6 +814,34 @@ Role and module access assumptions must remain consistent with `docs/navigation-
 - **And** this log cannot be deleted from the UI
 
 **Technical Notes:** Immutable table `audit_logs`.
+
+### Story 7.4: Live Role-Specific Dashboards
+
+**As a** Business Owner (Admin) and Factory Operator,
+**I want** a dashboard that immediately shows what needs my attention when I log in,
+**So that** I don't have to navigate menus to find critical information.
+
+**Acceptance Criteria:**
+
+- **Given** an Admin logs in
+- **When** the dashboard route loads
+- **Then** the Admin sees the "Executive Command Center":
+    - Real-time total inventory value (Raw + Bulk + Packing + FG)
+    - "Bleed" alert widget: batches with actual wastage > expected wastage %
+    - Critical re-order alerts: items below `minimum_stock` threshold
+    - Recent activity stream: high-value system events with user attribution
+
+- **Given** a Data Entry Operator logs in
+- **When** the dashboard route loads
+- **Then** the Operator sees the "Factory Floor Hub":
+    - Quick Action buttons: Receive Goods (GRN), Start Production Run, Start Packing Run, Dispatch Order
+    - Resume draft card: if `useAutoSave` has a stored draft, prompt to resume
+    - Stock-out blockers: active recipes impossible to run due to shortages
+
+- **Given** a single backend call is made on dashboard load
+- **Then** one aggregator endpoint returns all data needed for the role view (`GetAdminDashboardStats` / `GetOperatorDashboardAlerts`)
+
+**Technical Notes:** Dedicated components `AdminDashboard.tsx` and `OperatorDashboard.tsx` under `frontend/src/pages/dashboards/`. Role determined from JWT token claim. Default `/` route redirects by role. Remove monolithic `renderDashboard` logic from `App.tsx`. See [Dashboards UX Plan](./ui_ux_dashboards_plan.md).
 
 ---
 

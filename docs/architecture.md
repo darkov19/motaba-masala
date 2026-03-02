@@ -70,8 +70,8 @@ masala_inventory_managment/
 | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------- |
 | **1. Core Foundation** | `internal/infrastructure/db` (SQLite), `internal/infrastructure/license` (HW Binding), `frontend/src/wailsjs` (Auth Bridge) |
 | **2. Master Data**     | `internal/domain/models` (Item, Recipe, PackagingProfile), `internal/app/commands` (CreateItem, CreatePackagingProfile)      |
-| **3. Procurement**     | `internal/app/commands` (CreateGRN), `internal/domain/services` (StockUpdator)                                              |
-| **4. Production**      | **Core Logic:** `internal/domain/services` (YieldCalculator, CostAverager). This is the "Brain".                            |
+| **3. Procurement**     | `internal/app/commands` (CreateGRN), `internal/domain/services` (StockUpdator), `SuggestNextGRN()` / `SuggestNextSKU(itemType)` Wails endpoints (read-only max-sequence queries, results pre-fill form fields on mount) |
+| **4. Production**      | **Core Logic:** `internal/domain/services` (YieldCalculator [% scaling], CostAverager, ExecutionService). `execution_service.go` handles atomic production run transactions. |
 | **5. Packing**         | `internal/app/commands` (ExecutePacking), `internal/domain/services` (UnitConverter)                                        |
 | **6. Sales/Dispatch**  | `internal/app/commands` (CreateDispatch), PDF Generator Adapter (Go libraries)                                              |
 | **7. Reporting**       | `internal/app/queries` (Complex SQL Aggregations for Valuation/Wastage)                                                     |
@@ -136,14 +136,25 @@ export default function App() {
 - **Server-Side Only:** Only `Server.exe` checks `BIOS UUID` + `Disk Serial`.
 - **Enforcement:** If Server license fails/expires, the RPC API shuts down. Clients automatically disconnect and show "Server License Expired".
 
+### 6. Execution Service Pattern (Production & Packing Runs)
+
+- **Dedicated Service:** `internal/app/inventory/execution_service.go` handles all atomic run transactions (Production Runs and Packing Runs). Kept separate from the general inventory service to isolate complexity.
+- **Atomic Transactions:** All execution commits use `tx.BeginTx` to lock rows, prevent race conditions, and write multiple ledger entries in a single DB transaction.
+- **Actual vs Theoretical:** Stock deductions are driven by `ActualConsumedComponents` (operator-verified actuals), not theoretical recipe quantities.
+- **Live Feasibility:** Before commit, the service runs a pre-flight stock check against all required lots and returns shortages to the UI for operator review.
+
+Rationale: The production engine is the highest-risk service in the system (multi-lot deductions + batch creation in one commit). Isolation and explicit transaction management prevent partial state.
+
 ## Data Architecture
 
 ### Core Models
 
 - `Item`: Canonical master entity (ID, SKU, Name, Type [`RAW`, `BULK_POWDER`, `PACKING_MATERIAL`, `FINISHED_GOOD`], BaseUnit, MinimumStock, Active, timestamps).
 - `Item Type Details`: Extension tables keyed by `item_id` for type-specific metadata (`raw_item_details`, `bulk_powder_item_details`, `packing_material_item_details`, `finished_good_item_details`).
-- `Batch`: Traceability unit (ID, ItemID, Qty, Cost, SourceBatchID [Parent]).
-- `StockLedger`: Immutable transaction log (Date, Type [GRN/PROD/SALE], QtyChange, ValueChange).
+- `Batch`: Traceability unit (ID, ItemID, Qty, Cost, SourceBatchID [Parent], MarketSegment [`REGULAR`, `ONLINE`] — set at Packing Run time for FINISHED_GOOD batches).
+- `StockLedger`: Immutable transaction log (Date, Type [GRN/PROD/SALE/PACK], QtyChange, ValueChange, MarketSegment [nullable — only populated for FG movements]).
+- `Recipe`: BOM definition (ID, OutputItemID, OutputQtyBase, ExpectedWastagePct, IsPercentageBase [bool, default false] — when true, OutputQtyBase is always 100 and all component InputQtyBase values represent percentages; sum of components minus ExpectedWastagePct must equal 100%).
+- `RecipeComponent`: Input line (RecipeID, InputItemID, InputQtyBase).
 - `PackagingProfile`: Reusable pack mapping (ID, Name, PackMode, IsActive) that links one pack mode to multiple packing-material components.
 - `PackagingProfileComponent`: Child rows (ProfileID, PackingMaterialItemID, QtyPerUnit) consumed atomically during packing execution.
 

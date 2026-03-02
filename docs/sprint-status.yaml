@@ -62,15 +62,17 @@ development_status:
     2-2-unit-conversion-engine: done
     2-3-recipe-bom-management: done
     2-4-supplier-customer-masters: done
+    2-5-packaging-profile-edit-capability: backlog
     epic-2-retrospective: done
 
     # Epic 3: Procurement & Inventory (Inbound)
-    epic-3: contexted
+    epic-3: done
     3-1-goods-received-note-grn-standard: done
     3-2-lot-tracking-system: done
     3-2b-procurement-lots-route-enablement: done
     3-3-third-party-bulk-procurement: done
     3-4-stock-reconciliation-audit: done
+    3-5-auto-suggest-grn-sku: backlog
     epic-3-retrospective: optional
 
     # Epic 4: Production & Processing (The Core)
@@ -101,4 +103,5 @@ development_status:
     7-1-real-time-stock-ledger: backlog
     7-2-wastage-analysis-report: backlog
     7-3-audit-trail-data-integrity: backlog
+    7-4-live-role-specific-dashboards: backlog
     epic-7-retrospective: optional
